@@ -32,19 +32,24 @@
 | AOTP | AOT 非互換パターン(避けるべき実装) |
 | AOTS | AOT 対策パターン(ライブラリ設計手法) |
 
-## 構成(予定)
+## 構成
 
 ```
 dotnet-performance/
-├── docs/         パターンカタログ
-├── src/          パターンごとの実装例(パターン ID に対応)
-└── benchmarks/   BenchmarkDotNet によるベンチマーク
+├── docs/                              パターンカタログ
+├── src/PerformancePatterns/           パターン実装(カテゴリ別フォルダ、パターン ID を XML ドキュメントに記載)
+├── tests/PerformancePatterns.Tests/   実装の正しさの検証(xunit)
+└── benchmarks/
+    └── PerformancePatterns.Benchmarks/  BenchmarkDotNet による効果実証(結果は benchmarks/results/ に記録)
 ```
+
+- 実装・テスト・ベンチマークはパターン ID(例: SEQ-02)でカタログと対応付ける
+- ベンチマークは [docs/benchmark-methodology.md](docs/benchmark-methodology.md) の規約(実行前 Verify・インターン回避・3 ランタイム比較)に従う
 
 ## ロードマップ
 
 1. [x] パターン一覧の整備
-2. [ ] パターンごとの実装例プロジェクトの作成
+2. [ ] パターンごとの実装例プロジェクトの作成(進行中: SEQ-02 から順次)
 3. [ ] ベンチマークによる効果の実証
 4. [ ] Source Generator を含む AOT 対応実装例の作成
-5. [ ] 拡充候補パターン(SearchValues / FrozenDictionary / SIMD 等)のドキュメント化
+5. [ ] 拡充候補パターン(SearchValues / SIMD 等)のドキュメント化

@@ -64,9 +64,9 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [BUF-02](#buf-02-ibufferwritert--getspan--advance-パターン) | IBufferWriter\<T\> + GetSpan / Advance | 出力バッファへの直接書き込み | ✅ | 未着手 |
 | [BUF-03](#buf-03-bufferwriterslimtスタックファースト書き込み) | BufferWriterSlim\<T\> | スタックファーストのバッファ書き込み | ✅ | 未着手 |
 | [BUF-04](#buf-04-memoryownertスコープ付きバッファ所有権) | MemoryOwner\<T\> | プールレンタルへの RAII スコープ付与 | ✅ | 未着手 |
-| [BUF-05](#buf-05-一時バッファの段階戦略stackalloc--arraypool-統合) | 一時バッファの段階戦略 | stackalloc/プールの閾値切替統合 | ✅ | 未着手 |
+| [BUF-05](#buf-05-一時バッファの段階戦略stackalloc--arraypool-統合) | 一時バッファの段階戦略 | stackalloc/プールの閾値切替統合 | ✅ | [実装](../src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
 | [SEQ-01](#seq-01-spanreadert--spanwritert) | SpanReader\<T\> / SpanWriter\<T\> | ゼロアロケーション逐次読み書き | ✅ | 未着手 |
-| [SEQ-02](#seq-02-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | 未着手 |
+| [SEQ-02](#seq-02-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | [実装](../src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-03](#seq-03-stream-構造体-io) | Stream 構造体 I/O | 構造体の直接バイナリ読み書き | ✅ | 未着手 |
 | [SEQ-04](#seq-04-遅延評価シーケンス処理batch--segment--traverse) | Batch / Segment / Traverse | 低アロケーションのシーケンス処理 | ✅ | 未着手 |
 | [COL-01](#col-01-collectionsmarshal-による内部直接アクセス) | CollectionsMarshal | List/Dictionary 内部への直接アクセス | ✅ | 未着手 |
@@ -74,7 +74,7 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [COL-03](#col-03-getalternatelookup-による-span-キー検索) | GetAlternateLookup | Span キーでの辞書検索 | ✅ | 未着手 |
 | [COL-04](#col-04-少数要素ルックアップの戦略選択) | 少数要素ルックアップ戦略 | 規模・形状に応じた実装選択 | ✅ | 未着手 |
 | [TXT-01](#txt-01-ルックアップテーブルによる整形変換) | ルックアップテーブル整形 | 固定書式整形のテーブル化 | ✅ | 未着手 |
-| [TXT-02](#txt-02-文字列構築の-stackalloc-ファースト化) | 文字列構築の stackalloc ファースト | StringBuilder 代替の低アロケーション構築 | ✅ | 未着手 |
+| [TXT-02](#txt-02-文字列構築の-stackalloc-ファースト化) | 文字列構築の stackalloc ファースト | StringBuilder 代替の低アロケーション構築 | ✅ | [実装](../src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [TXT-03](#txt-03-try-パターンによる例外回避) | Try パターン | 例外を制御フローに使わない | ✅ | 未着手 |
 | [TYP-01](#typ-01-静的型スロットtypemap--typeslot) | 静的型スロット(TypeMap / TypeSlot) | Type キー辞書の配列アクセス化 | ⚠️ | 未着手 |
 | [TYP-02](#typ-02-bitwisecomparert生バイト比較) | BitwiseComparer\<T\> | unmanaged 値型の生バイト比較 | ✅ | 未着手 |
@@ -958,36 +958,43 @@ ParsePacket(owner.Span);
 public ref struct TemporaryBuffer<T>
 {
     private T[]? pooled;
-    private readonly Span<T> span;
 
-    public TemporaryBuffer(Span<T> initial) => span = initial;
-
-    public TemporaryBuffer(int size)
+    public TemporaryBuffer(Span<T> initial, int length)
     {
-        pooled = ArrayPool<T>.Shared.Rent(size);
-        span = pooled.AsSpan(0, size);
+        Span = initial[..length];
     }
 
-    public readonly Span<T> Span => span;
+    public TemporaryBuffer(int length)
+    {
+        pooled = ArrayPool<T>.Shared.Rent(length);
+        Span = pooled.AsSpan(0, length);
+    }
+
+    public Span<T> Span { get; }
 
     public void Dispose()
     {
-        if (pooled is not null)
+        var toReturn = pooled;
+        if (toReturn is not null)
         {
-            ArrayPool<T>.Shared.Return(pooled);
             pooled = null;
+            ArrayPool<T>.Shared.Return(toReturn);
         }
     }
 }
 
-// 呼び出し側: 閾値で stackalloc とプールを切り替え
+// 呼び出し側: 閾値で stackalloc とプールを切り替え(どちらの経路でも Span は要求長ちょうど)
 using var buffer = size <= 512
-    ? new TemporaryBuffer<char>(stackalloc char[512])
+    ? new TemporaryBuffer<char>(stackalloc char[512], size)
     : new TemporaryBuffer<char>(size);
-Process(buffer.Span[..size]);
+Process(buffer.Span);
 ```
 
 **ユースケース:** エンコード変換、P/Invoke 用バッファ、一時ワーク領域全般。
+
+**リポジトリ内実装:** [TemporaryBuffer.cs](../src/PerformancePatterns/Buf/TemporaryBuffer.cs) / [テスト](../tests/PerformancePatterns.Tests/Buf/TemporaryBufferTest.cs) / [ベンチマーク](../benchmarks/PerformancePatterns.Benchmarks/Buf/TemporaryBufferBenchmark.cs) / [測定結果](../benchmarks/results/BUF-05-TemporaryBuffer.md)
+
+**実測結果(Ryzen 9 5900X / net8〜10):** 4096 要素では `new T[]` 比 0.11〜0.32 倍(3〜9 倍高速、ゼロ初期化コストの除去)+ 0B。64 要素の stackalloc 経路は `new` より僅かに遅い(5.1ns vs 3.5ns)が 88B → 0B — **小サイズの価値は速度ではなく GC 圧力ゼロ化**にある。`ArrayPool` 直接利用と比べると小サイズで有利(stackalloc 経路がプールアクセスを回避)。
 
 **注意:**
 
@@ -1048,6 +1055,10 @@ foreach (var token in new SpanTokenizer<char>(line.AsSpan(), ','))
 **ユースケース:** CSV 解析、プロトコルヘッダ分割、コマンド引数パース。
 
 **関連:** STK-01(ref struct) + STK-03(struct iterator) + JIT-02(IEquatable 制約)の複合適用例。.NET 9+ の `MemoryExtensions.Split` も同種の機能を提供するため、要件に応じて使い分ける。
+
+**リポジトリ内実装:** [SpanTokenizer.cs](../src/PerformancePatterns/Seq/SpanTokenizer.cs) / [テスト](../tests/PerformancePatterns.Tests/Seq/SpanTokenizerTest.cs) / [ベンチマーク](../benchmarks/PerformancePatterns.Benchmarks/Seq/SpanTokenizerBenchmark.cs) / [測定結果](../benchmarks/results/SEQ-02-SpanTokenizer.md)
+
+**実測結果(Ryzen 9 5900X / net8〜10):** `string.Split` 比で 4 トークン時 0.30〜0.34 倍(約 3 倍高速)・64 トークン時 0.62〜0.70 倍、アロケーションは 216B〜3,096B → **0B**。.NET 9+ の `MemoryExtensions.Split` と比べても 7〜26% 高速でコードサイズも小さい(548B vs 751B)。
 
 ---
 
@@ -1268,6 +1279,10 @@ var result = handler.ToStringAndClear();
 ```
 
 ValueStringBuilder(stackalloc 初期バッファ + ArrayPool 拡張の ref struct)は BCL 内部実装と同型で、BUF-03 / BUF-05 の文字列特化形として自前実装する価値がある。
+
+**リポジトリ内実装:** [ValueStringBuilder.cs](../src/PerformancePatterns/Txt/ValueStringBuilder.cs) / [テスト](../tests/PerformancePatterns.Tests/Txt/ValueStringBuilderTest.cs) / [ベンチマーク](../benchmarks/PerformancePatterns.Benchmarks/Txt/ValueStringBuilderBenchmark.cs) / [測定結果](../benchmarks/results/TXT-02-ValueStringBuilder.md)
+
+**実測結果(Ryzen 9 5900X / net8〜10、24 文字 × 4 連結):** 容量指定なし `StringBuilder` 比で ValueStringBuilder は 0.31〜0.33 倍(約 3.2 倍高速)、アロケーションは 760B → 216B(結果文字列のみ)。stackalloc 付き補間ハンドラとほぼ同速で、容量指定 `StringBuilder`(0.43〜0.47 倍)よりさらに速い。
 
 **ユースケース:** ログメッセージ、キー文字列生成、SQL/パス等の短文組み立て。
 
