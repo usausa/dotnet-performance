@@ -65,7 +65,7 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [BUF-03](#buf-03-bufferwriterslimtスタックファースト書き込み) | BufferWriterSlim\<T\> | スタックファーストのバッファ書き込み | ✅ | 未着手 |
 | [BUF-04](#buf-04-memoryownertスコープ付きバッファ所有権) | MemoryOwner\<T\> | プールレンタルへの RAII スコープ付与 | ✅ | 未着手 |
 | [BUF-05](#buf-05-一時バッファの段階戦略stackalloc--arraypool-統合) | 一時バッファの段階戦略 | stackalloc/プールの閾値切替統合 | ✅ | [実装](../src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
-| [SEQ-01](#seq-01-spanreadert--spanwritert) | SpanReader\<T\> / SpanWriter\<T\> | ゼロアロケーション逐次読み書き | ✅ | 未着手 |
+| [SEQ-01](#seq-01-spanreadert--spanwritert) | SpanReader\<T\> / SpanWriter\<T\> | ゼロアロケーション逐次読み書き | ✅ | [実装](../src/PerformancePatterns/Seq/SpanReader.cs) |
 | [SEQ-02](#seq-02-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | [実装](../src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-03](#seq-03-stream-構造体-io) | Stream 構造体 I/O | 構造体の直接バイナリ読み書き | ✅ | 未着手 |
 | [SEQ-04](#seq-04-遅延評価シーケンス処理batch--segment--traverse) | Batch / Segment / Traverse | 低アロケーションのシーケンス処理 | ✅ | 未着手 |
@@ -73,7 +73,7 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [COL-02](#col-02-frozendictionary-の条件付き採用) | FrozenDictionary 条件付き採用 | 不変辞書の検索高速化 | ✅ | 未着手 |
 | [COL-03](#col-03-getalternatelookup-による-span-キー検索) | GetAlternateLookup | Span キーでの辞書検索 | ✅ | 未着手 |
 | [COL-04](#col-04-少数要素ルックアップの戦略選択) | 少数要素ルックアップ戦略 | 規模・形状に応じた実装選択 | ✅ | 未着手 |
-| [TXT-01](#txt-01-ルックアップテーブルによる整形変換) | ルックアップテーブル整形 | 固定書式整形のテーブル化 | ✅ | 未着手 |
+| [TXT-01](#txt-01-ルックアップテーブルによる整形変換) | ルックアップテーブル整形 | 固定書式整形のテーブル化 | ✅ | [実装](../src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#txt-02-文字列構築の-stackalloc-ファースト化) | 文字列構築の stackalloc ファースト | StringBuilder 代替の低アロケーション構築 | ✅ | [実装](../src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [TXT-03](#txt-03-try-パターンによる例外回避) | Try パターン | 例外を制御フローに使わない | ✅ | 未着手 |
 | [TYP-01](#typ-01-静的型スロットtypemap--typeslot) | 静的型スロット(TypeMap / TypeSlot) | Type キー辞書の配列アクセス化 | ⚠️ | 未着手 |
@@ -1029,6 +1029,10 @@ var payload = reader.Read(length);
 
 **ユースケース:** バイナリプロトコル解析、ファイルフォーマットパーサー、カスタムシリアライザ。
 
+**リポジトリ内実装:** [SpanReader.cs](../src/PerformancePatterns/Seq/SpanReader.cs) / [SpanWriter.cs](../src/PerformancePatterns/Seq/SpanWriter.cs) / [拡張](../src/PerformancePatterns/Seq/SpanReaderWriterExtensions.cs) / [テスト](../tests/PerformancePatterns.Tests/Seq/SpanReaderWriterTest.cs) / [ベンチマーク](../benchmarks/PerformancePatterns.Benchmarks/Seq/SpanReaderBenchmark.cs) / [測定結果](../benchmarks/results/SEQ-01-SpanReader.md)
+
+**実測結果(Ryzen 9 5900X / net8〜10、200 バイトのパケット解析):** `BinaryReader` + `MemoryStream` 比で 0.10〜0.14 倍(約 7〜10 倍高速)・アロケーション 120〜224B → 0B。手動オフセット管理(`BinaryPrimitives` + offset 変数)と同等〜わずかに速く、コードサイズも同一(125B)— **カーソル抽象化のコストは実測ゼロ**。
+
 ---
 
 ### SEQ-02: SpanTokenizer\<T\>
@@ -1257,6 +1261,10 @@ private static ReadOnlySpan<byte> HexTable => "0123456789ABCDEF"u8;
 **ユースケース:** 日時・数値の固定書式化、Hex/Base 系エンコーダ、プロトコル定数出力。
 
 **補足:** `static ReadOnlySpan<byte>` プロパティ + u8 リテラル(または `new byte[] {...}` 直返し)はコンパイラがデータセクション直参照に変換するため、静的テーブルの定義方法として常にこれを既定とする。
+
+**リポジトリ内実装:** [Utf8DateTimeFormatter.cs](../src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) / [テスト](../tests/PerformancePatterns.Tests/Txt/Utf8DateTimeFormatterTest.cs) / [ベンチマーク](../benchmarks/PerformancePatterns.Benchmarks/Txt/Utf8DateTimeFormatterBenchmark.cs) / [測定結果](../benchmarks/results/TXT-01-Utf8DateTimeFormatter.md)
+
+**実測結果(Ryzen 9 5900X / net8〜10、yyyyMMddHHmmss):** `ToString` + `Encoding.GetBytes` 比で 0.23〜0.32 倍(3〜4 倍高速)・56B → 0B、コードサイズ約 10KB → 0.9KB。`DateTime.TryFormat` + エンコードは時間面では `ToString` と同等(アロケーションのみ改善)で、テーブル方式の優位が際立つ。
 
 ---
 
@@ -1513,6 +1521,36 @@ public T Resolve<T>()
 | readonly フィールド化による JIT 最適化の期待 | インライン化される限り差は測定不能 | readonly は設計意図として付ける(性能目的にしない) |
 | static メソッドを直接バインドしたデリゲートの保持 | thunk 経由で最も遅い呼び出し形態になりうる | DSP-02 の指針で保持形態を選ぶ |
 | マイクロベンチ結果の直接外挿 | 単体で 30 倍差でも実処理では 1.1 倍程度に希釈される例あり | 実ワークロード形状で再計測([benchmark-methodology.md](benchmark-methodology.md)) |
+
+---
+
+## 検証キュー(実装例・ベンチマークによる採否判定待ち)
+
+以下はサンプル作成とベンチマーク実行を行った上で採否を判定する候補。判定の流れ:
+
+1. 候補ごとに検証ベンチマーク(+必要なら最小実装)を作成し、net8 / net9 / net10 で測定する
+2. **有効** → パターンとして本文へ収録(実装例・実測付き)
+3. **無効** → [反パターン表](#反パターン効果がない逆効果と実測された最適化)へ「どの世代まで有効だったか」を付けて記録する
+4. **条件付き** → 適用条件を明記して収録する
+
+| 批次 | 候補 | 概要 / 検証の問い | 関連 | 状態 |
+|:---:|---|---|---|:---:|
+| ① | RuntimeHelpers.IsReferenceOrContainsReferences\<T\> 分岐 | 参照を含まない T でクリア・コピー処理をスキップ。JIT が定数化して分岐ごと消えるか | JIT-03 | 未着手 |
+| ① | Unsafe.CopyBlockUnaligned | Span.CopyTo / Array.Copy に対して優位になる条件の特定(定数長で mov 列に展開される場合のみか) | MEM-05 / SEQ-03 | 未着手 |
+| ① | 末尾要素の事前アクセスによる境界チェック除去 | `_ = array[length - 1]` の事前タッチ・逆順アンロール。.NET 8 有効 / .NET 10 で差消滅の再確認(反パターン化想定) | MEM-01 | 未着手 |
+| ① | GC.AllocateUninitializedArray\<T\> | 大配列のゼロ初期化スキップ。効果が出るサイズ閾値の特定 | BUF-01 / BUF-05 | 未着手 |
+| ① | 定数サイズ stackalloc | 定数確保+スライス vs 可変サイズ(localloc 命令)のコスト差 | BUF-03 / BUF-05 | 未着手 |
+| ② | CollectionsMarshal.SetCount(.NET 8+) | Add ループ(容量チェック×N)vs SetCount + Span 直接書き込み。未初期化領域が見える危険の注意付き | COL-01 | 未着手 |
+| ② | IEnumerable\<T\> 引数の具象型分岐 | `is T[]` / `is List<T>` / TryGetNonEnumeratedCount で Span パスへ逃がす LINQ 内部の定石 | COL-04 / STK-02 | 未着手 |
+| ② | COL-01 の実装例・自環境再測定 | AsSpan / GetValueRefOrAddDefault(収録済みパターンの実装例化) | COL-01 | 未着手 |
+| ③ | byte 列の int 化定数比較 | 短い ASCII トークン(HTTP メソッド等)を uint/ulong 定数 1 比較で判定 vs `SequenceEqual("..."u8)` | BIT-02 / TXT-01 | 未着手 |
+| ③ | Utf8.TryWrite(.NET 8+) | UTF-8 補間ハンドラによる Span\<byte\> 直接整形。TXT-01 テーブル方式との比較 | TXT-01 / BUF-02 | 未着手 |
+| ③ | ASCII 特化処理 | Ascii クラス(.NET 8)/ char.IsAsciiXxx / `& 0x5F` 大文字化による ASCII 前提の高速パス | BIT-02 / TXT-01 | 未着手 |
+| ③ | BUF-02 の実装例(I/O 直結) | MemoryStream 蓄積 vs ArrayBufferWriter vs 自前 PooledBufferWriter(収録済みパターンの実証) | BUF-02 | 未着手 |
+| ④ | async ステートマシンの省略 | 単純フォワードの Task 直接返し vs async/await。例外発生位置・using スコープが変わる注意付き | TXT-03 / 拡充候補 ValueTask | 未着手 |
+| ④ | Environment.TickCount64 / Stopwatch.GetTimestamp | DateTime.UtcNow(十数 ns)を回避する時刻・経過時間取得。キャッシュ TTL・タイムアウト用途 | — | 未着手 |
+| ④ | pinned バッファ(GC.AllocateArray(pinned: true)) | POH 常駐 I/O バッファによるピン止めコスト回避 | BUF-01 / BUF-02 | 未着手 |
+| ④ | BitOperations 活用 | TrailingZeroCount / PopCount / Log2 によるスキャン・計算のループ除去 | BIT-03 | 未着手 |
 
 ---
 

@@ -49,7 +49,8 @@ dotnet-performance/
 ## ロードマップ
 
 1. [x] パターン一覧の整備
-2. [ ] パターンごとの実装例プロジェクトの作成(進行中: SEQ-02 から順次)
-3. [ ] ベンチマークによる効果の実証
-4. [ ] Source Generator を含む AOT 対応実装例の作成
-5. [ ] 拡充候補パターン(SearchValues / SIMD 等)のドキュメント化
+2. [ ] パターンごとの実装例プロジェクトの作成(進行中: SEQ-01/SEQ-02/BUF-05/TXT-01/TXT-02 完了)
+3. [ ] ベンチマークによる効果の実証(実装済みパターンは記録済み)
+4. [ ] 検証キューの採否判定(16 件、[performance-patterns.md](docs/performance-patterns.md) の検証キュー参照)
+5. [ ] Source Generator を含む AOT 対応実装例の作成
+6. [ ] 拡充候補パターン(SearchValues / SIMD 等)のドキュメント化
