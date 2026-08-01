@@ -30,6 +30,8 @@ public static class Program
         VerifyLab();
         VerifyLabBatch2();
         VerifyLabBatch3();
+        VerifyLabBatch4();
+        VerifyLabBatch5();
 
         // 実行例: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -57,6 +59,16 @@ public static class Program
                 typeof(TokenMatchBenchmark),
                 typeof(Utf8WriteBenchmark),
                 typeof(AsciiBenchmark),
+                typeof(AsyncElisionBenchmark),
+                typeof(TimestampBenchmark),
+                typeof(PinnedArrayBenchmark),
+                typeof(BitOperationsBenchmark),
+                typeof(VectorSumBenchmark),
+                typeof(RefFieldCursorBenchmark),
+                typeof(PInvokeBenchmark),
+                typeof(ChannelsBenchmark),
+                typeof(PipelinesBenchmark),
+                typeof(AsyncEnumerableBenchmark),
             ])
             .Run(args);
     }
@@ -298,6 +310,92 @@ public static class Program
         if (!expected.WrittenSpan.SequenceEqual(pooled.WrittenSpan))
         {
             throw new InvalidOperationException("Verify failed. BufferWriter content");
+        }
+    }
+
+    private static void VerifyLabBatch4()
+    {
+        // async フォワード 4 方式の結果一致(42 × 100)
+        var asyncElision = new AsyncElisionBenchmark();
+        if ((asyncElision.TaskAwaitForward().GetAwaiter().GetResult() != 4200) ||
+            (asyncElision.TaskDirectForward().GetAwaiter().GetResult() != 4200) ||
+            (asyncElision.ValueTaskAwaitForward().GetAwaiter().GetResult() != 4200) ||
+            (asyncElision.ValueTaskDirectForward().GetAwaiter().GetResult() != 4200))
+        {
+            throw new InvalidOperationException("Verify failed. AsyncElision");
+        }
+
+        // ビット走査・カウント 2 方式の一致
+        var bitOperations = new BitOperationsBenchmark();
+        bitOperations.Setup();
+        if ((bitOperations.SetBitScanLoop() != bitOperations.SetBitScanTzcnt()) ||
+            (bitOperations.PopCountManual() != bitOperations.PopCountIntrinsic()))
+        {
+            throw new InvalidOperationException("Verify failed. BitOperations");
+        }
+
+        // pinned バッファ 4 方式の結果一致
+        var pinned = new PinnedArrayBenchmark();
+        pinned.Setup();
+        if ((pinned.PinWithFixed() != 3) || (pinned.PinnedPointerDirect() != 3) ||
+            (pinned.AllocateNormal() != 1) || (pinned.AllocatePinned() != 1))
+        {
+            throw new InvalidOperationException("Verify failed. PinnedArray");
+        }
+    }
+
+    private static void VerifyLabBatch5()
+    {
+        // SIMD 3 方式の合計一致
+        var vectorSum = new VectorSumBenchmark();
+        vectorSum.Setup();
+        var expectedVector = vectorSum.ScalarSum();
+        if ((vectorSum.EnumerableSum() != expectedVector) ||
+            (vectorSum.VectorTSum() != expectedVector) ||
+            (vectorSum.Vector256Sum() != expectedVector))
+        {
+            throw new InvalidOperationException("Verify failed. VectorSum");
+        }
+
+        // カーソル 3 方式の合計一致
+        var cursor = new RefFieldCursorBenchmark();
+        cursor.Setup();
+        var expectedCursor = 1023 * 1024 / 2;
+        if ((cursor.SumSpanIndex() != expectedCursor) ||
+            (cursor.SumSpanReader() != expectedCursor) ||
+            (cursor.SumRefFieldCursor() != expectedCursor))
+        {
+            throw new InvalidOperationException("Verify failed. RefFieldCursor");
+        }
+
+        // P/Invoke 各方式が値を返すこと(tick 値そのものは変動するため非ゼロのみ確認)
+        var pinvoke = new PInvokeBenchmark();
+        if ((pinvoke.DllImportCall() == 0UL) || (pinvoke.LibraryImportCall() == 0UL) ||
+            (pinvoke.LibraryImportSuppressGC() == 0UL) || (pinvoke.ManagedTickCount64() == 0UL))
+        {
+            throw new InvalidOperationException("Verify failed. PInvoke");
+        }
+
+        // Channels / Pipe / IAsyncEnumerable の合計一致
+        const long expectedChannel = 10_000L * 9_999L / 2L;
+        if (new ChannelsBenchmark().UnboundedDefault().GetAwaiter().GetResult() != expectedChannel)
+        {
+            throw new InvalidOperationException("Verify failed. Channels");
+        }
+
+        var pipelines = new PipelinesBenchmark();
+        pipelines.Setup();
+        if ((pipelines.MemoryStreamPump() != 65536L) ||
+            (pipelines.PipePump().GetAwaiter().GetResult() != 65536L))
+        {
+            throw new InvalidOperationException("Verify failed. Pipelines");
+        }
+
+        var asyncEnumerable = new AsyncEnumerableBenchmark();
+        if ((asyncEnumerable.SyncForeach() != expectedCursor) ||
+            (asyncEnumerable.AsyncForeach().GetAwaiter().GetResult() != expectedCursor))
+        {
+            throw new InvalidOperationException("Verify failed. AsyncEnumerable");
         }
     }
 

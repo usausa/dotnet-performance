@@ -35,6 +35,9 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | COL | コレクション最適化 |
 | TXT | 文字列・フォーマット |
 | TYP | 型システム活用(型ディスパッチ・比較・内部アクセス) |
+| ASY | 非同期 |
+| SYS | システム・OS 機能 |
+| VEC | SIMD・ベクトル化 |
 
 ## パターン一覧(サマリー)
 
@@ -53,6 +56,7 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [BIT-01](#bit-01-符号なしオーバーフローによる範囲チェック) | 符号なしオーバーフロー範囲チェック | 範囲判定の分岐削減 | ✅ | 未着手 |
 | [BIT-02](#bit-02-ドメイン制約を活かした軽量ハッシュ生成) | ドメイン制約を活かした軽量ハッシュ | 既知キー集合の O(1) ハッシュ | ✅ | 未着手 |
 | [BIT-03](#bit-03-2-の累乗サイズ--マスクによる剰余置換) | 2 の累乗サイズ + マスク | 剰余(除算)のビット AND 化 | ✅ | 未着手 |
+| [BIT-04](#bit-04-bitoperations-によるビット走査計数) | BitOperations | ビット走査・計数のハードウェア命令化 | ✅ | [検証済](../benchmarks/results/BIT-04-BitOperations.md) |
 | [DSP-01](#dsp-01-sealed-による-devirtualization) | sealed による devirtualization | 仮想呼び出しの直接化 | ✅ | 未着手 |
 | [DSP-02](#dsp-02-呼び出し抽象化の選択指針) | 呼び出し抽象化の選択指針 | delegate/interface/関数ポインタの使い分け | ✅ | 未着手 |
 | [DSP-03](#dsp-03-ハンドラ列の不変配列化マルチキャストデリゲート回避) | ハンドラ列の不変配列化 | マルチキャストデリゲートの劣化回避 | ✅ | 未着手 |
@@ -88,6 +92,13 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [TYP-03](#typ-03-unsafeaccessor非公開メンバーへの直接アクセス) | UnsafeAccessor | 非公開メンバーへの直接アクセス | ✅ | 未着手 |
 | [TYP-04](#typ-04-ジェネリック-static-クラスによる型別キャッシュ) | ジェネリック static 型別キャッシュ | 型ごとの成果物の辞書レス取得 | ✅ | 未着手 |
 | [TYP-05](#typ-05-unsafeas-による型チェック省略キャスト) | Unsafe.As キャスト | 型保証済みキャストの高速化 | ✅ | 未着手 |
+| [ASY-01](#asy-01-async-ステートマシンの省略) | async ステートマシンの省略 | 単純フォワードの Task 直接返し | ✅ | [検証済](../benchmarks/results/ASY-01-AsyncElision.md) |
+| [ASY-02](#asy-02-systemthreadingchannels-による生産者消費者) | System.Threading.Channels | 生産者消費者キュー | ✅ | [検証済](../benchmarks/results/ASY-02-Channels.md) |
+| [ASY-03](#asy-03-systemiopipelines) | System.IO.Pipelines | I/O ストリーミングのパイプ化 | ✅ | [検証済](../benchmarks/results/ASY-03-Pipelines.md) |
+| [ASY-04](#asy-04-iasyncenumerable-のコスト認知と使い分け) | IAsyncEnumerable の使い分け | await foreach の要素あたりコスト | ✅ | [検証済](../benchmarks/results/ASY-04-AsyncEnumerable.md) |
+| [SYS-01](#sys-01-低コストの時刻経過時間取得) | 低コスト時刻取得 | DateTime.UtcNow 回避 | ✅ | [検証済](../benchmarks/results/SYS-01-Timestamp.md) |
+| [SYS-02](#sys-02-pinvoke-高速化libraryimport--suppressgctransition) | P/Invoke 高速化 | LibraryImport + SuppressGCTransition | ✅ | [検証済](../benchmarks/results/SYS-02-PInvoke.md) |
+| [VEC-01](#vec-01-明示的-simdvectort--vector256) | 明示的 SIMD | Vector\<T\> / Vector256 による一括処理 | ✅ | [検証済](../benchmarks/results/VEC-01-VectorSum.md) |
 
 ## 逆引き:目的別の選択指針
 
@@ -129,6 +140,9 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | 短命文字列の組み立て | TXT-02 |
 | パース・変換の失敗ハンドリング | TXT-03 |
 | 型保証済みキャストの高速化 | TYP-05 |
+| ビットマップ走査・ビット計数 | BIT-04 |
+| 単純フォワードの async 排除 | ASY-01 |
+| TTL・タイムアウト用の時刻取得 | SYS-01 |
 
 ---
 
@@ -618,6 +632,33 @@ var index = hash & mask;
 
 - 符号付き int の `/ 2` や `% 2` は JIT が単純シフトに落とせない(負数補正が入る)。非負が保証できるなら uint 化または符号なし右シフト `>>>`(C# 11)を使う
 - 境界チェック除去目的の無条件な uint キャスト小細工は最近のランタイムでは効果が消えていることが実測されている(BIT-01 の範囲チェックのような意味のある形に限定する)
+
+---
+
+### BIT-04: BitOperations によるビット走査・計数
+
+**目的:** ビットマップの走査・ビット数計測を素朴なループからハードウェア命令(`TrailingZeroCount` / `PopCount` / `Log2` 等)へ置き換える。
+
+**効果(実測、Ryzen 9 5900X / net10、7 ビット立った疎な ulong × 64 個):**
+
+- 立ちビット走査: 全 64 ビットループ 1,604ns → TZCNT 方式 **210ns(0.13、7.6 倍)**
+- ビット数計測: 手動ループ 1,062ns → `PopCount` **15.8ns(0.01、67 倍)**
+
+**AOT:** ✅ 問題なし(対応 CPU ではハードウェア命令、未対応環境はソフトウェアフォールバック)
+
+**実装例:**
+
+```csharp
+// 立っているビットだけを辿る: 最下位の立ちビット位置を取得し、mask &= mask - 1 で消す
+while (mask != 0UL)
+{
+    var bit = BitOperations.TrailingZeroCount(mask);
+    ProcessSlot(bit);
+    mask &= mask - 1;
+}
+```
+
+**ユースケース:** ビットマップアロケータ・プールの空きスロット検索、sparse set、フラグ集計、`RoundUpToPowerOf2`(BIT-03)や `Log2` によるサイズ計算。
 
 ---
 
@@ -1144,7 +1185,7 @@ stream.ReadExactly(buffer);
 **注意:**
 
 - 未初期化領域を読まない保証は呼び出し側の責任(読み出し前に必ず全域を書く)
-- `pinned: true` オプションで POH(Pinned Object Heap)確保も可能(検証キュー④で別途検証)
+- `GC.AllocateArray(pinned: true)` による POH 確保は通常確保の約 17.5 倍のコスト(実測)。長寿命 I/O バッファの断片化回避専用とし、起動時に一度だけ使う(反パターン表参照)
 
 ---
 
@@ -1177,6 +1218,8 @@ var payload = reader.Read(length);
 **リポジトリ内実装:** [SpanReader.cs](../src/PerformancePatterns/Seq/SpanReader.cs) / [SpanWriter.cs](../src/PerformancePatterns/Seq/SpanWriter.cs) / [拡張](../src/PerformancePatterns/Seq/SpanReaderWriterExtensions.cs) / [テスト](../tests/PerformancePatterns.Tests/Seq/SpanReaderWriterTest.cs) / [ベンチマーク](../benchmarks/PerformancePatterns.Benchmarks/Seq/SpanReaderBenchmark.cs) / [測定結果](../benchmarks/results/SEQ-01-SpanReader.md)
 
 **実測結果(Ryzen 9 5900X / net8〜10、200 バイトのパケット解析):** `BinaryReader` + `MemoryStream` 比で 0.10〜0.14 倍(約 7〜10 倍高速)・アロケーション 120〜224B → 0B。手動オフセット管理(`BinaryPrimitives` + offset 変数)と同等〜わずかに速く、コードサイズも同一(125B)— **カーソル抽象化のコストは実測ゼロ**。
+
+**注意:** カーソルが向くのは「フィールド粒度の構造読み」であり、同一型要素の全走査を `Read()` の繰り返しで書くと素の for ループの約 2 倍かかる(反パターン表「反復目的の ref フィールドカーソル」参照)。全要素処理は Span の for で書く。
 
 ---
 
@@ -1791,6 +1834,198 @@ public T Resolve<T>()
 
 ---
 
+## ASY: 非同期
+
+### ASY-01: async ステートマシンの省略
+
+**目的:** 内側の Task / ValueTask を加工せず返すだけのメソッドでは `async`/`await` を書かず、そのまま返す(async 消去)。
+
+**効果(実測、Ryzen 9 5900X / net10、同期完了パス):**
+
+- Task 直接返し: **0.16 倍(6.4 倍高速)+ 73B → 0B** — async ラッパーはキャッシュ済みの完了 Task ですら毎回新しい Task に再ラップして確保する
+- ValueTask でも await ラッパー 6.7ns に対し直接返し 1.7ns(0.15 倍。アロケーションはどちらも 0)
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// ❌ 単純フォワードに async/await(ステートマシン + 結果の再ラップ)
+public async Task<int> ReadAsync(byte[] buffer) => await inner.ReadAsync(buffer);
+
+// ✅ そのまま返す(async 消去)
+public Task<int> ReadAsync(byte[] buffer) => inner.ReadAsync(buffer);
+```
+
+**適用条件(重要):** 「await が 1 箇所・その結果を直後に返すだけ・`try`/`using`/`lock` スコープをまたがない」単純フォワードに限定する。スコープをまたぐ場合に省略すると、例外時・解放タイミングの意味論が変わる(await 前に同期例外が呼び出し側へ直接飛ぶ、using が完了前に解放される等)。省略したメソッドは非同期スタックトレースからも消える。
+
+**ユースケース:** デコレータ・ラッパー層のフォワードメソッド、インターフェース実装の委譲、キャッシュヒット時の完了済み Task 返し。
+
+---
+
+### ASY-02: System.Threading.Channels による生産者消費者
+
+**目的:** スレッド間のデータ受け渡しを、自前のロック+キュー+シグナルではなく `Channel<T>` で構成する。
+
+**効果(実測、Ryzen 9 5900X / net10、10,000 要素のパンプ):**
+
+- Unbounded チャネルで**要素あたり約 45ns**(書き込み+非同期読み取り+完了通知込み)、アロケーションほぼゼロ
+- `SingleReader`/`SingleWriter` オプションは本シナリオでは誤差(0.97 倍)— 高競合時の最適化であり、単一生産者消費者では期待しすぎない
+- Bounded(容量 128)は 2.0 倍 — バックプレッシャ(メモリ上限保証)の対価として妥当か判断する
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+var channel = Channel.CreateUnbounded<Work>(new UnboundedChannelOptions
+{
+    SingleReader = true, // 構成が確定しているなら宣言しておく(害はない)
+    SingleWriter = false,
+});
+
+// 生産者: await channel.Writer.WriteAsync(work);  完了時 channel.Writer.Complete();
+// 消費者: await foreach (var work in channel.Reader.ReadAllAsync()) { ... }
+```
+
+**ユースケース:** バックグラウンド処理キュー、ログ・メトリクスの集約、パイプライン化されたステージ間接続。
+
+**注意:** Unbounded は生産過剰時にメモリが際限なく増える。上限保証が必要なら Bounded + `FullMode`(Wait/Drop系)を選び、2 倍のコストを織り込む。
+
+---
+
+### ASY-03: System.IO.Pipelines
+
+**目的:** ストリーム I/O の読み書きを `Pipe`(PipeReader/PipeWriter)で接続し、バッファ管理・部分読み・バックプレッシャを基盤に任せる。
+
+**効果(実測、Ryzen 9 5900X / net10、4KB × 16 チャンクの同スレッド転送):**
+
+- `MemoryStream` 往復比で時間は 1.63 倍(同期機構のコスト)だが、**アロケーション 128.2KB → 1.6KB(1/80)** — プール化されたセグメント再利用の効果
+- 本領は「ネットワーク/ファイル I/O のストリーミング処理」であり、メモリ内の小データ移送に使うものではない
+
+**AOT:** ✅ 問題なし(NuGet パッケージ System.IO.Pipelines)
+
+**ユースケース:** ソケット受信のフレーミング(長さプレフィックス・行分割)、Kestrel 型のプロトコル処理、大きなストリームの逐次パース(SEQ-01 と接続)。
+
+**注意(実際に踏んだ罠):** 既定 `PauseWriterThreshold` は 64KB で、未消費データがこれに達すると `FlushAsync` が読み手の消費を待って**完了しなくなる**。「書き切ってから読む」逐次構造は 64KB ちょうどでデッドロックする — 書き手と読み手は必ず並行させる(本リポジトリの検証でも初版がこのデッドロックを踏んだ)。
+
+---
+
+### ASY-04: IAsyncEnumerable のコスト認知と使い分け
+
+**目的:** `await foreach` の要素あたりオーバーヘッドを把握し、同期で列挙できるデータに async ストリームを使わない。
+
+**効果(実測、Ryzen 9 5900X / net10、同期完了する 1,024 要素の列挙):**
+
+- 同期 `foreach` 0.96ns/要素に対し、`await foreach` は **11.0ns/要素(11.6 倍)** — ステートマシンと `MoveNextAsync` の ValueTask 機構のコスト
+- 絶対値は 10ns 程度なので、要素ごとの処理が重い(数百 ns〜)ストリームでは希釈されて問題にならない
+
+**AOT:** ✅ 問題なし
+
+**設計指針:**
+
+- 同期に列挙できるなら `IEnumerable<T>` / Span 系を返す。`IAsyncEnumerable<T>` は「要素の生成自体が非同期」(ページング API、DB カーソル、ソケット)の場合に使う
+- キャンセルは `[EnumeratorCancellation]` 付き `CancellationToken` 引数で受け、呼び出し側は `WithCancellation` で渡す
+- ライブラリ内部の転送には ASY-02(Channels)の `ReadAllAsync` が同型の消費 API を提供する
+
+---
+
+## SYS: システム・OS 機能
+
+### SYS-01: 低コストの時刻・経過時間取得
+
+**目的:** キャッシュ TTL・タイムアウト判定・経過時間測定で、壁時計時刻(`DateTime.UtcNow`)の取得コストを回避する。
+
+**効果(実測、Ryzen 9 5900X / net10):**
+
+| API | 時間 | 比率 | 特性 |
+|---|---|---|---|
+| `DateTime.UtcNow` / `DateTimeOffset.UtcNow` | 24.8 / 25.3 ns | 1.00 | 壁時計時刻。システム時刻変更の影響を受ける |
+| `Stopwatch.GetTimestamp` | 19.1 ns | 0.77 | 高分解能・単調。`Stopwatch.GetElapsedTime` で TimeSpan 化 |
+| `Environment.TickCount64` | **1.13 ns** | **0.05(22 倍)** | 単調・ミリ秒単位(分解能 ~10〜16ms) |
+
+**AOT:** ✅ 問題なし
+
+**設計指針:**
+
+- TTL・タイムアウト判定(ms 精度で十分)→ `Environment.TickCount64` の差分比較
+- 高精度な経過時間測定 → `Stopwatch.GetTimestamp` + `Stopwatch.GetElapsedTime`
+- 実際の日時が必要な場合のみ `DateTime.UtcNow`(判定用途に壁時計を使うとシステム時刻変更で誤動作するため、正しさの面でも単調クロックが優る)
+- テスト容易性が必要な箇所は `TimeProvider`(.NET 8+)で抽象化し、ホットパスのみ直接 API を使う
+
+**ユースケース:** キャッシュの有効期限、レートリミッタ、リトライ・タイムアウト管理、簡易メトリクス。
+
+---
+
+### SYS-02: P/Invoke 高速化(LibraryImport + SuppressGCTransition)
+
+**目的:** ネイティブ呼び出しのオーバーヘッドを削減し、AOT/トリミング互換のマーシャリングに移行する。
+
+**効果(実測、Ryzen 9 5900X / net10、GetTickCount64 呼び出し):**
+
+- `[LibraryImport]` は blittable な呼び出しでは `DllImport` と同速(0.96 倍)。価値は速度ではなく**ソース生成マーシャリングによる AOT / トリミング完全対応**(ランタイムマーシャリング不要)
+- `[SuppressGCTransition]` で **0.57 倍(1.8 倍高速)** — GC 遷移(preemptive/cooperative モード切替)を省略し、1.36ns とマネージド呼び出し(1.24ns)並みになる
+
+**AOT:** ✅ LibraryImport は AOT 対応の推奨形([aot-compatibility.md](aot-compatibility.md) の Source Generator 方針と同軸)
+
+**実装例:**
+
+```csharp
+[LibraryImport("kernel32.dll", EntryPoint = "GetTickCount64")]
+[DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+[SuppressGCTransition]
+private static partial ulong GetTickCount64();
+```
+
+**ユースケース:** 高頻度に呼ぶ極小のネイティブ API(時刻・カウンタ取得、軽量な計算関数)。
+
+**注意(SuppressGCTransition の厳格な制約):** 対象は「極短時間(〜数百 ns)・ブロックしない・コールバックしない・例外を出さない」呼び出し限定。違反すると GC の停止待ちを妨げ、プロセス全体の GC 遅延・ハングを招く。I/O を伴う呼び出しには絶対に付けない。
+
+---
+
+## VEC: SIMD・ベクトル化
+
+### VEC-01: 明示的 SIMD(Vector\<T\> / Vector256)
+
+**目的:** 集計・変換・検索のデータ並列処理をハードウェア SIMD 命令で一括実行する。
+
+**効果(実測、Ryzen 9 5900X(AVX2)/ net10、int[4096] の合計):**
+
+| 実装 | 比率 |
+|---|---|
+| スカラーループ | 1.00(1,111ns) |
+| `Enumerable.Sum`(BCL、ベクトル化済み) | 0.24 |
+| `Vector<T>` | 0.16 |
+| `Vector256` 直接 | **0.11(8.9 倍)** |
+
+**AOT:** ✅ 問題なし(AOT でもターゲット ISA の SIMD 命令が使われる。`IsHardwareAccelerated` ガード + スカラーフォールバックを用意する)
+
+**実装例:**
+
+```csharp
+ref var start = ref MemoryMarshal.GetArrayDataReference(values);
+var acc = Vector256<int>.Zero;
+var i = 0;
+for (; i <= values.Length - Vector256<int>.Count; i += Vector256<int>.Count)
+{
+    acc += Vector256.LoadUnsafe(ref start, (nuint)i);
+}
+
+var total = Vector256.Sum(acc);
+for (; i < values.Length; i++)
+{
+    total += Unsafe.Add(ref start, i); // 端数はスカラーで処理
+}
+```
+
+**設計指針(重要):** まず BCL のベクトル化済み API(`Enumerable.Sum`、`IndexOf`/`SequenceEqual`、`SearchValues`、`Ascii`、`TensorPrimitives`)を探す — スカラー比 4 倍超が書かずに手に入る。自前 SIMD は「BCL に該当 API がない処理」に限定し、`Vector<T>`(可搬)→ `Vector128/256`(制御重視)の順で検討する。
+
+**ユースケース:** チェックサム・集計、独自エンコード/デコード、数値変換の一括適用。
+
+**注意:** 端数処理・非対応 CPU フォールバックのテストを必ず用意する(Verify で全経路をスカラー実装と突き合わせる)。
+
+---
+
 ## 反パターン:効果がない・逆効果と実測された最適化
 
 「やらない判断」も性能設計の一部。以下は実測で効果なし・逆効果が確認された定番の誤解。AI がコードを生成する際も、これらを「最適化」として適用しないこと。
@@ -1810,6 +2045,8 @@ public T Resolve<T>()
 | static メソッドを直接バインドしたデリゲートの保持 | thunk 経由で最も遅い呼び出し形態になりうる | DSP-02 の指針で保持形態を選ぶ |
 | `Span.CopyTo` の `Unsafe.CopyBlockUnaligned` 置換 | 可変長では同速(0.98〜1.03 倍、両者とも同じ Memmove に到達)。定数長 16B でも 0.2ns / コードサイズ 45B の微差のみ([実測](../benchmarks/results/LAB-CopyBlockUnaligned.md)) | `Span.CopyTo` を既定にする。`Array.Copy` はコードサイズ肥大(1.7KB)で最遅 |
 | 末尾要素の事前タッチ・ガードによる境界チェック誘導 | .NET 10 では全バリアント差なし。.NET 8 でも 1024 要素の合計ループでは差なし(旧世代の極小ループ限定で効いた小差テクニック、[実測](../benchmarks/results/LAB-BoundsCheckHint.md)) | ループ条件に `array.Length` / `span.Length` を直接使う形にする(コードサイズも最小: 34B vs 94〜140B) |
+| 反復目的の ref フィールドカーソル(C# 11) | 全要素走査では Span + インデックスの for(249ns)に勝てず 1.21 倍。カーソル型での要素単位読み(SpanReader.Read())は 2.06 倍([実測](../benchmarks/results/LAB-RefFieldCursor.md)) | 全要素走査は素の for ループで書く。カーソル型(SEQ-01)は「フィールド粒度の構造読み」専用 |
+| 性能目的の pinned(POH)バッファ化 | 都度 `fixed` のピン止めは実測ほぼ無料(0.74ns)で、POH 化しても速くならない(0.85ns)。POH 確保自体は通常の **17.5 倍** + Gen2 誘発([実測](../benchmarks/results/LAB-PinnedArray.md)) | `fixed` をそのまま使う。POH は「長寿命 I/O バッファの GC 移動・断片化回避」専用とし、起動時に一度だけ確保する |
 | マイクロベンチ結果の直接外挿 | 単体で 30 倍差でも実処理では 1.1 倍程度に希釈される例あり | 実ワークロード形状で再計測([benchmark-methodology.md](benchmark-methodology.md)) |
 
 ---
@@ -1837,16 +2074,16 @@ public T Resolve<T>()
 | ③ | Utf8.TryWrite(.NET 8+) | UTF-8 補間ハンドラによる Span\<byte\> 直接整形。TXT-01 テーブル方式との比較 | TXT-01 / BUF-02 | ✅ 収録([TXT-05](#txt-05-utf8trywrite-による-utf-8-直接整形)、0.54 倍・0B) |
 | ③ | ASCII 特化処理 | Ascii クラス(.NET 8)/ char.IsAsciiXxx / `& 0x5F` 大文字化による ASCII 前提の高速パス | BIT-02 / TXT-01 | ✅ 収録([TXT-06](#txt-06-ascii-特化比較)、0.62 倍。手書き正規化は記号衝突の注意付き) |
 | ③ | BUF-02 の実装例(I/O 直結) | MemoryStream 蓄積 vs ArrayBufferWriter vs 自前 PooledBufferWriter(収録済みパターンの実証) | BUF-02 | ✅ 実装済(PooledBufferWriter。アロケーション 2,976B→32B) |
-| ④ | async ステートマシンの省略 | 単純フォワードの Task 直接返し vs async/await。例外発生位置・using スコープが変わる注意付き | TXT-03 / 拡充候補 ValueTask | 未着手 |
-| ④ | Environment.TickCount64 / Stopwatch.GetTimestamp | DateTime.UtcNow(十数 ns)を回避する時刻・経過時間取得。キャッシュ TTL・タイムアウト用途 | — | 未着手 |
-| ④ | pinned バッファ(GC.AllocateArray(pinned: true)) | POH 常駐 I/O バッファによるピン止めコスト回避 | BUF-01 / BUF-02 | 未着手 |
-| ④ | BitOperations 活用 | TrailingZeroCount / PopCount / Log2 によるスキャン・計算のループ除去 | BIT-03 | 未着手 |
-| ⑤ | SIMD 実装例(Vector128/256) | 合計・検索・変換の明示的 SIMD 化。スカラー・`Vector<T>`・組み込み関数の比較 | JIT-02 / BIT | 未着手 |
-| ⑤ | ref フィールドによる ref struct 設計(C# 11) | カーソルを Span + index でなく ref T で保持する設計のコスト比較 | SEQ-01 / STK-01 | 未着手 |
-| ⑤ | P/Invoke 高速化 | \[LibraryImport\] + Span 渡し + \[SuppressGCTransition\](短時間ネイティブ呼び出しの GC 遷移省略)の効果と制約 | BUF-05 | 未着手 |
-| ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | 未着手 |
-| ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 / SEQ-01 | 未着手 |
-| ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-04 | 未着手 |
+| ④ | async ステートマシンの省略 | 単純フォワードの Task 直接返し vs async/await。例外発生位置・using スコープが変わる注意付き | TXT-03 / 拡充候補 ValueTask | ✅ 収録([ASY-01](#asy-01-async-ステートマシンの省略)、0.16 倍・73B→0B) |
+| ④ | Environment.TickCount64 / Stopwatch.GetTimestamp | DateTime.UtcNow(十数 ns)を回避する時刻・経過時間取得。キャッシュ TTL・タイムアウト用途 | — | ✅ 収録([SYS-01](#sys-01-低コストの時刻経過時間取得)、TickCount64 は 22 倍) |
+| ④ | pinned バッファ(GC.AllocateArray(pinned: true)) | POH 常駐 I/O バッファによるピン止めコスト回避 | BUF-01 / BUF-02 | ❌ 性能目的は反パターン表へ(fixed は実測無料。POH は長寿命断片化対策専用) |
+| ④ | BitOperations 活用 | TrailingZeroCount / PopCount / Log2 によるスキャン・計算のループ除去 | BIT-03 | ✅ 収録([BIT-04](#bit-04-bitoperations-によるビット走査計数)、走査 7.6 倍・PopCount 67 倍) |
+| ⑤ | SIMD 実装例(Vector128/256) | 合計・検索・変換の明示的 SIMD 化。スカラー・`Vector<T>`・組み込み関数の比較 | JIT-02 / BIT | ✅ 収録([VEC-01](#vec-01-明示的-simdvectort--vector256)、Vector256 8.9 倍。BCL 済み API 優先の指針付き) |
+| ⑤ | ref フィールドによる ref struct 設計(C# 11) | カーソルを Span + index でなく ref T で保持する設計のコスト比較 | SEQ-01 / STK-01 | ❌ 反復用途は反パターン表へ(for 比 1.21 倍で利得なし) |
+| ⑤ | P/Invoke 高速化 | \[LibraryImport\] + Span 渡し + \[SuppressGCTransition\](短時間ネイティブ呼び出しの GC 遷移省略)の効果と制約 | BUF-05 | ✅ 収録([SYS-02](#sys-02-pinvoke-高速化libraryimport--suppressgctransition)、SuppressGC 1.8 倍・LibraryImport は AOT 対応が価値) |
+| ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | ✅ 収録([ASY-02](#asy-02-systemthreadingchannels-による生産者消費者)、~45ns/要素・Bounded は 2 倍) |
+| ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 / SEQ-01 | ✅ 条件付き収録([ASY-03](#asy-03-systemiopipelines)、小データは 1.63 倍・アロケーション 1/80。64KB デッドロック注意) |
+| ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-04 | ✅ 収録([ASY-04](#asy-04-iasyncenumerable-のコスト認知と使い分け)、要素あたり 11.6 倍のコスト認知) |
 
 ---
 
