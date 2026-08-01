@@ -63,7 +63,7 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [STK-05](#stk-05-ボックス化回避と頻出値キャッシュ) | ボックス化回避と頻出値キャッシュ | object 境界のアロケーション排除 | ✅ | 未着手 |
 | [STK-06](#stk-06-定数サイズ-stackalloc) | 定数サイズ stackalloc | localloc 回避とゼロ初期化制御 | ✅ | [検証済](../benchmarks/results/STK-06-StackallocSize.md) |
 | [BUF-01](#buf-01-arraypoolt-によるバッファ再利用) | ArrayPool\<T\> | 使い捨てバッファの GC 圧力削減 | ✅ | 未着手 |
-| [BUF-02](#buf-02-ibufferwritert--getspan--advance-パターン) | IBufferWriter\<T\> + GetSpan / Advance | 出力バッファへの直接書き込み | ✅ | 未着手 |
+| [BUF-02](#buf-02-ibufferwritert--getspan--advance-パターン) | IBufferWriter\<T\> + GetSpan / Advance | 出力バッファへの直接書き込み | ✅ | [実装](../src/PerformancePatterns/Buf/PooledBufferWriter.cs) |
 | [BUF-03](#buf-03-bufferwriterslimtスタックファースト書き込み) | BufferWriterSlim\<T\> | スタックファーストのバッファ書き込み | ✅ | 未着手 |
 | [BUF-04](#buf-04-memoryownertスコープ付きバッファ所有権) | MemoryOwner\<T\> | プールレンタルへの RAII スコープ付与 | ✅ | 未着手 |
 | [BUF-05](#buf-05-一時バッファの段階戦略stackalloc--arraypool-統合) | 一時バッファの段階戦略 | stackalloc/プールの閾値切替統合 | ✅ | [実装](../src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
@@ -72,13 +72,17 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [SEQ-02](#seq-02-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | [実装](../src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-03](#seq-03-stream-構造体-io) | Stream 構造体 I/O | 構造体の直接バイナリ読み書き | ✅ | 未着手 |
 | [SEQ-04](#seq-04-遅延評価シーケンス処理batch--segment--traverse) | Batch / Segment / Traverse | 低アロケーションのシーケンス処理 | ✅ | 未着手 |
-| [COL-01](#col-01-collectionsmarshal-による内部直接アクセス) | CollectionsMarshal | List/Dictionary 内部への直接アクセス | ✅ | 未着手 |
+| [COL-01](#col-01-collectionsmarshal-による内部直接アクセス) | CollectionsMarshal | List/Dictionary 内部への直接アクセス | ✅ | [検証済](../benchmarks/results/COL-01-CollectionsMarshal.md) |
 | [COL-02](#col-02-frozendictionary-の条件付き採用) | FrozenDictionary 条件付き採用 | 不変辞書の検索高速化 | ✅ | 未着手 |
 | [COL-03](#col-03-getalternatelookup-による-span-キー検索) | GetAlternateLookup | Span キーでの辞書検索 | ✅ | 未着手 |
 | [COL-04](#col-04-少数要素ルックアップの戦略選択) | 少数要素ルックアップ戦略 | 規模・形状に応じた実装選択 | ✅ | 未着手 |
+| [COL-05](#col-05-ienumerable-引数の具象型ディスパッチ) | IEnumerable 具象型ディスパッチ | List/配列入力の Span パス化 | ✅ | [検証済](../benchmarks/results/COL-05-EnumerableDispatch.md) |
 | [TXT-01](#txt-01-ルックアップテーブルによる整形変換) | ルックアップテーブル整形 | 固定書式整形のテーブル化 | ✅ | [実装](../src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#txt-02-文字列構築の-stackalloc-ファースト化) | 文字列構築の stackalloc ファースト | StringBuilder 代替の低アロケーション構築 | ✅ | [実装](../src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [TXT-03](#txt-03-try-パターンによる例外回避) | Try パターン | 例外を制御フローに使わない | ✅ | 未着手 |
+| [TXT-04](#txt-04-バイト列トークンの直接判定) | バイト列トークン直接判定 | string 化せず u8/uint で判定 | ✅ | [検証済](../benchmarks/results/TXT-04-TokenMatch.md) |
+| [TXT-05](#txt-05-utf8trywrite-による-utf-8-直接整形) | Utf8.TryWrite | UTF-8 補間の Span 直接書き込み | ✅ | [検証済](../benchmarks/results/TXT-05-Utf8TryWrite.md) |
+| [TXT-06](#txt-06-ascii-特化比較) | ASCII 特化比較 | Ascii クラスによる大小無視処理 | ✅ | [検証済](../benchmarks/results/TXT-06-Ascii.md) |
 | [TYP-01](#typ-01-静的型スロットtypemap--typeslot) | 静的型スロット(TypeMap / TypeSlot) | Type キー辞書の配列アクセス化 | ⚠️ | 未着手 |
 | [TYP-02](#typ-02-bitwisecomparert生バイト比較) | BitwiseComparer\<T\> | unmanaged 値型の生バイト比較 | ✅ | 未着手 |
 | [TYP-03](#typ-03-unsafeaccessor非公開メンバーへの直接アクセス) | UnsafeAccessor | 非公開メンバーへの直接アクセス | ✅ | 未着手 |
@@ -994,6 +998,10 @@ public static void Write<T>(this IBufferWriter<byte> writer, T value)
 
 **設計指針:** シリアライザ系ライブラリの出力 API は `byte[]` 返しではなく `IBufferWriter<byte>` 受け取りを基本形にする。
 
+**リポジトリ内実装:** [PooledBufferWriter.cs](../src/PerformancePatterns/Buf/PooledBufferWriter.cs)(ArrayPool 後背 + JIT-04 の Grow 分離 + JIT-05 の型別クリア) / [テスト](../tests/PerformancePatterns.Tests/Buf/PooledBufferWriterTest.cs) / [ベンチマーク](../benchmarks/PerformancePatterns.Benchmarks/Buf/BufferWriterBenchmark.cs) / [測定結果](../benchmarks/results/BUF-02-BufferWriter.md)
+
+**実測結果(Ryzen 9 5900X / net10、16B × 64 チャンク書き込み):** `MemoryStream` + ToArray 比で `ArrayBufferWriter` 0.56 倍 / `PooledBufferWriter` 0.63 倍。単発の速度は ArrayBufferWriter が最速だが、PooledBufferWriter は**アロケーション 2,976B → 32B(ライター本体のみ)**で、繰り返し書き込みでの GC 圧力をゼロ化できる。
+
 ---
 
 ### BUF-03: BufferWriterSlim\<T\>(スタックファースト書き込み)
@@ -1279,8 +1287,9 @@ foreach (var node in root.TraverseDepthFirst(static x => x.Children))
 
 **効果(実測例):**
 
-- `CollectionsMarshal.AsSpan(list)` で List 反復が最大 1.9 倍(.NET 8)。`List<T>` の素の foreach は最も遅い反復手段
-- `GetValueRefOrAddDefault` で辞書の read-modify-write(`map[key]++` 相当)が約 1.35 倍(ハッシュ計算・探索が 2 回 → 1 回になる)
+- `CollectionsMarshal.AsSpan(list)` で List 反復が約 2 倍(自環境 net10 実測 0.52、for/foreach とも)。`List<T>` の素の foreach / for は同速で最も遅い
+- `GetValueRefOrAddDefault` で辞書の read-modify-write(`map[key]++` 相当)が 0.66 倍(自環境 net10。ハッシュ計算・探索が 2 回 → 1 回になる)
+- `SetCount`(.NET 8+)+ Span 書き込みによる一括構築は Add ループ比 0.22〜0.26 倍(約 4 倍)。容量指定 Add(0.47〜0.60 倍)よりさらに 2 倍速く、成長再確保の排除でアロケーションも半減
 
 **AOT:** ✅ 問題なし
 
@@ -1296,14 +1305,26 @@ foreach (ref var item in CollectionsMarshal.AsSpan(list))
 // 辞書のカウントアップ: 探索 1 回で読み書き
 ref var count = ref CollectionsMarshal.GetValueRefOrAddDefault(map, key, out _);
 count++;
+
+// サイズ既知の一括構築: Add を使わず Count を確定してから Span で書く(.NET 8+)
+var list = new List<int>();
+CollectionsMarshal.SetCount(list, size);
+var span = CollectionsMarshal.AsSpan(list);
+for (var i = 0; i < span.Length; i++)
+{
+    span[i] = Compute(i);
+}
 ```
 
 **ユースケース:** 集計処理、キャッシュのヒットカウント、内部モデルの一括更新。
+
+**リポジトリ内実装:** [ベンチマーク](../benchmarks/PerformancePatterns.Benchmarks/Lab/CollectionsMarshalBenchmark.cs)([SetCount](../benchmarks/PerformancePatterns.Benchmarks/Lab/ListSetCountBenchmark.cs)) / [測定結果](../benchmarks/results/COL-01-CollectionsMarshal.md)
 
 **注意:**
 
 - `AsSpan` 保持中に List へ Add しない(内部配列の差し替えで Span が古い配列を指す)
 - 旨味は「読み+書きの統合」にある。追加のみなら `TryAdd` と差はなく、`GetValueRefOrNullRef` + `Unsafe.IsNullRef` の存在チェックを挟むと効果が減る
+- `SetCount` で拡張された領域は値型ではゼロ初期化が保証されない(旧値が見える)。読み出す前に必ず全域へ書き込む前提で使う
 
 ---
 
@@ -1368,6 +1389,51 @@ public bool TryResolve(ReadOnlySpan<char> name, out int value)
 **ユースケース:** Source Generator が生成する名前→インデックス解決(DB カラム、プロパティ名、enum 名)、プロトコルのヘッダディスパッチ。
 
 **設計指針:** 生成コードなら要素数が生成時に分かるため、件数に応じて Equals 連鎖(小)/ ハッシュ switch(中〜)を出し分けるのが理想。
+
+---
+
+### COL-05: IEnumerable 引数の具象型ディスパッチ
+
+**目的:** `IEnumerable<T>` を受ける API の内部で実行時型を判定し、`List<T>`(および必要に応じて `T[]`)を Span パスへ逃がす(LINQ 内部の定石)。
+
+**効果(実測、Ryzen 9 5900X / net10、1024 要素の合計):**
+
+- **List ソース: 0.56 倍(約 1.8 倍高速)** — `List<T>` の列挙子はインターフェース経由では速くならないため分岐の本命
+- 配列ソース: 利得なし(258.5 vs 272.4ns で分岐側が僅かに遅い)— 現代 JIT はプロファイルに基づくガード付き devirtualization で配列の IEnumerable 列挙を既に最適化している
+- 分岐が外れる列挙子ソースへのペナルティ: なし(829.0 vs 822.8ns)
+
+**AOT:** ✅ 問題なし。AOT には実行時プロファイル由来の devirtualization がないため、**配列分岐も含めて JIT 環境より価値が高い**
+
+**実装例:**
+
+```csharp
+public static int Sum(IEnumerable<int> source)
+{
+    if (source is int[] array)          // net10 JIT では利得なしだが AOT・保険として害もない
+    {
+        return SumSpan(array);
+    }
+
+    if (source is List<int> list)       // net10 でも約 1.8 倍
+    {
+        return SumSpan(CollectionsMarshal.AsSpan(list));
+    }
+
+    var total = 0;
+    foreach (var value in source)       // フォールバック(型チェックのペナルティは実測ゼロ)
+    {
+        total += value;
+    }
+
+    return total;
+}
+```
+
+**ユースケース:** コレクションユーティリティ、シリアライザ・マッパーの入力受け取り、LINQ 風演算子。
+
+**関連:** 事前容量確保には `TryGetNonEnumeratedCount`(.NET 6+)で同じ分岐思想を適用できる(列挙せずに件数取得 → `new List<T>(count)` / COL-01 SetCount へ接続)。
+
+**リポジトリ内実装:** [ベンチマーク](../benchmarks/PerformancePatterns.Benchmarks/Lab/EnumerableDispatchBenchmark.cs) / [測定結果](../benchmarks/results/COL-05-EnumerableDispatch.md)
 
 ---
 
@@ -1453,6 +1519,91 @@ ValueStringBuilder(stackalloc 初期バッファ + ArrayPool 拡張の ref struc
 
 - ライブラリの公開 API は `TryXxx(out T result)` を正とし、例外版(`Xxx`)は Try 版のラッパーとして提供する
 - 内部実装でも BCL の Try 系 API(`int.TryParse`, `Utf8Parser.TryParse` 等)を使い、try/catch を制御フローにしない
+
+---
+
+### TXT-04: バイト列トークンの直接判定
+
+**目的:** 受信バイト列中の既知トークン(HTTP メソッド、プロトコルキーワード等)を、string 化せずバイト列のまま判定する。
+
+**効果(実測、Ryzen 9 5900X / net10、4 バイトトークン × 64 判定):**
+
+- string 化 + switch 比で **0.23 倍(4.3 倍高速)+ アロケーション 2,048B → 0B** — 効果の本質は「string 化の回避」
+- `SequenceEqual("GET "u8)` 連鎖と uint 定数比較は**完全に同速**(115.4 vs 115.2ns)。net10 の SequenceEqual は定数長で十分最適化されており、uint 化の利得はコードサイズ減(226B → 166B)のみ
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// 既定: u8 リテラルの SequenceEqual(可読・安全・十分速い)
+if (span.SequenceEqual("GET "u8)) { return HttpMethod.Get; }
+
+// 分岐が多い場合・コードサイズ重視: 整数化して定数比較
+// 定数は手書き 16 進でなく u8 リテラルから生成(static readonly は Tier1 で JIT 定数化)
+private static readonly uint GetToken = BinaryPrimitives.ReadUInt32LittleEndian("GET "u8);
+
+var value = BinaryPrimitives.ReadUInt32LittleEndian(span);
+if (value == GetToken) { return HttpMethod.Get; }
+```
+
+**ユースケース:** プロトコルパーサーのメソッド/キーワードディスパッチ、マジックナンバー判定。
+
+**注意:** 4/8 バイト厳密長でないトークン混在時は長さ判定を先に行う。5〜7 バイトは `ulong` 読み + マスクで対応できるが、まず SequenceEqual で書いて計測してから最適化する。
+
+---
+
+### TXT-05: Utf8.TryWrite による UTF-8 直接整形
+
+**目的:** UTF-8 出力の組み立てを、string 補間 → エンコードの 2 段ではなく、UTF-8 補間ハンドラ(.NET 8+)で `Span<byte>` へ直接書き込む。
+
+**効果(実測、Ryzen 9 5900X / net10、`id={int}&name={string}&ts={long}` の整形):**
+
+- string 補間 + `Encoding.UTF8.GetBytes` 比で **0.54 倍(1.9 倍高速)+ 104B → 0B**
+- char ベースの `MemoryExtensions.TryWrite` + エンコード(0.60 倍)よりも速い(中間 char 表現が不要)
+
+**AOT:** ✅ 問題なし(補間ハンドラはコンパイル時変換)
+
+**実装例:**
+
+```csharp
+using System.Text.Unicode;
+
+if (Utf8.TryWrite(destination, $"id={id}&name={name}&ts={timestamp}", out var written))
+{
+    writer.Advance(written);
+}
+```
+
+**ユースケース:** HTTP/プロトコルレスポンスの組み立て、UTF-8 ログ出力、BUF-02(IBufferWriter)への直接整形。
+
+**注意:** 固定書式の数値・日時のみなら TXT-01(ルックアップテーブル)がさらに速い。可変フォーマット・混在コンテンツの汎用手段として使い分ける。
+
+---
+
+### TXT-06: ASCII 特化比較
+
+**目的:** ASCII 前提が保証できるトークン(HTTP ヘッダ名等)の大文字小文字無視処理を、Unicode 対応の汎用実装から ASCII 特化(.NET 8 の `Ascii` クラス)へ置き換える。
+
+**効果(実測、Ryzen 9 5900X / net10、ヘッダ名 8 ペアの大小無視比較):**
+
+- `Ascii.EqualsIgnoreCase`(byte 列同士)は `string.Equals(OrdinalIgnoreCase)` 比 **0.62 倍**。byte のままで比較でき、事前の string 化自体も不要になる(実質の差はさらに大きい)
+- 手書き `| 0x20` 正規化比較は 0.43 倍・コードサイズ 242B と最速だが、`@` と `` ` `` など記号ペアを誤同一視する罠がある
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// 既定: Ascii クラス(.NET 8+。byte/char 混在オーバーロードもある)
+if (Ascii.EqualsIgnoreCase(headerName, "content-type"u8)) { ... }
+
+// 英字のみ大小が異なる閉じたトークン集合に限り、| 0x20 正規化も可
+```
+
+**ユースケース:** HTTP ヘッダ・プロトコルフィールドの判定、`Ascii.ToLowerInPlace` 等による正規化、`char.IsAsciiDigit` 系での分類。
+
+**注意:** 入力が非 ASCII を含みうる場合は `Ascii.IsValid` で先に判定するか、汎用実装へフォールバックする。`| 0x20` は記号衝突(`@`↔`` ` ``、`[`↔`{` 等)があるため既知集合との比較専用。
 
 ---
 
@@ -1679,13 +1830,13 @@ public T Resolve<T>()
 | ① | 末尾要素の事前アクセスによる境界チェック除去 | `_ = array[length - 1]` の事前タッチ・逆順アンロール。.NET 8 有効 / .NET 10 で差消滅の再確認(反パターン化想定) | MEM-01 | ❌ 反パターン表へ |
 | ① | GC.AllocateUninitializedArray\<T\> | 大配列のゼロ初期化スキップ。効果が出るサイズ閾値の特定 | BUF-01 / BUF-05 | ✅ 条件付き収録([BUF-06](#buf-06-gcallocateuninitializedarray-によるゼロ初期化スキップ)) |
 | ① | 定数サイズ stackalloc | 定数確保+スライス vs 可変サイズ(localloc 命令)のコスト差 | BUF-03 / BUF-05 | ✅ 収録([STK-06](#stk-06-定数サイズ-stackalloc)) |
-| ② | CollectionsMarshal.SetCount(.NET 8+) | Add ループ(容量チェック×N)vs SetCount + Span 直接書き込み。未初期化領域が見える危険の注意付き | COL-01 | 未着手 |
-| ② | IEnumerable\<T\> 引数の具象型分岐 | `is T[]` / `is List<T>` / TryGetNonEnumeratedCount で Span パスへ逃がす LINQ 内部の定石 | COL-04 / STK-02 | 未着手 |
-| ② | COL-01 の実装例・自環境再測定 | AsSpan / GetValueRefOrAddDefault(収録済みパターンの実装例化) | COL-01 | 未着手 |
-| ③ | byte 列の int 化定数比較 | 短い ASCII トークン(HTTP メソッド等)を uint/ulong 定数 1 比較で判定 vs `SequenceEqual("..."u8)` | BIT-02 / TXT-01 | 未着手 |
-| ③ | Utf8.TryWrite(.NET 8+) | UTF-8 補間ハンドラによる Span\<byte\> 直接整形。TXT-01 テーブル方式との比較 | TXT-01 / BUF-02 | 未着手 |
-| ③ | ASCII 特化処理 | Ascii クラス(.NET 8)/ char.IsAsciiXxx / `& 0x5F` 大文字化による ASCII 前提の高速パス | BIT-02 / TXT-01 | 未着手 |
-| ③ | BUF-02 の実装例(I/O 直結) | MemoryStream 蓄積 vs ArrayBufferWriter vs 自前 PooledBufferWriter(収録済みパターンの実証) | BUF-02 | 未着手 |
+| ② | CollectionsMarshal.SetCount(.NET 8+) | Add ループ(容量チェック×N)vs SetCount + Span 直接書き込み。未初期化領域が見える危険の注意付き | COL-01 | ✅ 収録(COL-01 拡張、0.22〜0.26 倍) |
+| ② | IEnumerable\<T\> 引数の具象型分岐 | `is T[]` / `is List<T>` / TryGetNonEnumeratedCount で Span パスへ逃がす LINQ 内部の定石 | COL-04 / STK-02 | ✅ 条件付き収録([COL-05](#col-05-ienumerable-引数の具象型ディスパッチ)。List 1.8 倍、配列は GDV により利得なし) |
+| ② | COL-01 の実装例・自環境再測定 | AsSpan / GetValueRefOrAddDefault(収録済みパターンの実装例化) | COL-01 | ✅ 検証済(AsSpan 0.52 / ref 化 0.66) |
+| ③ | byte 列の int 化定数比較 | 短い ASCII トークン(HTTP メソッド等)を uint/ulong 定数 1 比較で判定 vs `SequenceEqual("..."u8)` | BIT-02 / TXT-01 | ✅ 収録([TXT-04](#txt-04-バイト列トークンの直接判定)。string 化回避が本質、uint と SequenceEqual は同速) |
+| ③ | Utf8.TryWrite(.NET 8+) | UTF-8 補間ハンドラによる Span\<byte\> 直接整形。TXT-01 テーブル方式との比較 | TXT-01 / BUF-02 | ✅ 収録([TXT-05](#txt-05-utf8trywrite-による-utf-8-直接整形)、0.54 倍・0B) |
+| ③ | ASCII 特化処理 | Ascii クラス(.NET 8)/ char.IsAsciiXxx / `& 0x5F` 大文字化による ASCII 前提の高速パス | BIT-02 / TXT-01 | ✅ 収録([TXT-06](#txt-06-ascii-特化比較)、0.62 倍。手書き正規化は記号衝突の注意付き) |
+| ③ | BUF-02 の実装例(I/O 直結) | MemoryStream 蓄積 vs ArrayBufferWriter vs 自前 PooledBufferWriter(収録済みパターンの実証) | BUF-02 | ✅ 実装済(PooledBufferWriter。アロケーション 2,976B→32B) |
 | ④ | async ステートマシンの省略 | 単純フォワードの Task 直接返し vs async/await。例外発生位置・using スコープが変わる注意付き | TXT-03 / 拡充候補 ValueTask | 未着手 |
 | ④ | Environment.TickCount64 / Stopwatch.GetTimestamp | DateTime.UtcNow(十数 ns)を回避する時刻・経過時間取得。キャッシュ TTL・タイムアウト用途 | — | 未着手 |
 | ④ | pinned バッファ(GC.AllocateArray(pinned: true)) | POH 常駐 I/O バッファによるピン止めコスト回避 | BUF-01 / BUF-02 | 未着手 |

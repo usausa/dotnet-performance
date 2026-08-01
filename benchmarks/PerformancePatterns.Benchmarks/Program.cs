@@ -1,8 +1,10 @@
 namespace PerformancePatterns.Benchmarks;
 
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 using BenchmarkDotNet.Running;
@@ -26,6 +28,8 @@ public static class Program
         VerifySpanReaderWriter();
         VerifyUtf8DateTimeFormatter();
         VerifyLab();
+        VerifyLabBatch2();
+        VerifyLabBatch3();
 
         // 実行例: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -45,6 +49,14 @@ public static class Program
                 typeof(BoundsCheckHintBenchmark),
                 typeof(UninitializedArrayBenchmark),
                 typeof(StackallocSizeBenchmark),
+                typeof(ListSetCountBenchmark),
+                typeof(EnumerableDispatchBenchmark),
+                typeof(ListIterationBenchmark),
+                typeof(DictionaryCountBenchmark),
+                typeof(BufferWriterBenchmark),
+                typeof(TokenMatchBenchmark),
+                typeof(Utf8WriteBenchmark),
+                typeof(AsciiBenchmark),
             ])
             .Run(args);
     }
@@ -182,6 +194,110 @@ public static class Program
         if ((copy1 != copy2) || (copy2 != copy3) || (copy1 != unchecked((byte)4095)))
         {
             throw new InvalidOperationException("Verify failed. CopyVariable");
+        }
+    }
+
+    private static void VerifyLabBatch2()
+    {
+        // SetCount + Span 書き込みが Add ループと同一内容になること
+        var added = new List<int>();
+        for (var i = 0; i < 100; i++)
+        {
+            added.Add(i);
+        }
+
+        var filled = new List<int>();
+        CollectionsMarshal.SetCount(filled, 100);
+        var fillSpan = CollectionsMarshal.AsSpan(filled);
+        for (var i = 0; i < fillSpan.Length; i++)
+        {
+            fillSpan[i] = i;
+        }
+
+        if (!added.SequenceEqual(filled))
+        {
+            throw new InvalidOperationException("Verify failed. SetCount");
+        }
+
+        // 具象型分岐・反復・辞書カウントのバリアント一致
+        var dispatch = new EnumerableDispatchBenchmark();
+        dispatch.Setup();
+        var expectedSum = 1023 * 1024 / 2;
+        if ((dispatch.EnumerateArray() != expectedSum) || (dispatch.DispatchArray() != expectedSum) ||
+            (dispatch.EnumerateList() != expectedSum) || (dispatch.DispatchList() != expectedSum) ||
+            (dispatch.EnumerateIterator() != expectedSum) || (dispatch.DispatchIterator() != expectedSum))
+        {
+            throw new InvalidOperationException("Verify failed. EnumerableDispatch");
+        }
+
+        var iteration = new ListIterationBenchmark();
+        iteration.Setup();
+        if ((iteration.ForEachList() != expectedSum) || (iteration.ForList() != expectedSum) ||
+            (iteration.AsSpanFor() != expectedSum) || (iteration.AsSpanForEach() != expectedSum))
+        {
+            throw new InvalidOperationException("Verify failed. ListIteration");
+        }
+
+        var counting = new DictionaryCountBenchmark();
+        counting.Setup();
+        if ((counting.DoubleLookup() != 256) || (counting.RefLookup() != 256))
+        {
+            throw new InvalidOperationException("Verify failed. DictionaryCount");
+        }
+    }
+
+    private static void VerifyLabBatch3()
+    {
+        // トークン判定 3 方式の一致(64 プローブ × 4 種のマッチ ID 合計 = 160)
+        var tokenMatch = new TokenMatchBenchmark();
+        tokenMatch.Setup();
+        if ((tokenMatch.StringSwitch() != 160) || (tokenMatch.SequenceEqualChain() != 160) || (tokenMatch.UIntConstantCompare() != 160))
+        {
+            throw new InvalidOperationException("Verify failed. TokenMatch");
+        }
+
+        // UTF-8 整形 3 方式のバイト列一致
+        var utf8Write = new Utf8WriteBenchmark();
+        utf8Write.Setup();
+        var utf8Results = new byte[3][];
+        utf8Results[0] = utf8Write.CopyBuffer(utf8Write.StringInterpolationEncode());
+        utf8Results[1] = utf8Write.CopyBuffer(utf8Write.CharTryWriteEncode());
+        utf8Results[2] = utf8Write.CopyBuffer(utf8Write.Utf8TryWrite());
+        if (!utf8Results[0].SequenceEqual(utf8Results[1]) || !utf8Results[0].SequenceEqual(utf8Results[2]))
+        {
+            throw new InvalidOperationException("Verify failed. Utf8Write");
+        }
+
+        // ASCII 比較 3 方式の一致(8 ペアすべて一致)
+        var ascii = new AsciiBenchmark();
+        ascii.Setup();
+        if ((ascii.StringEqualsIgnoreCase() != 8) || (ascii.AsciiEqualsIgnoreCase() != 8) || (ascii.ManualOr20Compare() != 8))
+        {
+            throw new InvalidOperationException("Verify failed. Ascii");
+        }
+
+        // BufferWriter 3 方式の長さと内容の一致
+        var bufferWriter = new BufferWriterBenchmark();
+        bufferWriter.Setup();
+        if ((bufferWriter.MemoryStreamWrite() != 1024) || (bufferWriter.ArrayBufferWriterWrite() != 1024) || (bufferWriter.PooledBufferWriterWrite() != 1024))
+        {
+            throw new InvalidOperationException("Verify failed. BufferWriter length");
+        }
+
+        var expected = new ArrayBufferWriter<byte>();
+        using var pooled = new PooledBufferWriter<byte>();
+        for (var i = 0; i < 4; i++)
+        {
+            var chunk = new byte[] { 1, 2, 3, (byte)i };
+            chunk.CopyTo(expected.GetSpan(chunk.Length));
+            expected.Advance(chunk.Length);
+            chunk.CopyTo(pooled.GetSpan(chunk.Length));
+            pooled.Advance(chunk.Length);
+        }
+
+        if (!expected.WrittenSpan.SequenceEqual(pooled.WrittenSpan))
+        {
+            throw new InvalidOperationException("Verify failed. BufferWriter content");
         }
     }
 
