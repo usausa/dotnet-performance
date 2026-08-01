@@ -8,6 +8,7 @@ using System.Text;
 using BenchmarkDotNet.Running;
 
 using PerformancePatterns.Benchmarks.Buf;
+using PerformancePatterns.Benchmarks.Lab;
 using PerformancePatterns.Benchmarks.Seq;
 using PerformancePatterns.Benchmarks.Txt;
 using PerformancePatterns.Buf;
@@ -24,6 +25,7 @@ public static class Program
         VerifyValueStringBuilder();
         VerifySpanReaderWriter();
         VerifyUtf8DateTimeFormatter();
+        VerifyLab();
 
         // 実行例: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -37,6 +39,12 @@ public static class Program
                 typeof(TemporaryBufferBenchmark),
                 typeof(ValueStringBuilderBenchmark),
                 typeof(Utf8DateTimeFormatterBenchmark),
+                typeof(ReferenceContainsBranchBenchmark),
+                typeof(CopyVariableBenchmark),
+                typeof(CopyConstantBenchmark),
+                typeof(BoundsCheckHintBenchmark),
+                typeof(UninitializedArrayBenchmark),
+                typeof(StackallocSizeBenchmark),
             ])
             .Run(args);
     }
@@ -141,6 +149,39 @@ public static class Program
             {
                 throw new InvalidOperationException($"Verify failed. Utf8DateTimeFormatter value=[{value:O}]");
             }
+        }
+    }
+
+    private static void VerifyLab()
+    {
+        // 境界チェック除去バリアントの合計一致
+        var bounds = new BoundsCheckHintBenchmark();
+        bounds.Setup();
+        var expectedSum = 1023 * 1024 / 2;
+        if ((bounds.SumByLength() != expectedSum) ||
+            (bounds.SumByArrayLength() != expectedSum) ||
+            (bounds.SumWithTailTouch() != expectedSum) ||
+            (bounds.SumWithUnsignedGuard() != expectedSum))
+        {
+            throw new InvalidOperationException("Verify failed. BoundsCheckHint");
+        }
+
+        // コピーバリアントの結果一致
+        var copyConstant = new CopyConstantBenchmark();
+        copyConstant.Setup();
+        if (copyConstant.SpanCopyTo16() != copyConstant.CopyBlockUnaligned16())
+        {
+            throw new InvalidOperationException("Verify failed. CopyConstant");
+        }
+
+        var copyVariable = new CopyVariableBenchmark { Size = 4096 };
+        copyVariable.Setup();
+        var copy1 = copyVariable.SpanCopyTo();
+        var copy2 = copyVariable.ArrayCopy();
+        var copy3 = copyVariable.CopyBlockUnaligned();
+        if ((copy1 != copy2) || (copy2 != copy3) || (copy1 != unchecked((byte)4095)))
+        {
+            throw new InvalidOperationException("Verify failed. CopyVariable");
         }
     }
 

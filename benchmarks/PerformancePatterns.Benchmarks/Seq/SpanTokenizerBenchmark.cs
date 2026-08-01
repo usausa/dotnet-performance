@@ -5,12 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Seq;
 
-// 注意: 下位 TFM に存在しないメソッドを同一クラスに #if で混在させると、
-// ホスト(net10.0)が発見したメソッドを下位ランタイムの子ビルドが解決できず全ケース NA になる。
-// TFM 依存の比較は「クラスごと #if + そのクラスにだけ新しいランタイムのジョブを付ける」形で分離する。
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net80)]
-[MediumRunJob(RuntimeMoniker.Net90)]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class SpanTokenizerBenchmark
 {
@@ -51,9 +46,9 @@ public class SpanTokenizerBenchmark
     }
 }
 
+// net8.0 ビルドには MemoryExtensions.Split が存在しないためクラスごと除外する(methodology 落とし穴 7)
 #if NET9_0_OR_GREATER
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net90)]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class SpanTokenizerBclComparisonBenchmark
 {

@@ -7,7 +7,8 @@
 
 - **MemoryDiagnoser を常時有効化** — 速度とアロケーションは常にセットで判断する
 - **DisassemblyDiagnoser(printSource, exportDiff)を有効化** — 生成コードとコードサイズを確認する。速度差が誤差レベルでも、コードサイズで優劣を判断できるケースがある(インライン化への影響はコードサイズに現れる)
-- **複数ランタイムの同時実行**(例: net8.0 / net9.0 / net10.0)— 世代間で結論が変わる最適化がある(uint キャスト小細工のように新世代で効果が消えるもの、逆に新世代でのみ効くもの)
+- ベンチマークを介さず単発で生成コードを見たい場合は、環境変数 `DOTNET_JitDisasm="メソッド名"` を設定して実行すると JIT アセンブリが標準出力に出る(Release ビルド + `DOTNET_TieredCompilation=0` 併用で最終コードを直接確認)
+- **既定は最新ランタイム(net10.0)単独で測定する**。複数ランタイム並走は「世代で効果が変わるか」自体を問う検証(境界チェック除去イディオム、uint キャスト小細工のように新世代で消える最適化)に限定して使う
 
 ```csharp
 public class BenchmarkConfig : ManualConfig
@@ -19,10 +20,11 @@ public class BenchmarkConfig : ManualConfig
         AddDiagnoser(new DisassemblyDiagnoser(new DisassemblyDiagnoserConfig(
             maxDepth: 3, printSource: true, exportDiff: true)));
         AddColumn(StatisticColumn.Min, StatisticColumn.Max, StatisticColumn.P90);
-        AddJob(Job.MediumRun.WithRuntime(CoreRuntime.Core80));
-        AddJob(Job.MediumRun.WithRuntime(CoreRuntime.Core90));
     }
 }
+
+// クラス側: 既定は net10.0 のみ。世代検証の対象クラスに限り net8 等のジョブを追加する
+[MediumRunJob(RuntimeMoniker.Net10_0)]
 ```
 
 ## 測定を無意味にする落とし穴

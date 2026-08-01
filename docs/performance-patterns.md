@@ -49,6 +49,7 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [JIT-02](#jit-02-iequatablet-制約による分岐除去) | IEquatable\<T\> 制約による分岐除去 | 比較の仮想ディスパッチ除去 | ✅ | 未着手 |
 | [JIT-03](#jit-03-typeoft-分岐によるジェネリック特殊化) | typeof(T) 分岐特殊化 | ジェネリック変換の分岐除去 | ✅ | 未着手 |
 | [JIT-04](#jit-04-コールドパス分離throw-ヘルパー--grow-の-noinlining) | コールドパス分離 | ホットパスのインライン化促進 | ✅ | 未着手 |
+| [JIT-05](#jit-05-isreferenceorcontainsreferences-による処理スキップ) | IsReferenceOrContainsReferences 分岐 | 参照なし型の後始末スキップ | ✅ | [検証済](../benchmarks/results/JIT-05-ReferenceContainsBranch.md) |
 | [BIT-01](#bit-01-符号なしオーバーフローによる範囲チェック) | 符号なしオーバーフロー範囲チェック | 範囲判定の分岐削減 | ✅ | 未着手 |
 | [BIT-02](#bit-02-ドメイン制約を活かした軽量ハッシュ生成) | ドメイン制約を活かした軽量ハッシュ | 既知キー集合の O(1) ハッシュ | ✅ | 未着手 |
 | [BIT-03](#bit-03-2-の累乗サイズ--マスクによる剰余置換) | 2 の累乗サイズ + マスク | 剰余(除算)のビット AND 化 | ✅ | 未着手 |
@@ -60,11 +61,13 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [STK-03](#stk-03-struct-iterator-パターン) | struct iterator パターン | foreach の仮想呼び出し・ヒープ確保除去 | ✅ | 未着手 |
 | [STK-04](#stk-04-static-ローカルメソッドによる-iterator-の最適化) | static ローカルメソッド iterator | 即時バリデーション + クロージャ防止 | ✅ | 未着手 |
 | [STK-05](#stk-05-ボックス化回避と頻出値キャッシュ) | ボックス化回避と頻出値キャッシュ | object 境界のアロケーション排除 | ✅ | 未着手 |
+| [STK-06](#stk-06-定数サイズ-stackalloc) | 定数サイズ stackalloc | localloc 回避とゼロ初期化制御 | ✅ | [検証済](../benchmarks/results/STK-06-StackallocSize.md) |
 | [BUF-01](#buf-01-arraypoolt-によるバッファ再利用) | ArrayPool\<T\> | 使い捨てバッファの GC 圧力削減 | ✅ | 未着手 |
 | [BUF-02](#buf-02-ibufferwritert--getspan--advance-パターン) | IBufferWriter\<T\> + GetSpan / Advance | 出力バッファへの直接書き込み | ✅ | 未着手 |
 | [BUF-03](#buf-03-bufferwriterslimtスタックファースト書き込み) | BufferWriterSlim\<T\> | スタックファーストのバッファ書き込み | ✅ | 未着手 |
 | [BUF-04](#buf-04-memoryownertスコープ付きバッファ所有権) | MemoryOwner\<T\> | プールレンタルへの RAII スコープ付与 | ✅ | 未着手 |
 | [BUF-05](#buf-05-一時バッファの段階戦略stackalloc--arraypool-統合) | 一時バッファの段階戦略 | stackalloc/プールの閾値切替統合 | ✅ | [実装](../src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
+| [BUF-06](#buf-06-gcallocateuninitializedarray-によるゼロ初期化スキップ) | GC.AllocateUninitializedArray | 大配列確保のゼロ初期化スキップ | ✅ | [検証済](../benchmarks/results/BUF-06-UninitializedArray.md) |
 | [SEQ-01](#seq-01-spanreadert--spanwritert) | SpanReader\<T\> / SpanWriter\<T\> | ゼロアロケーション逐次読み書き | ✅ | [実装](../src/PerformancePatterns/Seq/SpanReader.cs) |
 | [SEQ-02](#seq-02-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | [実装](../src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-03](#seq-03-stream-構造体-io) | Stream 構造体 I/O | 構造体の直接バイナリ読み書き | ✅ | 未着手 |
@@ -122,6 +125,33 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | 短命文字列の組み立て | TXT-02 |
 | パース・変換の失敗ハンドリング | TXT-03 |
 | 型保証済みキャストの高速化 | TYP-05 |
+
+---
+
+## Unsafe / MemoryMarshal API 早見表
+
+低レベル API は複数パターンに分散しているため、用途からの横断参照用にまとめる。
+
+| API | 用途 | 関連パターン |
+|---|---|---|
+| `Unsafe.Add(ref r, i)` | ref からのオフセットアクセス(境界チェックなし) | MEM-01 / MEM-02 |
+| `Unsafe.As<T>(object)` | 型チェック省略キャスト(参照型) | TYP-05 |
+| `Unsafe.As<TFrom, TTo>(ref v)` | ref の再解釈(ジェネリック特殊化・ビット再解釈) | JIT-03 / SEQ-03 |
+| `Unsafe.ReadUnaligned / WriteUnaligned` | アラインメント非保証位置の unmanaged 読み書き | SEQ-01 / SEQ-03 / BUF-02 |
+| `Unsafe.SkipInit(out v)` | out 変数の初期化スキップ | MEM-03 / SEQ-03 |
+| `Unsafe.SizeOf<T>()` | unmanaged 型のサイズ(JIT 定数) | SEQ-01 / SEQ-03 |
+| `Unsafe.IsAddressLessThan` | ref 同士の位置比較(終端判定) | MEM-01 |
+| `Unsafe.BitCast<TFrom, TTo>`(.NET 8+) | 同サイズ値型の安全なビット再解釈(As の安全版) | SEQ-03 / TYP-02 |
+| `MemoryMarshal.GetReference(span)` | Span 先頭への ref 取得 | MEM-01 |
+| `MemoryMarshal.GetArrayDataReference(array)` | 配列先頭への ref 取得 | MEM-02 |
+| `MemoryMarshal.Cast<TFrom, TTo>(span)` | Span の要素型再解釈(ゼロコスト) | TYP-02 / 拡充候補 XxHash3 |
+| `MemoryMarshal.AsBytes(span)` | Span の byte ビュー化 | TYP-02 |
+| `MemoryMarshal.CreateSpan(ref r, len)` | ref からの Span 構築 | SEQ-03 |
+| `CollectionsMarshal.AsSpan(list)` | List 内部配列の Span 化 | COL-01 |
+| `CollectionsMarshal.GetValueRefOrAddDefault` | 辞書エントリへの ref 取得 | COL-01 |
+| `RuntimeHelpers.IsReferenceOrContainsReferences<T>()` | 参照有無の型別分岐(JIT 定数) | JIT-05 |
+
+**共通の注意:** これらは境界チェック・型安全性を自分で保証する API 群。公開 API の入力検証を通過した後の内部実装に閉じて使い、Debug ビルドでの `Debug.Assert` 併用を推奨する。
 
 ---
 
@@ -201,7 +231,7 @@ for (var i = 0; i < array.Length; i++)
 
 - スタックフレーム確保時の `memset` を除去
 - `stackalloc` を多用するメソッドで特に有効
-- 実測で数十 ns のオーバーヘッドを削減できる場合がある
+- 実測例: 定数 512 バイトの stackalloc を含むメソッドで 6.6ns → 1.6ns(STK-06 の検証で確認)
 
 **AOT:** ✅ 問題なし
 
@@ -327,6 +357,7 @@ public static bool TryGetValue<TKey>(...)
 - `EqualityComparer<T>.Default` の仮想ディスパッチが除去される
 - プリミティブ型では直接の `==` 命令に展開される
 - `IndexOf` 等のスパン検索は型に特化した SIMD 実装が選択される
+- struct を制約付きジェネリック(`where TComparer : IComparer<T>` 等)で受けると constrained call になり、ボックス化なしで型別特殊化コードが生成される。interface 型の引数(`IComparer<T> comparer`)で受けると struct 実装は毎回ボックス化される — 「比較子・ストラテジは struct + ジェネリック制約で受ける」が定石
 
 **AOT:** ✅ 問題なし。値型のジェネリックは AOT コンパイル時に型ごとに完全特殊化されるため、JIT と同等の最適化が効く
 
@@ -422,6 +453,39 @@ private static void ThrowInvalidState() => throw new InvalidOperationException(.
 ```
 
 **ユースケース:** builder/writer の Grow 処理、引数検証、稀なエラーパス全般。
+
+---
+
+### JIT-05: IsReferenceOrContainsReferences による処理スキップ
+
+**目的:** 参照を含まない型 `T` に対して、GC 参照解放のための後始末(配列クリア等)を分岐でスキップする。
+
+**効果(実測、Ryzen 9 5900X / net10):**
+
+- `RuntimeHelpers.IsReferenceOrContainsReferences<T>()` は JIT が型ごとに定数畳み込みし、成立しない側の分岐をコードごと削除する
+- `int[1024]` のクリア: 無条件 40.9ns → 条件分岐 **0.19ns**(仕事ごと消滅。コードサイズ 510B → 28B)
+- 参照型(`string[]`、クリアが必要な側)ではチェックのオーバーヘッドは実測ゼロ(184.5ns vs 189.5ns、コードサイズ同一)
+
+**AOT:** ✅ 問題なし(値型は AOT でも完全特殊化され定数化される)
+
+**実装例:**
+
+```csharp
+public void Return(T[] array)
+{
+    // 参照を含まない型では GC のためのクリアは不要(BCL の ArrayPool/List と同じ判断)
+    if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+    {
+        Array.Clear(array);
+    }
+
+    pool.Push(array);
+}
+```
+
+**ユースケース:** プール返却時のクリア、コレクションの Clear/Remove、シリアライザのバッファ後始末、コピー/比較方式の型別切替。
+
+**注意:** スキップしてよいのは「GC に参照を解放させる」目的のクリアだけ。機密データ消去などセキュリティ目的のクリアは型にかかわらず必ず実行する。
 
 ---
 
@@ -822,6 +886,47 @@ public static object Box(int value) => value switch
 
 **注意:** ジェネリック制約(`where T : struct` + インターフェース制約)で呼び出し全体をボックス化なしに設計できるなら、そちらが根本対策(JIT-02 参照)。
 
+**暗黙ボックス化の主な発生源(レビュー観点):**
+
+- struct の interface 型変数・引数への代入(`IComparer<T> c = myStructComparer`)
+- `object` 引数への値型渡し(`string.Format` / `string.Concat` / 旧式ロガー / `ArrayList` 等の非ジェネリック API)
+- struct メソッドのデリゲート束縛
+- 列挙型・値型の `Enum.Parse`(非ジェネリック版)・`GetHashCode`/`Equals(object)` の既定実装経由の比較
+- `params object[]` への値型展開(C# 13 の `params ReadOnlySpan<T>` で回避可能)
+
+---
+
+### STK-06: 定数サイズ stackalloc
+
+**目的:** stackalloc をコンパイル時定数サイズで確保し(フレーム内固定領域になる)、必要分をスライスして使う。可変サイズ確保は `localloc` 命令になり高コスト。
+
+**効果(実測、Ryzen 9 5900X / net10):**
+
+| 確保形 | SkipLocalsInit あり | ゼロ初期化あり |
+|---|---|---|
+| 定数 512(+ スライス) | **1.6 ns** | 6.6 ns |
+| 可変サイズ 512 | 4.6 ns(約 3 倍) | **14.8 ns(約 9 倍)** |
+
+- 定数サイズならゼロ初期化コストもサイズ固定で予測可能。可変サイズは localloc 自体のコストに加え、ゼロ初期化も遅い形になる
+- MEM-03(SkipLocalsInit)の除去効果(6.6 → 1.6ns)も同時に実証
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// ✅ 定数で確保して必要分をスライス(BUF-05 の閾値イディオムもこの形)
+Span<byte> buffer = stackalloc byte[512];
+var span = buffer[..size];
+
+// ❌ 可変サイズの stackalloc(localloc 命令化)
+Span<byte> buffer = stackalloc byte[size];
+```
+
+**ユースケース:** BUF-03 / BUF-05 / TXT-02 の初期バッファ確保すべて。
+
+**注意:** 定数は 256〜512 バイト程度を目安にし、再帰・ループ内での確保は避ける(スタック消費は呼び出しごと)。
+
 ---
 
 ## BUF: バッファ管理・プーリング
@@ -1000,6 +1105,38 @@ Process(buffer.Span);
 
 - 変種として `[ThreadStatic]` static バッファの使い回しがある(完全アロケーションゼロ)が、再入・async 境界をまたぐ保持・スレッドごとのメモリ滞留に注意。ThreadStatic フィールドへのアクセス自体にもコストがあるため、使う場合はループ前にローカル変数へ退避する
 - stackalloc 側の閾値は 256〜512 要素程度を目安にする(BUF-03 と同様)
+
+---
+
+### BUF-06: GC.AllocateUninitializedArray によるゼロ初期化スキップ
+
+**目的:** ヒープ配列の確保時ゼロ初期化をスキップする(ヒープ版 SkipLocalsInit)。全域を自分で書き潰すことが確実な一時バッファ向け。
+
+**効果(実測、Ryzen 9 5900X / net10、`new byte[N]` 比):**
+
+| サイズ | 比率 | 判定 |
+|---|---|---|
+| 256B / 2048B | 1.05 / **1.27(逆効果)** | 小サイズはランタイムが通常確保にフォールバックし、呼び出しオーバーヘッドだけ残る |
+| 4096B | 0.64 | 有効 |
+| 64KB | **0.14(約 7 倍)** | 最も有効な帯域 |
+| 1MB(LOH 級) | 1.00 | 確保ごとの GC コストが支配し差が消える |
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// 直後に全域へ書き込むことが確実な受信バッファ等
+var buffer = GC.AllocateUninitializedArray<byte>(length);
+stream.ReadExactly(buffer);
+```
+
+**ユースケース:** 一度きりの大きめバッファ(4KB〜数百 KB)の確保。繰り返し確保する場合は BUF-01(ArrayPool)を優先する。
+
+**注意:**
+
+- 未初期化領域を読まない保証は呼び出し側の責任(読み出し前に必ず全域を書く)
+- `pinned: true` オプションで POH(Pinned Object Heap)確保も可能(検証キュー④で別途検証)
 
 ---
 
@@ -1520,6 +1657,8 @@ public T Resolve<T>()
 | Span で書ける処理の `fixed` ポインタ化 | `MemoryMarshal.Cast` / `Unsafe.As` と同速か遅い(固定コストが載る) | Span / ref ベースで書く |
 | readonly フィールド化による JIT 最適化の期待 | インライン化される限り差は測定不能 | readonly は設計意図として付ける(性能目的にしない) |
 | static メソッドを直接バインドしたデリゲートの保持 | thunk 経由で最も遅い呼び出し形態になりうる | DSP-02 の指針で保持形態を選ぶ |
+| `Span.CopyTo` の `Unsafe.CopyBlockUnaligned` 置換 | 可変長では同速(0.98〜1.03 倍、両者とも同じ Memmove に到達)。定数長 16B でも 0.2ns / コードサイズ 45B の微差のみ([実測](../benchmarks/results/LAB-CopyBlockUnaligned.md)) | `Span.CopyTo` を既定にする。`Array.Copy` はコードサイズ肥大(1.7KB)で最遅 |
+| 末尾要素の事前タッチ・ガードによる境界チェック誘導 | .NET 10 では全バリアント差なし。.NET 8 でも 1024 要素の合計ループでは差なし(旧世代の極小ループ限定で効いた小差テクニック、[実測](../benchmarks/results/LAB-BoundsCheckHint.md)) | ループ条件に `array.Length` / `span.Length` を直接使う形にする(コードサイズも最小: 34B vs 94〜140B) |
 | マイクロベンチ結果の直接外挿 | 単体で 30 倍差でも実処理では 1.1 倍程度に希釈される例あり | 実ワークロード形状で再計測([benchmark-methodology.md](benchmark-methodology.md)) |
 
 ---
@@ -1535,11 +1674,11 @@ public T Resolve<T>()
 
 | 批次 | 候補 | 概要 / 検証の問い | 関連 | 状態 |
 |:---:|---|---|---|:---:|
-| ① | RuntimeHelpers.IsReferenceOrContainsReferences\<T\> 分岐 | 参照を含まない T でクリア・コピー処理をスキップ。JIT が定数化して分岐ごと消えるか | JIT-03 | 未着手 |
-| ① | Unsafe.CopyBlockUnaligned | Span.CopyTo / Array.Copy に対して優位になる条件の特定(定数長で mov 列に展開される場合のみか) | MEM-05 / SEQ-03 | 未着手 |
-| ① | 末尾要素の事前アクセスによる境界チェック除去 | `_ = array[length - 1]` の事前タッチ・逆順アンロール。.NET 8 有効 / .NET 10 で差消滅の再確認(反パターン化想定) | MEM-01 | 未着手 |
-| ① | GC.AllocateUninitializedArray\<T\> | 大配列のゼロ初期化スキップ。効果が出るサイズ閾値の特定 | BUF-01 / BUF-05 | 未着手 |
-| ① | 定数サイズ stackalloc | 定数確保+スライス vs 可変サイズ(localloc 命令)のコスト差 | BUF-03 / BUF-05 | 未着手 |
+| ① | RuntimeHelpers.IsReferenceOrContainsReferences\<T\> 分岐 | 参照を含まない T でクリア・コピー処理をスキップ。JIT が定数化して分岐ごと消えるか | JIT-03 | ✅ 収録([JIT-05](#jit-05-isreferenceorcontainsreferences-による処理スキップ)) |
+| ① | Unsafe.CopyBlockUnaligned | Span.CopyTo / Array.Copy に対して優位になる条件の特定(定数長で mov 列に展開される場合のみか) | MEM-05 / SEQ-03 | ❌ 反パターン表へ |
+| ① | 末尾要素の事前アクセスによる境界チェック除去 | `_ = array[length - 1]` の事前タッチ・逆順アンロール。.NET 8 有効 / .NET 10 で差消滅の再確認(反パターン化想定) | MEM-01 | ❌ 反パターン表へ |
+| ① | GC.AllocateUninitializedArray\<T\> | 大配列のゼロ初期化スキップ。効果が出るサイズ閾値の特定 | BUF-01 / BUF-05 | ✅ 条件付き収録([BUF-06](#buf-06-gcallocateuninitializedarray-によるゼロ初期化スキップ)) |
+| ① | 定数サイズ stackalloc | 定数確保+スライス vs 可変サイズ(localloc 命令)のコスト差 | BUF-03 / BUF-05 | ✅ 収録([STK-06](#stk-06-定数サイズ-stackalloc)) |
 | ② | CollectionsMarshal.SetCount(.NET 8+) | Add ループ(容量チェック×N)vs SetCount + Span 直接書き込み。未初期化領域が見える危険の注意付き | COL-01 | 未着手 |
 | ② | IEnumerable\<T\> 引数の具象型分岐 | `is T[]` / `is List<T>` / TryGetNonEnumeratedCount で Span パスへ逃がす LINQ 内部の定石 | COL-04 / STK-02 | 未着手 |
 | ② | COL-01 の実装例・自環境再測定 | AsSpan / GetValueRefOrAddDefault(収録済みパターンの実装例化) | COL-01 | 未着手 |
@@ -1551,6 +1690,12 @@ public T Resolve<T>()
 | ④ | Environment.TickCount64 / Stopwatch.GetTimestamp | DateTime.UtcNow(十数 ns)を回避する時刻・経過時間取得。キャッシュ TTL・タイムアウト用途 | — | 未着手 |
 | ④ | pinned バッファ(GC.AllocateArray(pinned: true)) | POH 常駐 I/O バッファによるピン止めコスト回避 | BUF-01 / BUF-02 | 未着手 |
 | ④ | BitOperations 活用 | TrailingZeroCount / PopCount / Log2 によるスキャン・計算のループ除去 | BIT-03 | 未着手 |
+| ⑤ | SIMD 実装例(Vector128/256) | 合計・検索・変換の明示的 SIMD 化。スカラー・`Vector<T>`・組み込み関数の比較 | JIT-02 / BIT | 未着手 |
+| ⑤ | ref フィールドによる ref struct 設計(C# 11) | カーソルを Span + index でなく ref T で保持する設計のコスト比較 | SEQ-01 / STK-01 | 未着手 |
+| ⑤ | P/Invoke 高速化 | \[LibraryImport\] + Span 渡し + \[SuppressGCTransition\](短時間ネイティブ呼び出しの GC 遷移省略)の効果と制約 | BUF-05 | 未着手 |
+| ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | 未着手 |
+| ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 / SEQ-01 | 未着手 |
+| ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-04 | 未着手 |
 
 ---
 
@@ -1562,12 +1707,12 @@ public T Resolve<T>()
 |---|---|:---:|
 | string.Create / TryFormat / ISpanFormattable | 文字列生成のゼロアロケーション化 | ✅ |
 | SearchValues\<T\> | 多数候補探索の SIMD 最適化(.NET 8+)。候補 2〜3 個なら `IndexOfAny` 専用オーバーロードの方が速い点に注意 | ✅ |
-| Vector128/256\<T\> ハードウェア組み込み | 明示的 SIMD による一括処理 | ✅ |
 | InlineArray | 構造体内固定長バッファ(.NET 8+) | ✅ |
 | ObjectPool | 参照型インスタンスの再利用 | ✅ |
 | ValueTask / IValueTaskSource | 非同期完了パスのアロケーション削減 | ✅ |
 | params ReadOnlySpan\<T\> | 可変長引数の配列アロケーション除去(C# 13) | ✅ |
 | Interlocked / lock-free 構造 | 競合の少ない同期プリミティブ設計(.NET 9+ の `System.Threading.Lock` 含む) | ✅ |
 | 構造体サイズ別の in / ref 渡し戦略 | 16〜24 バイト超の構造体引数の防御的コピー・値コピー回避 | ✅ |
-| P/Invoke バッファの Span 化 | `StringBuilder` マーシャリングを `Span<char>` + ref 渡しに置換 | ✅ |
 | XxHash3 による汎用ハッシュ | 非暗号ハッシュの高速化。`MemoryMarshal.Cast` での byte 再解釈はゼロコスト | ✅ |
+
+(SIMD と P/Invoke は検証キュー⑤へ移動済み)

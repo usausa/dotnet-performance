@@ -8,8 +8,6 @@ using BenchmarkDotNet.Jobs;
 using PerformancePatterns.Buf;
 
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net80)]
-[MediumRunJob(RuntimeMoniker.Net90)]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class TemporaryBufferBenchmark
 {
