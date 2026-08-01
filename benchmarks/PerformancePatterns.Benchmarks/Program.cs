@@ -10,9 +10,12 @@ using System.Text;
 using BenchmarkDotNet.Running;
 
 using PerformancePatterns.Benchmarks.Buf;
+using PerformancePatterns.Benchmarks.Col;
+using PerformancePatterns.Benchmarks.Dsp;
 using PerformancePatterns.Benchmarks.Lab;
 using PerformancePatterns.Benchmarks.Seq;
 using PerformancePatterns.Benchmarks.Txt;
+using PerformancePatterns.Benchmarks.Typ;
 using PerformancePatterns.Buf;
 using PerformancePatterns.Seq;
 using PerformancePatterns.Txt;
@@ -32,6 +35,7 @@ public static class Program
         VerifyLabBatch3();
         VerifyLabBatch4();
         VerifyLabBatch5();
+        VerifyPatternImplementations();
 
         // 実行例: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -69,6 +73,13 @@ public static class Program
                 typeof(ChannelsBenchmark),
                 typeof(PipelinesBenchmark),
                 typeof(AsyncEnumerableBenchmark),
+                typeof(DisposeGuardBenchmark),
+                typeof(TypeMapBenchmark),
+                typeof(HandlerListBenchmark),
+                typeof(SampledNameTableBenchmark),
+#if NET9_0_OR_GREATER
+                typeof(SampledNameTableSpanKeyBenchmark),
+#endif
             ])
             .Run(args);
     }
@@ -397,6 +408,52 @@ public static class Program
         {
             throw new InvalidOperationException("Verify failed. AsyncEnumerable");
         }
+    }
+
+    private static void VerifyPatternImplementations()
+    {
+        // TYP-01: 4 経路が同じ値を返すこと
+        var typeMap = new TypeMapBenchmark();
+        typeMap.Setup();
+        if (!string.Equals(typeMap.DictionaryLookup(), "guid", StringComparison.Ordinal) ||
+            !string.Equals(typeMap.FrozenLookup(), "guid", StringComparison.Ordinal) ||
+            !string.Equals(typeMap.TypeMapGeneric(), "guid", StringComparison.Ordinal) ||
+            !string.Equals(typeMap.TypeMapRuntimeType(), "guid", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Verify failed. TypeMap");
+        }
+
+        // DSP-03: 購読者数ぶん通知されること
+        var handlerList = new HandlerListBenchmark { Subscribers = 4 };
+        handlerList.Setup();
+        var afterMulticast = handlerList.MulticastDelegate();
+        var afterArray = handlerList.HandlerArray();
+        if ((afterMulticast != 4) || (afterArray != 8))
+        {
+            throw new InvalidOperationException("Verify failed. HandlerList");
+        }
+
+        // BIT-02 / COL-04: 全経路が同じ合計になること
+        var expected = 15 * 16 / 2;
+        var nameTable = new SampledNameTableBenchmark { Columns = 16 };
+        nameTable.Setup();
+        if ((nameTable.DictionaryLookup() != expected) ||
+            (nameTable.LinearScan() != expected) ||
+            (nameTable.SampledHashTable() != expected))
+        {
+            throw new InvalidOperationException("Verify failed. SampledNameTable");
+        }
+
+#if NET9_0_OR_GREATER
+        var spanKeyTable = new SampledNameTableSpanKeyBenchmark { Columns = 16 };
+        spanKeyTable.Setup();
+        if ((spanKeyTable.DictionaryAlternateLookup() != expected) ||
+            (spanKeyTable.FrozenAlternateLookup() != expected) ||
+            (spanKeyTable.SampledHashTable() != expected))
+        {
+            throw new InvalidOperationException("Verify failed. SampledNameTableSpanKey");
+        }
+#endif
     }
 
     private static void VerifyValueStringBuilder()

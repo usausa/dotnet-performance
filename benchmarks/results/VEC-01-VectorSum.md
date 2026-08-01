@@ -1,6 +1,8 @@
-# VEC-01: 明示的 SIMD(Vector<T> / Vector256)
+# VEC-01: Explicit SIMD (Vector<T> / Vector256)
 
-判定: 収録(Vector256 0.11 倍。Enumerable.Sum も 0.24 で BCL 済み API 優先の指針)
+- Verdict: adopted
+- Vector256: 0.11x, Vector<T>: 0.16x vs scalar loop
+- Enumerable.Sum already 0.24x (BCL is vectorized) - prefer BCL SIMD APIs first
 
 ```
 

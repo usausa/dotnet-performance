@@ -1,6 +1,8 @@
-# JIT-05: IsReferenceOrContainsReferences による処理スキップ
+# JIT-05: RuntimeHelpers.IsReferenceOrContainsReferences branch
 
-判定: 収録(チェックは JIT が定数畳み込み。不要なクリアが仕事ごと消え、必要な側のオーバーヘッドはゼロ)
+- Verdict: adopted
+- Clear skipped for int[1024]: 40.9 ns -> 0.19 ns (code 510 B -> 28 B)
+- Zero measured overhead when clear is still required (string[]: 184.5 vs 189.5 ns, same code size)
 
 ```
 

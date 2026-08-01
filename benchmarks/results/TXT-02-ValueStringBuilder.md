@@ -1,5 +1,10 @@
 # TXT-02: ValueStringBuilder
 
+- Verdict: adopted (implemented)
+- 0.31-0.33x vs StringBuilder (no capacity), 760 B -> 216 B (result string only)
+- On par with stackalloc-backed DefaultInterpolatedStringHandler
+- Capacity-specified StringBuilder alone gives 0.43-0.47x
+
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)

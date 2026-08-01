@@ -1,6 +1,8 @@
-# TXT-06: ASCII 特化比較
+# TXT-06: Ascii class comparison
 
-判定: 収録(Ascii.EqualsIgnoreCase 0.62 倍。手書き | 0x20 は 0.43 倍だが記号衝突あり閉集合限定)
+- Verdict: adopted
+- Ascii.EqualsIgnoreCase (bytes) 0.62x vs string.Equals(OrdinalIgnoreCase)
+- Manual (b | 0x20) compare 0.43x, but collides on symbol pairs ('@' vs backquote) - closed token sets only
 
 ```
 

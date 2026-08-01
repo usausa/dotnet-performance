@@ -1,6 +1,10 @@
 # SEQ-02: SpanTokenizer
 
-## SpanTokenizerBenchmark(string.Split との比較)
+- Verdict: adopted (implemented)
+- 0.30-0.34x (4 tokens) / 0.62-0.70x (64 tokens) vs string.Split, 216-3096 B -> 0 B
+- Faster than MemoryExtensions.Split (BCL is 1.07-1.26x slower)
+
+## SpanTokenizerBenchmark (vs string.Split)
 
 ```
 
@@ -35,7 +39,7 @@ IterationCount=15  LaunchCount=2  WarmupCount=10
 | StringSplit   | MediumRun-.NET 9.0  | .NET 9.0  | 64     | 537.42 ns | 18.136 ns | 27.145 ns | 493.03 ns | 588.80 ns | 573.95 ns |  1.00 |    0.07 |   2,941 B | 0.1850 | 0.0019 |    3096 B |        1.00 |
 | SpanTokenizer | MediumRun-.NET 9.0  | .NET 9.0  | 64     | 363.24 ns |  4.172 ns |  6.244 ns | 356.14 ns | 378.98 ns | 372.14 ns |  0.68 |    0.04 |     567 B |      - |      - |         - |        0.00 |
 
-## SpanTokenizerBclComparisonBenchmark(MemoryExtensions.Split との比較、.NET 9+)
+## SpanTokenizerBclComparisonBenchmark (vs MemoryExtensions.Split, .NET 9+)
 
 ```
 
@@ -62,3 +66,4 @@ IterationCount=15  LaunchCount=2  WarmupCount=10
 |                       |                     |           |        |           |          |          |           |           |           |       |         |           |           |             |
 | SpanTokenizer         | MediumRun-.NET 9.0  | .NET 9.0  | 64     | 358.31 ns | 4.791 ns | 7.171 ns | 349.94 ns | 376.13 ns | 369.82 ns |  1.00 |    0.03 |     567 B |         - |          NA |
 | MemoryExtensionsSplit | MediumRun-.NET 9.0  | .NET 9.0  | 64     | 384.86 ns | 2.161 ns | 3.235 ns | 380.22 ns | 391.43 ns | 389.37 ns |  1.07 |    0.02 |     730 B |         - |          NA |
+

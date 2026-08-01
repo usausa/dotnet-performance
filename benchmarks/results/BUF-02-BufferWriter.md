@@ -1,6 +1,8 @@
-# BUF-02: IBufferWriter 実装例(PooledBufferWriter)
+# BUF-02: IBufferWriter (PooledBufferWriter)
 
-判定: 実装済(MemoryStream 比 0.56〜0.63。速度は ArrayBufferWriter、アロケーションゼロ化は PooledBufferWriter 2,976B→32B)
+- Verdict: adopted (implemented)
+- ArrayBufferWriter 0.56x / PooledBufferWriter 0.63x vs MemoryStream + ToArray
+- PooledBufferWriter allocation: 2,976 B -> 32 B (writer instance only)
 
 ```
 

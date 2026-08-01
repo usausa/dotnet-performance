@@ -1,6 +1,10 @@
-# COL-05: IEnumerable 引数の具象型ディスパッチ
+# COL-05: IEnumerable concrete-type dispatch
 
-判定: 条件付き収録(List 0.56 倍。配列は GDV により利得なし・フォールバックのペナルティなし。AOT では配列分岐も有効)
+- Verdict: adopted (conditional)
+- List source 0.56x via CollectionsMarshal.AsSpan branch
+- Array source: no gain on net10 (guarded devirtualization already handles it; 258.5 vs 272.4 ns)
+- No penalty on iterator fallback (829.0 vs 822.8 ns)
+- On AOT the array branch remains valuable (no dynamic PGO)
 
 ```
 

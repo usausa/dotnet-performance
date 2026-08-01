@@ -1,9 +1,9 @@
-# ベンチマーク実施ガイドライン
+# 📐 ベンチマーク実施ガイドライン
 
 パターンの効果検証に使う BenchmarkDotNet の構成と、測定を無意味にする落とし穴の回避策。
-[performance-patterns.md](performance-patterns.md) の「実測例」は本ガイドラインに沿った測定を前提とする。
+[README](../README.md) の「実測例」は本ガイドラインに沿った測定を前提とする。
 
-## 基本構成
+## 🧰 基本構成
 
 - **MemoryDiagnoser を常時有効化** — 速度とアロケーションは常にセットで判断する
 - **DisassemblyDiagnoser(printSource, exportDiff)を有効化** — 生成コードとコードサイズを確認する。速度差が誤差レベルでも、コードサイズで優劣を判断できるケースがある(インライン化への影響はコードサイズに現れる)
@@ -27,7 +27,7 @@ public class BenchmarkConfig : ManualConfig
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 ```
 
-## 測定を無意味にする落とし穴
+## ⚠️ 測定を無意味にする落とし穴
 
 ### 1. 最適化による測定対象の消滅
 
@@ -66,8 +66,8 @@ Debug.Assert(string.IsInterned(probe) is null || !ReferenceEquals(string.IsInter
 
 衝突キーの探索・データ生成などの準備は `[GlobalSetup]` で行い、測定対象から外す。`IterationSetup` は測定精度を落とすため、可能な限り GlobalSetup + 状態リセット不要の設計にする。
 
-## 判断基準
+## ⚖️ 判断基準
 
 - **速度・アロケーション・コードサイズの 3 軸**で評価する。1 軸だけの改善は採用理由として弱い
 - Ratio のベースラインは「現状の素直な実装」にし、改善幅がそのまま読めるようにする
-- 効果が世代で消えた最適化は、パターンとしては「不要になった」と記録する(反パターン表へ)
+- 効果が世代で消えた最適化は、パターンとしては「不要になった」と記録する([rejected-patterns.md](rejected-patterns.md) へ)

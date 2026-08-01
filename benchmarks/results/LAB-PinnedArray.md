@@ -1,6 +1,9 @@
-# LAB: pinned(POH)バッファ(反パターン判定)
+# LAB: Pinned (POH) buffer for speed (rejected, R-13)
 
-判定: 性能目的は反パターン(fixed のピン止めは実測ほぼ無料 0.74ns、POH 化で速くならず。POH 確保は通常の 17.5 倍 + Gen2 誘発。長寿命 I/O バッファの断片化回避専用)
+- Verdict: rejected (for performance purposes)
+- fixed pinning is ~free (0.74 ns); POH pointer access not faster (0.85 ns)
+- POH allocation 17.5x vs normal + Gen2 collections
+- POH is for long-lived I/O buffers (fragmentation avoidance), allocate once at startup
 
 ```
 

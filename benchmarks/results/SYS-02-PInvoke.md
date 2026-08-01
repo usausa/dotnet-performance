@@ -1,6 +1,9 @@
-# SYS-02: P/Invoke 高速化
+# SYS-02: P/Invoke (LibraryImport + SuppressGCTransition)
 
-判定: 収録(SuppressGCTransition 0.57 倍でマネージド並み。LibraryImport は同速だが AOT 対応が価値)
+- Verdict: adopted
+- LibraryImport: same speed as DllImport for blittable call (0.96x); value is AOT/trimming-safe marshalling
+- SuppressGCTransition: 0.57x (1.36 ns, near managed 1.24 ns)
+- SuppressGCTransition constraints: sub-microsecond, non-blocking, no callbacks, no exceptions
 
 ```
 

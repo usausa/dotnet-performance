@@ -1,6 +1,8 @@
-# BIT-04: BitOperations によるビット走査・計数
+# BIT-04: BitOperations scan / popcount
 
-判定: 収録(TZCNT 走査 0.13 倍、PopCount 0.01 倍)
+- Verdict: adopted
+- Set-bit scan via TrailingZeroCount + (mask &= mask - 1): 0.13x
+- PopCount intrinsic vs manual loop: 0.01x
 
 ```
 

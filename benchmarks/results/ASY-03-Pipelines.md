@@ -1,6 +1,9 @@
 # ASY-03: System.IO.Pipelines
 
-判定: 条件付き収録(同スレッド小データは MemoryStream 比 1.63 倍・アロケーション 128KB→1.6KB。PauseWriterThreshold 64KB の逐次書き切りデッドロックに注意)
+- Verdict: adopted (conditional)
+- 1.63x vs MemoryStream for small same-thread transfer (4 KB x 16)
+- Allocation 128.2 KB -> 1.6 KB (1/80, pooled segments)
+- Caution: sequential write-then-read deadlocks at PauseWriterThreshold (default 64 KB); reader must run concurrently
 
 ```
 

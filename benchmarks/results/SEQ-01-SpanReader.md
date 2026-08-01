@@ -1,5 +1,9 @@
 # SEQ-01: SpanReader / SpanWriter
 
+- Verdict: adopted (implemented)
+- 0.10-0.14x vs BinaryReader + MemoryStream, 120-224 B -> 0 B
+- Equal to manual offset parsing (BinaryPrimitives + offset), same code size (125 B)
+
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)

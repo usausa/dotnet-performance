@@ -1,6 +1,8 @@
-# TXT-05: Utf8.TryWrite による UTF-8 直接整形
+# TXT-05: Utf8.TryWrite
 
-判定: 収録(string 補間+Encode 比 0.54 倍・0B。char TryWrite+Encode より速い)
+- Verdict: adopted
+- 0.54x vs string interpolation + Encoding.UTF8.GetBytes, 104 B -> 0 B
+- Faster than char-based TryWrite + encode (0.60x)
 
 ```
 

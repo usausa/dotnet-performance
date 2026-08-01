@@ -1,6 +1,9 @@
 # ASY-02: System.Threading.Channels
 
-判定: 収録(Unbounded ~45ns/要素。SingleReader/Writer は本シナリオ誤差、Bounded 2.0 倍)
+- Verdict: adopted
+- ~45 ns/item unbounded (producer/consumer pump, 10,000 items)
+- SingleReader/SingleWriter options: no measurable effect in this scenario (0.97x)
+- Bounded(128): 2.0x - the price of backpressure
 
 ```
 

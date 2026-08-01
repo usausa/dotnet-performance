@@ -1,6 +1,8 @@
-# LAB: 末尾要素の事前タッチによる境界チェック誘導(反パターン判定)
+# LAB: Tail-touch bounds check hint (rejected, R-15)
 
-判定: 反パターン表へ(net10 / net8 とも 1024 要素の合計ループで全バリアント差なし。array.Length 直接形がコードサイズ最小)
+- Verdict: rejected
+- No difference across all variants on net10 and net8 (1024-int sum)
+- array.Length loop form has the smallest code (34 B vs 94-140 B)
 
 ```
 

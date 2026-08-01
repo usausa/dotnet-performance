@@ -1,5 +1,10 @@
 # BUF-05: TemporaryBuffer
 
+- Verdict: adopted (implemented)
+- 0.11-0.32x at 4096 B (pool path), 0 B allocated
+- 64 B stack path slightly slower than new byte[] (value is zero GC pressure, not latency)
+- Faster than direct ArrayPool at small sizes (stackalloc path skips the pool)
+
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)

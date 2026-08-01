@@ -1,6 +1,8 @@
-# LAB: ref フィールドカーソル(反パターン判定)
+# LAB: ref-field cursor for iteration (rejected, R-12)
 
-判定: 反復用途は反パターン(Span+index の for 比 1.21 倍。SpanReader の要素単位 Read は 2.06 倍 — カーソルは構造読み専用)
+- Verdict: rejected (for iteration use)
+- 1.21x vs plain span for-loop (249 ns baseline)
+- SpanReader per-element Read(): 2.06x - cursors are for field-granularity structured reads
 
 ```
 

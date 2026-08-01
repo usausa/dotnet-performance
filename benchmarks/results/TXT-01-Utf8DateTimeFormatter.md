@@ -1,4 +1,9 @@
-# TXT-01: Utf8DateTimeFormatter(ルックアップテーブル整形)
+# TXT-01: Utf8DateTimeFormatter (lookup table)
+
+- Verdict: adopted (implemented)
+- 0.23-0.32x vs ToString + Encoding.GetBytes, 56 B -> 0 B
+- Code size ~10 KB -> 0.9 KB
+- DateTime.TryFormat + encode gives no time win over ToString (allocation only)
 
 ```
 

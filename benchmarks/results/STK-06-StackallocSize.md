@@ -1,6 +1,10 @@
-# STK-06: 定数サイズ stackalloc
+# STK-06: Constant-size stackalloc
 
-判定: 収録(定数+SkipLocalsInit 1.6ns vs 可変+SkipLocalsInit 4.6ns vs 可変ゼロ初期化 512 で 14.8ns)
+- Verdict: adopted
+- Constant 512 + SkipLocalsInit: 1.6 ns
+- Variable size + SkipLocalsInit: 4.3-4.6 ns (localloc, ~3x)
+- Variable 512 zero-initialized: 14.8 ns (~9x)
+- Also demonstrates MEM-03 (SkipLocalsInit): 6.6 -> 1.6 ns
 
 ```
 

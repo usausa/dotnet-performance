@@ -1,6 +1,9 @@
 # BUF-06: GC.AllocateUninitializedArray
 
-判定: 条件付き収録(4KB〜数百 KB で有効・64KB で約 7 倍。2KB 以下は逆効果、LOH 級は GC 支配で差なし)
+- Verdict: adopted (conditional)
+- 0.14x at 64 KB, 0.64x at 4 KB
+- 1.27x (worse) at 2048 B, ~1.0x at 256 B and 1 MB (LOH / GC dominated)
+- Use for 4 KB - hundreds of KB one-shot buffers only
 
 ```
 

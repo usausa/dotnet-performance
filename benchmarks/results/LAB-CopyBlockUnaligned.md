@@ -1,8 +1,11 @@
-# LAB: Unsafe.CopyBlockUnaligned(反パターン判定)
+# LAB: Unsafe.CopyBlockUnaligned (rejected, R-14)
 
-判定: 反パターン表へ(可変長は Span.CopyTo と同速。定数長 16B のみ 0.83 倍・コードサイズ 61B vs 106B の微差)
+- Verdict: rejected
+- Variable length: 0.98-1.03x vs Span.CopyTo (same Memmove)
+- Constant 16 B: 0.83x, code 61 B vs 106 B - marginal
+- Array.Copy is slowest with 1.7 KB code
 
-## 可変長
+## CopyVariableBenchmark
 
 ```
 
@@ -30,7 +33,7 @@ LaunchCount=2  WarmupCount=10
 | ArrayCopy          | 4096 | 49.591 ns | 1.1152 ns | 1.6692 ns | 46.2714 ns | 52.735 ns | 51.708 ns |  1.11 |    0.13 |   1,740 B |         - |          NA |
 | CopyBlockUnaligned | 4096 | 46.267 ns | 1.5413 ns | 2.3070 ns | 39.7751 ns | 49.725 ns | 48.943 ns |  1.03 |    0.13 |     593 B |         - |          NA |
 
-## 定数長(16 バイト)
+## CopyConstantBenchmark (16 B)
 
 ```
 
@@ -48,3 +51,4 @@ LaunchCount=2  WarmupCount=10
 |--------------------- |----------:|----------:|----------:|----------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
 | SpanCopyTo16         | 1.1533 ns | 0.0584 ns | 0.0874 ns | 0.9017 ns | 1.283 ns | 1.264 ns |  1.01 |    0.11 |     106 B |         - |          NA |
 | CopyBlockUnaligned16 | 0.9563 ns | 0.0457 ns | 0.0684 ns | 0.7887 ns | 1.079 ns | 1.039 ns |  0.83 |    0.09 |      61 B |         - |          NA |
+

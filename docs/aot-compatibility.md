@@ -1,12 +1,12 @@
-# AOT / トリミング対応パターン一覧
+# 🧩 AOT / トリミング対応パターン一覧
 
 Native AOT・トリミング対応ライブラリを実装するためのパターンカタログ。
 
 - **非互換パターン(AOTP)**: 避けるべき・注意すべき実装と、その代替手段
 - **対策パターン(AOTS)**: ライブラリ設計側で使う対応手法
-- パフォーマンス実装パターンの AOT 可否は [performance-patterns.md](performance-patterns.md) の AOT 列を参照
+- パフォーマンス実装パターンの AOT 可否は [README](../README.md) のパターン一覧の AOT 列を参照
 
-## 全体像
+## 🗺️ 全体像
 
 | 最適化 | 内容 | 壊れるもの | 警告 |
 |---|---|---|---|
@@ -21,7 +21,7 @@ Native AOT・トリミング対応ライブラリを実装するためのパタ�
 
 ---
 
-## 非互換パターン一覧(AOTP)
+## 🚫 非互換パターン一覧(AOTP)
 
 | ID | パターン | 深刻度 | 主な症状 | 主な代替 |
 |---|---|:---:|---|---|
@@ -89,7 +89,7 @@ Native AOT・トリミング対応ライブラリを実装するためのパタ�
 
 **問題:** トリミングでメンバーが除去されると実行時エラー。IL2026 警告の対象。
 
-**対策:** Source Generator による静的アクセサ生成 / `Action<T, TValue>` 形式の事前デリゲート登録 / インターフェース契約への移行。対象が既知の非公開メンバーであれば `[UnsafeAccessor]`([performance-patterns.md](performance-patterns.md) の TYP-03)がリフレクション不要かつ AOT 互換の代替になる。
+**対策:** Source Generator による静的アクセサ生成 / `Action<T, TValue>` 形式の事前デリゲート登録 / インターフェース契約への移行。対象が既知の非公開メンバーであれば `[UnsafeAccessor]`([README](../README.md#typ-03-unsafeaccessor非公開メンバーへの直接アクセス) の TYP-03)がリフレクション不要かつ AOT 互換の代替になる。
 
 ### AOTP-07: 文字列ベース型解決・動的アセンブリロード
 
@@ -149,7 +149,7 @@ private static partial Regex LikeEscapePattern();
 
 ---
 
-## 対策パターン一覧(AOTS)
+## 🛡️ 対策パターン一覧(AOTS)
 
 | ID | パターン | 位置づけ | 主な用途 |
 |---|---|---|---|
@@ -373,7 +373,7 @@ dotnet publish -r win-x64 -c Release -p:PublishAot=true
 
 ---
 
-## 属性の使い分けフロー
+## 🧭 属性の使い分けフロー
 
 ```
 トリマー/AOT 警告が出た
@@ -391,7 +391,7 @@ dotnet publish -r win-x64 -c Release -p:PublishAot=true
     └─ No → コードの設計を見直す(Source Generator 化を検討)
 ```
 
-## 責任分担:ライブラリ作者とアプリ開発者
+## 🤝 責任分担:ライブラリ作者とアプリ開発者
 
 | 対応 | ライブラリ作者 | アプリ開発者 |
 |---|:---:|:---:|
@@ -402,7 +402,7 @@ dotnet publish -r win-x64 -c Release -p:PublishAot=true
 | `rd.xml` / `TrimmerRootDescriptor` | △(原則使わない) | ◎(サードパーティ対応) |
 | `PublishAot=true` での検証 | ○(CI のサンプルアプリで) | ◎ 最終確認 |
 
-## 段階的対応ロードマップ
+## 🪜 段階的対応ロードマップ
 
 | フェーズ | 内容 |
 |---|---|
@@ -413,7 +413,7 @@ dotnet publish -r win-x64 -c Release -p:PublishAot=true
 | 5. AOT ビルドテスト | `PublishAot=true` での CI テストを追加 |
 | 6. 警告ゼロの維持 | CI の品質ゲートとして AOT 警告ゼロを要求 |
 
-## フレームワーク・主要ライブラリの対応状況(参考)
+## 📦 フレームワーク・主要ライブラリの対応状況(参考)
 
 > 2025 年時点の情報。採用判断時は最新状況を確認すること。
 
@@ -438,7 +438,7 @@ dotnet publish -r win-x64 -c Release -p:PublishAot=true
 | System.Reactive | 一部オペレータで動的コード | R3 |
 | System.Management (WMI) | リフレクション・COM 多用 | Win32 API 直接呼び出し |
 
-## チェックリスト(ライブラリの AOT 対応完了条件)
+## ☑️ チェックリスト(ライブラリの AOT 対応完了条件)
 
 ```
 □ IsAotCompatible を設定した

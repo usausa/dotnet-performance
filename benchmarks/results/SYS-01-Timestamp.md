@@ -1,6 +1,9 @@
-# SYS-01: 低コストの時刻・経過時間取得
+# SYS-01: Low-cost timestamp acquisition
 
-判定: 収録(TickCount64 0.05 倍=22 倍高速・ms 分解能。GetTimestamp 0.77・高分解能単調)
+- Verdict: adopted
+- Environment.TickCount64: 0.05x (1.13 ns, ~10-16 ms resolution, monotonic)
+- Stopwatch.GetTimestamp: 0.77x (high resolution, monotonic)
+- DateTime.UtcNow / DateTimeOffset.UtcNow: baseline (24.8 / 25.3 ns)
 
 ```
 

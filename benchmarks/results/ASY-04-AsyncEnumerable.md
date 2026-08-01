@@ -1,6 +1,8 @@
-# ASY-04: IAsyncEnumerable のコスト
+# ASY-04: IAsyncEnumerable cost
 
-判定: 収録(同期完了データの await foreach は 11.6 倍/要素。真に非同期な生成のみに使う)
+- Verdict: adopted (cost awareness)
+- await foreach over sync-completing items: 11.6x per item (0.96 -> 11.0 ns)
+- Use IAsyncEnumerable only when element production is truly asynchronous
 
 ```
 
