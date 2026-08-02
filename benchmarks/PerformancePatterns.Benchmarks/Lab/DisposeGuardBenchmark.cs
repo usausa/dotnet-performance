@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証: CON-02 Interlocked ワンショットガード
+// 検証: CON-01 Interlocked ワンショットガード
 // 問い: Dispose 多重実行防止として、Interlocked は他方式(素の bool / volatile bool / lock)に対して
 // 明確なメリットがあるか。測定は「破棄済みインスタンスへの再呼び出し」の定常パス。
 [Config(typeof(BenchmarkConfig))]

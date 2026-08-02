@@ -1,41 +1,41 @@
 # dotnet-performance
 
-A collection of techniques for implementing .NET libraries tuned for speed and low allocation.
+高速・低アロケーションにチューニングされた .NET ライブラリを実装するためのノウハウ集。
 
-This README is the single source of the core knowledge (pattern categories, index, and per-pattern explanations), structured so that implementation decisions can be made from it alone. The goal is to let AI reference this repository during library development so that high-performance, AOT-compatible implementations can be reproduced.
+この README が主知識(パターンの分類・一覧・各パターンの解説)の単一ソースであり、これ 1 つで実装判断が完結するように構成している。ライブラリ開発時に AI へ本リポジトリを参照させることで、高性能かつ AOT 対応の実装を再現できる状態にすることを目的とする。
 
-## 📖 Documentation structure
+## 📖 ドキュメント構成
 
-| Document | Contents |
+| ドキュメント | 内容 |
 |---|---|
-| README.md (this document) | Categories, index, and explanations of performance implementation patterns (core knowledge) |
-| [docs/rejected-patterns.md](docs/rejected-patterns.md) | Details of techniques not adopted (why they are ineffective or counterproductive) |
-| [docs/aot-compatibility.md](docs/aot-compatibility.md) | AOT / trimming compatibility pattern index (incompatible patterns and workarounds) |
-| [docs/benchmark-methodology.md](docs/benchmark-methodology.md) | Benchmarking guidelines (BenchmarkDotNet configuration and measurement pitfalls) |
-| [docs/generated-code-patterns.md](docs/generated-code-patterns.md) | Source Generator codegen pattern collection (what to generate for speed, plus an anti-generation list) |
+| README.md(本書) | パフォーマンス実装パターンの分類・一覧・解説(主知識) |
+| [docs/rejected-patterns.md](docs/rejected-patterns.md) | 採用しない手法の詳細(なぜ効果がない・逆効果か) |
+| [docs/aot-compatibility.md](docs/aot-compatibility.md) | AOT / トリミング対応パターン一覧(非互換パターンと対策) |
+| [docs/benchmark-methodology.md](docs/benchmark-methodology.md) | ベンチマーク実施ガイドライン(BenchmarkDotNet 構成と測定の落とし穴) |
+| [docs/generated-code-patterns.md](docs/generated-code-patterns.md) | Source Generator 生成コードパターン集(何を生成すれば速いか・アンチ生成リスト) |
 
-## 🏗️ Repository layout
+## 🏗️ リポジトリ構成
 
 ```
 dotnet-performance/
-├── README.md                          Pattern catalog (this document)
-├── docs/                              Supporting docs (AOT / rejected techniques / measurement methodology)
-├── src/PerformancePatterns/           Pattern implementations (folders by category, pattern IDs in XML docs)
-├── tests/PerformancePatterns.Tests/   Correctness verification of the implementations (xunit)
+├── README.md                          パターンカタログ(本書)
+├── docs/                              補助ドキュメント(AOT / 不採用手法 / 測定手法)
+├── src/PerformancePatterns/           パターン実装(カテゴリ別フォルダ、パターン ID を XML ドキュメントに記載)
+├── tests/PerformancePatterns.Tests/   実装の正しさの検証(xunit)
 └── benchmarks/
-    ├── PerformancePatterns.Benchmarks/  Evidence of effect via BenchmarkDotNet (Lab/ is for exploration)
-    └── results/                         Recorded measurement results (keyed by pattern ID, in English)
+    ├── PerformancePatterns.Benchmarks/  BenchmarkDotNet による効果実証(Lab/ は検証用)
+    └── results/                         測定結果の記録(パターン ID 対応、英語)
 ```
 
-- Implementations, tests, and benchmarks are cross-referenced with this document by pattern ID (e.g. SEQ-02)
-- Benchmarks follow the conventions in [docs/benchmark-methodology.md](docs/benchmark-methodology.md) (Verify before running, avoid interning, net10 only by default)
-- See [docs/aot-compatibility.md](docs/aot-compatibility.md) for the detailed AOT compatibility IDs (AOTP-xx / AOTS-xx)
+- 実装・テスト・ベンチマークはパターン ID(例: SEQ-02)で本書と対応付ける
+- ベンチマークは [docs/benchmark-methodology.md](docs/benchmark-methodology.md) の規約(実行前 Verify・インターン回避・既定 net10 単独)に従う
+- AOT 対応の詳細 ID(AOTP-xx / AOTS-xx)は [docs/aot-compatibility.md](docs/aot-compatibility.md) を参照
 
-## 🧭 How to read this document
+## 🧭 本書の読み方
 
-- Every pattern has a unique ID (e.g. MEM-01); examples, tests, benchmarks, and measurement results are cross-referenced by that ID
-- In code examples, ✅ marks the recommended form and ❌ the form to avoid
-- Measured numbers are guidelines that shift with environment and runtime generation; re-measure in your target environment before adopting anything
+- 各パターンには一意の ID(例: MEM-01)を付与し、実装例・テスト・ベンチマーク・測定結果はこの ID で対応付ける
+- コード例中の ✅ は推奨形、❌ は避けるべき形を示す
+- 「実測例」の数値は環境・ランタイム世代で変動する目安であり、採用時は対象環境での再計測を前提とする
 
 ---
 
@@ -581,28 +581,28 @@ public void Return(T[] array)
 
 ---
 
-## 🔢 BIT: Bit manipulation and branchless optimization
+## 🔢 BIT: ビット演算・ブランチレス最適化
 
-### 🔢 BIT-01: Range check via unsigned overflow
+### 🔢 BIT-01: 符号なしオーバーフローによる範囲チェック
 
-**Goal:** Reduce the two comparisons and two branches of `min <= value && value <= max` to a single comparison by exploiting unsigned integer semantics.
+**目的:** `min <= value && value <= max` の 2 比較・2 分岐を、符号なし整数の性質を利用した 1 比較に削減する。
 
-**Effect:**
+**効果:**
 
-- Comparisons and branches drop from 2 to 1, reducing opportunities for branch misprediction
-- A standard idiom the .NET runtime itself uses heavily (array bounds checks and the like), so it plays well with JIT optimizations
-- The one-shot gain is small (measured: 1-2 ns within a 100 ns operation), but it adds up for frequent checks inside hot loops
+- 比較・分岐が 2 回 → 1 回になり、分岐予測ミスの機会が減る
+- .NET ランタイム自身が配列境界チェック等で多用する定石で、JIT 最適化との親和性が高い
+- 単発の効果は小さい(実測例: 100 ns 規模の処理で 1〜2 ns)が、ホットループ内の頻出判定で積み上がる
 
-**AOT:** ✅ No issues
+**AOT:** ✅ 問題なし
 
-**Example:**
+**実装例:**
 
 ```csharp
-// Before: two comparisons
+// Before: 比較 2 回
 public static bool IsInRange(int value, int min, int max)
     => (min <= value) && (value <= max);
 
-// After: one comparison (assumes min <= max)
+// After: 比較 1 回(min <= max が前提)
 public static bool IsInRange(int value, int min, int max)
 {
     unchecked
@@ -612,17 +612,17 @@ public static bool IsInRange(int value, int min, int max)
 }
 ```
 
-**How it works:** When `value < min`, `value - min` is negative and wraps around to a huge value when reinterpreted as `uint` (overflow), so `<= (uint)(max - min)` is always false. Inside the range the difference stays at or below `max - min`, so a single comparison tests both bounds at once.
+**仕組み:** `value < min` の場合、`value - min` は負になり `uint` として解釈すると巨大な値に折り返す(オーバーフロー)ため、`<= (uint)(max - min)` が必ず false になる。範囲内なら差分は `max - min` 以下に収まるため、単一比較で上下限を同時に判定できる。
 
-**Use cases:** Checking whether a contiguous-value enum is defined, index validation, character classification (`(uint)(c - '0') <= 9` for digits). The `(uint)index < (uint)array.Length` in the TYP-01 example is a special case of this pattern.
+**ユースケース:** 連続値 enum の定義済み判定、インデックス検証、文字種判定(`(uint)(c - '0') <= 9` で数字判定等)。TYP-01 の実装例にある `(uint)index < (uint)array.Length` はこのパターンの特殊形。
 
-**Caveats:**
+**注意:**
 
-- Readability is clearly worse. Restrict it to hot paths where a microbenchmark confirms the gain
-- Mark the deliberate overflow with `unchecked` so the code does not break under a checked project setting
-- Assumes `min <= max`. Violating it makes every input compare as out of range
+- 可読性は明確に劣る。マイクロベンチマークで効果を確認できるホットパスに限定する
+- 意図的なオーバーフロー利用であることを `unchecked` で明示する(プロジェクト設定が checked でも壊れないようにする)
+- `min <= max` の成立が前提。破ると全入力が範囲外判定になる
 
-**Measured (Ryzen 9 5900X / net10, range check over 1024 values):** 548.5 vs 553.7 ns with overlapping CIs. **Comparing the Tier1 generated code shows the JIT already fuses the two-comparison form into a single unsigned comparison, making them essentially identical** (the only difference is the encoding, `sub r8d,100` vs `add r8d,-100`, both 45 B). **For plain min/max checks the hand-written transform is unnecessary (no difference)** — write the readable two-comparison form. The hand-written form only matters for compound conditions where the JIT cannot prove the range, or for collapsing exhaustive check branches. → [Measurement results](benchmarks/results/BIT-01-RangeCheck.md)
+**実測結果(Ryzen 9 5900X / net10、1024 値の範囲判定):** 548.5 vs 553.7 ns で信頼区間重複。**Tier1 の生成コードを比較すると、JIT が 2 比較形を自動で符号なし 1 比較へ融合しており実質同一**(差は `sub r8d,100` vs `add r8d,-100` の符号化のみ、45 B)。**単純な min/max 判定では手書き変換は不要(差なし)** — 可読な 2 比較形で書いてよい。手書き形が意味を持つのは、JIT が範囲を証明できない複合条件・チェック網羅の分岐削減に限られる。→ [測定結果](benchmarks/results/BIT-01-RangeCheck.md)
 
 ---
 
