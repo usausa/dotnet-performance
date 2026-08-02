@@ -1,4 +1,4 @@
-# BIT-01: Unsigned single-comparison range check
+# R-18 (was BIT-01): Unsigned single-comparison range check
 
 - Verdict: no effect on net10 (JIT already fuses the two-comparison form)
 - 548.5 vs 553.7 ns (CIs overlap), Code Size 60 B both

@@ -1,4 +1,4 @@
-# MEM-01: Dual-span walk - indexed vs pre-sliced vs manual ref
+# R-02 (was MEM-01): Dual-span walk - indexed vs pre-sliced vs manual ref
 
 - Verdict: REVERSED on net10 for vectorizable bodies - manual ref walk is 1.46x SLOWER
 - Indexed 367.7 ns == PreSliced 368.6 ns (0.36 ns/elem: the JIT auto-vectorizes the indexed dual-span loop)

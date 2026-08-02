@@ -1,4 +1,4 @@
-# MEM-02: GetArrayDataReference
+# R-02 (was MEM-02): GetArrayDataReference
 
 - Verdict: NO speed benefit on net10 - use only where a ref (not a Span) is structurally required
 - Sequential walk: ref form 595.7 ns vs plain for 457.4 ns (1.30x SLOWER - defeats auto-vectorization, same finding as MEM-01/R-02)

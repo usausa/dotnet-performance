@@ -1628,7 +1628,7 @@ return (length << 16)
 
 - Collisions obviously happen (e.g. `AxxxBxxxC` and `AyyyByyyC` hash the same). Always pair a hash match with a full equality comparison, and check the collision rate against the real key set
 - With no seed or randomization it is defenseless against hash flooding (deliberately injecting colliding keys). Do not use it for general-purpose hash tables that accept external input as keys — reserve it for closed, known sets
-- Element access can skip the bounds check by combining with MEM-01 (access through an already-obtained ref)
+- The implementation’s `CalculateHash` reads its three characters through a manual ref (`GetReference` + `Unsafe.Add`). **The indexed form cannot eliminate one bounds check on `value[length >> 1]`** (the Tier1 code keeps an RNGCHKFAIL path: 128 B vs 115 B, 56 vs 49 instructions) while the time difference is below measurement resolution — kept as the R-02 exception (sampling access whose range is guaranteed by construction)
 
 **Implementation in this repo:** `CalculateHash` in [SampledNameTable.cs](src/PerformancePatterns/Col/SampledNameTable.cs) (measurements in [COL-04](benchmarks/results/COL-04-SampledNameTable.md))
 
@@ -1674,7 +1674,7 @@ var index = hash & mask;
 **Caveats:**
 
 - The JIT cannot lower `/ 2` or `% 2` on a signed int to a plain shift (negative-value correction gets inserted). Where non-negativity is guaranteed, switch to uint or the unsigned right shift `>>>` (C# 11)
-- Unconditional uint-cast tricks aimed at eliminating bounds checks have been measured to no longer help on recent runtimes (keep to meaningful forms like the BIT-01 range check)
+- Unconditional uint-cast tricks aimed at eliminating bounds checks have been measured to no longer help on recent runtimes (hand-rewriting range checks is also auto-fused by the JIT — R-18)
 
 ---
 
@@ -3017,7 +3017,7 @@ The `Call` vs `Callvirt` substitution, on the other hand, measured 14.2 vs 14.6 
 | Collection conversion | Fixed capacity + `SetCount` + a loop writing straight into the Span | COL-01 / COL-06 |
 | Change notification / events | Bake EventArgs into static readonly fields; shape by subscriber count | DSP-03 / DSP-04 |
 
-**❌ Code you must not emit (anti-generation):** typeof caching (R-01), unconditional Frozen conversion (R-08), readonly for performance (R-10), CopyBlock substitution (R-14), hand-written digit padding (R-16), Call substitution (R-17), manual ref walks over a single Span (R-02), hand-rolled hash loops (BIT-04), and making a runtime Type-keyed dictionary the main path (TYP-01). The full list with reasons is in section 9 of the [generated code pattern collection](docs/generated-code-patterns.md).
+**❌ Code you must not emit (anti-generation):** typeof caching (R-01), unconditional Frozen conversion (R-08), readonly for performance (R-10), CopyBlock substitution (R-14), hand-written digit padding (R-16), Call substitution (R-17), manual ref walking (R-02), hand-rolled hash loops (BIT-04), and making a runtime Type-keyed dictionary the main path (TYP-01). The full list with reasons is in section 9 of the [generated code pattern collection](docs/generated-code-patterns.md).
 
 **Relationship to GEN-01:** Literally generated code can emit, AOT-safely, the same shape as Emit's best form (holder field 6.55 ns ≒ closure 6.23 ns). You only need Emit alongside it (the AOTS-08 dual path) for dynamic scenarios that cannot be generated at build time.
 
@@ -3104,7 +3104,7 @@ Forms that codegen (and AI-generated code) tends to emit because they look faste
 |---|---|---|---|
 | static readonly caching of `typeof(X)` | Byte-identical codegen at Tier1; before promotion the cache is the slower side | Write `typeof(X)` literally | R-01 |
 | Rewriting a single-Span loop with `GetReference` + `Unsafe.Add` | A plain for loop already has bounds checks removed; 1.07-1.13x slower | An indexed `for` | R-02 |
-| Manual ref walking in a loop over **multiple Spans** | The indexed form auto-vectorizes; the manual form blocks it and is 1.46x slower | An indexed `for` | [MEM-01](#-mem-01-skiplocalsinit) |
+| Manual ref walking (single / multiple Spans, arrays) | The indexed form already gets bounds-check elimination + auto-vectorization; the manual form is 1.46x slower over multiple Spans | An indexed `for` | [R-02](docs/rejected-patterns.md) |
 | Rewriting array traversal with `GetArrayDataReference` | 1.30x slower sequentially, no difference even with random access | An indexed `for` | [MEM-02](#-mem-02-struct-element-array--ref-access-data-oriented-layout) |
 | Converting read-only dictionaries to `FrozenDictionary` unconditionally | 7.4-10.2x construction cost with no lookup gain (string keys) | `Dictionary` or a name switch (COL-04) | R-08 |
 | `readonly` on instance fields for performance | Identical codegen (apart from offsets) | Apply it only to express design intent | R-10 |
@@ -3124,11 +3124,11 @@ For the shape to emit per scenario and its evidence see the [generated code patt
 
 | Goal | Recommended pattern |
 |---|---|
-| Eliminating bounds checks inside a loop | MEM-01 / MEM-02 |
+| Eliminating bounds checks inside a loop | Write the indexed form (manual ref walking is rejected as R-02) |
 | Cutting stack frame initialization cost | MEM-01 |
 | Cutting function call cost | JIT-01 |
 | Removing virtual calls from comparison and search | JIT-02 |
-| Reducing branches in range checks | BIT-01 |
+| Reducing branches in range checks | No hand-writing needed — the JIT fuses them (R-18) |
 | Fast hashing of a known key set (enum names and the like) | BIT-01 |
 | Keeping temporary objects off the heap | STK-01 |
 | Referencing data without copying | STK-02 |
@@ -3193,16 +3193,16 @@ The low-level APIs are spread across many patterns, so this table cross-referenc
 
 | API | Purpose | Related patterns |
 |---|---|---|
-| `Unsafe.Add(ref r, i)` | Offset access from a ref (no bounds check) | MEM-01 / MEM-02 |
+| `Unsafe.Add(ref r, i)` | Offset access from a ref (no bounds check) | R-02 (structural uses only) |
 | `Unsafe.As<T>(object)` | Cast that skips the type check (reference types) | TYP-05 |
 | `Unsafe.As<TFrom, TTo>(ref v)` | Reinterpreting a ref (generic specialization, bit reinterpretation) | JIT-03 / SEQ-02 |
 | `Unsafe.ReadUnaligned / WriteUnaligned` | unmanaged reads and writes at positions with no alignment guarantee | SEQ-01 / SEQ-02 / BUF-02 |
 | `Unsafe.SkipInit(out v)` | Skipping initialization of an out variable | MEM-01 / SEQ-02 |
 | `Unsafe.SizeOf<T>()` | Size of an unmanaged type (a JIT constant) | SEQ-01 / SEQ-02 |
-| `Unsafe.IsAddressLessThan` | Comparing the positions of two refs (end detection) | MEM-01 |
+| `Unsafe.IsAddressLessThan` | Comparing the positions of two refs (end detection) | R-02 (structural uses only) |
 | `Unsafe.BitCast<TFrom, TTo>` (.NET 8+) | Safe bit reinterpretation of same-size value types (the safe form of As) | SEQ-02 / TYP-02 |
-| `MemoryMarshal.GetReference(span)` | Getting a ref to the start of a Span | MEM-01 |
-| `MemoryMarshal.GetArrayDataReference(array)` | Getting a ref to the start of an array | MEM-02 |
+| `MemoryMarshal.GetReference(span)` | Getting a ref to the start of a Span | R-02 (structural uses only) |
+| `MemoryMarshal.GetArrayDataReference(array)` | Getting a ref to the start of an array | R-02 (structural uses only) |
 | `MemoryMarshal.Cast<TFrom, TTo>(span)` | Reinterpreting a Span's element type (zero cost) | TYP-02 / candidate XxHash3 |
 | `MemoryMarshal.AsBytes(span)` | Viewing a Span as bytes | TYP-02 |
 | `MemoryMarshal.CreateSpan(ref r, len)` | Building a Span from a ref | SEQ-02 |

@@ -27,11 +27,12 @@ Measurement environment: Ryzen 9 5900X / .NET 10 (generation-dependent items are
 - Single Span: the plain `for` loop already gets full bounds-check elimination, so the manual ref form only pays the setup cost (1.07-1.13x)
 - **Walking several Spans at once** (the shape this technique was supposed to win): the JIT auto-vectorizes the indexed loop (0.36 ns/element), and manual ref walking blocks that — **1.46x slower**
 - **Sequential array walk** (`GetArrayDataReference`): same mechanism, **1.30x slower**
-- **Random access with a structurally guaranteed range** (sampling and similar): **no difference** from the indexed form — the bounds check is effectively free
+- **Random access with a structurally guaranteed range** (array + masked index): **no difference** from the indexed form — the bounds check is effectively free
+- **Sampling access** (three computed positions in a Span): the time difference is below resolution, but **the indexed form cannot eliminate one bounds check on `value[length >> 1]`** (the Tier1 code keeps an RNGCHKFAIL path: 128 B vs 115 B, 56 vs 49 instructions) — under the noise policy this is ➖ measurement noise (codegen differs)
 
 Manual walking also has a high defect rate (several real bugs were found during verification: wrong end-ref computation, forgetting to advance one cursor).
 
-✅ **Do this instead:** write the indexed form, `for (var i = 0; i < span.Length; i++)`. Use `GetArrayDataReference` only when there is a **structural** reason — you need a head ref where a Span cannot be formed, or you are implementing a type that stores a ref — never for speed.
+✅ **Do this instead:** write the indexed form, `for (var i = 0; i < span.Length; i++)`. Only two legitimate uses of manual refs remain: (1) **structural** reasons — a head ref where a Span cannot be formed, or a type that stores a ref; (2) **hot-path sampling access whose range is guaranteed by construction** (it removes the bounds check the indexed form keeps; in-repo example: SampledNameTable.CalculateHash).
 
 🔗 **Measurement record:** [LAB-DualSpanWalk.md](../benchmarks/results/LAB-DualSpanWalk.md) / [LAB-ArrayDataReference.md](../benchmarks/results/LAB-ArrayDataReference.md)
 

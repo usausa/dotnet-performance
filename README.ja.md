@@ -1628,7 +1628,7 @@ return (length << 16)
 
 - 衝突は当然起こりうる(例: `AxxxBxxxC` と `AyyyByyyC` は同値)。ハッシュ一致後の完全一致比較を必ず併用し、実際のキー集合で衝突率を確認する
 - シード・ランダム化がないため hash flooding(意図的な衝突キーの大量投入)に無防備。外部入力をキーとして受け付ける汎用ハッシュテーブルには使用せず、閉じた既知集合専用とする
-- 要素アクセスは MEM-01(取得済み ref 経由)の併用で境界チェックなしにできる
+- 実装の `CalculateHash` は 3 文字の取得に手動 ref(`GetReference` + `Unsafe.Add`)を使う。**索引形は `value[length >> 1]` の境界チェックを 1 本除去できず**(Tier1 で RNGCHKFAIL 経路が残存、128 B vs 115 B・56 vs 49 命令)、時間差は分解能以下 — R-02 の例外(構成的に範囲保証されたサンプリングアクセス)としてこの形を維持している
 
 **リポジトリ内実装:** [SampledNameTable.cs](src/PerformancePatterns/Col/SampledNameTable.cs) の `CalculateHash`(実測は [COL-04](benchmarks/results/COL-04-SampledNameTable.md))
 
@@ -1674,7 +1674,7 @@ var index = hash & mask;
 **注意:**
 
 - 符号付き int の `/ 2` や `% 2` は JIT が単純シフトに落とせない(負数補正が入る)。非負が保証できるなら uint 化または符号なし右シフト `>>>`(C# 11)を使う
-- 境界チェック除去目的の無条件な uint キャスト小細工は最近のランタイムでは効果が消えていることが実測されている(BIT-01 の範囲チェックのような意味のある形に限定する)
+- 境界チェック除去目的の無条件な uint キャスト小細工は最近のランタイムでは効果が消えていることが実測されている(範囲チェックの手書き変換も JIT が自動で融合する — R-18)
 
 ---
 
@@ -3017,7 +3017,7 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | コレクション変換 | 容量確定 + `SetCount` + Span 直書きループ | COL-01 / COL-06 |
 | 変更通知・イベント | EventArgs の static readonly 焼き込み + 購読数に応じた形 | DSP-03 / DSP-04 |
 
-**❌ 生成してはいけないコード(アンチ生成):** typeof キャッシュ(R-01)、無条件 Frozen 化(R-08)、性能目的 readonly(R-10)、CopyBlock 置換(R-14)、手書き桁詰め(R-16)、Call 置換(R-17)、単一 Span の手動 ref 走査(R-02)、自前ハッシュループ(BIT-04)、実行時 Type キー辞書の主経路化(TYP-01)。一覧と理由は[生成コードパターン集](docs/generated-code-patterns.md)の第 9 節。
+**❌ 生成してはいけないコード(アンチ生成):** typeof キャッシュ(R-01)、無条件 Frozen 化(R-08)、性能目的 readonly(R-10)、CopyBlock 置換(R-14)、手書き桁詰め(R-16)、Call 置換(R-17)、手動 ref 走査(R-02)、自前ハッシュループ(BIT-04)、実行時 Type キー辞書の主経路化(TYP-01)。一覧と理由は[生成コードパターン集](docs/generated-code-patterns.md)の第 9 節。
 
 **GEN-01 との関係:** 直書き生成コードは Emit の最良形(Holder フィールド 6.55 ns ≒ クロージャ 6.23 ns)と同等の形を AOT 安全に出力できる。Emit 併設(AOTS-08 の二重パス)が要るのは「ビルド時に生成できない動的シナリオ」だけ。
 
@@ -3104,7 +3104,7 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 |---|---|---|---|
 | `typeof(X)` の static readonly キャッシュ | Tier1 で生成コード完全一致。昇格前はキャッシュ側が不利 | `typeof(X)` を直書き | R-01 |
 | 単一 Span ループの `GetReference` + `Unsafe.Add` 化 | 標準 for で境界チェック除去済み。1.07〜1.13 倍遅 | 索引形の `for` | R-02 |
-| **複数 Span** ループの手動 ref 走査 | 索引形は自動ベクトル化され、手動化は阻害して 1.46 倍遅 | 索引形の `for` | [MEM-01](#-mem-01-skiplocalsinit) |
+| 手動 ref 走査(単一 / 複数 Span・配列) | 索引形は境界チェック除去 + 自動ベクトル化済み。手動化は複数 Span で 1.46 倍遅 | 索引形の `for` | [R-02](docs/rejected-patterns.md) |
 | 配列走査の `GetArrayDataReference` 化 | 逐次で 1.30 倍遅、ランダムでも差なし | 索引形の `for` | [MEM-02](#-mem-02-struct-要素配列--ref-アクセスデータ指向レイアウト) |
 | 読み取り専用辞書の無条件 `FrozenDictionary` 化 | 構築 7.4〜10.2 倍、検索利得なし(string キー) | `Dictionary` か名前スイッチ(COL-04) | R-08 |
 | インスタンスフィールドへの性能目的 `readonly` | 生成コード同一(オフセット以外) | 設計意図としてのみ付与 | R-10 |
@@ -3124,11 +3124,11 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 
 | 目的 | 推奨パターン |
 |---|---|
-| ループ内の境界チェック除去 | MEM-01 / MEM-02 |
+| ループ内の境界チェック除去 | 索引形で書く(手動 ref 走査は R-02 で不採用) |
 | スタックフレーム初期化コスト削減 | MEM-01 |
 | 関数呼び出しコスト削減 | JIT-01 |
 | 比較・検索の仮想呼び出し除去 | JIT-02 |
-| 範囲チェックの分岐削減 | BIT-01 |
+| 範囲チェックの分岐削減 | 手書き不要 — JIT が自動融合(R-18) |
 | 既知キー集合(列挙型名等)の高速ハッシュ | BIT-01 |
 | 一時オブジェクトのヒープ確保禁止 | STK-01 |
 | コピーなしのデータ参照 | STK-02 |
@@ -3193,16 +3193,16 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 
 | API | 用途 | 関連パターン |
 |---|---|---|
-| `Unsafe.Add(ref r, i)` | ref からのオフセットアクセス(境界チェックなし) | MEM-01 / MEM-02 |
+| `Unsafe.Add(ref r, i)` | ref からのオフセットアクセス(境界チェックなし) | R-02(構造上の用途のみ) |
 | `Unsafe.As<T>(object)` | 型チェック省略キャスト(参照型) | TYP-05 |
 | `Unsafe.As<TFrom, TTo>(ref v)` | ref の再解釈(ジェネリック特殊化・ビット再解釈) | JIT-03 / SEQ-02 |
 | `Unsafe.ReadUnaligned / WriteUnaligned` | アラインメント非保証位置の unmanaged 読み書き | SEQ-01 / SEQ-02 / BUF-02 |
 | `Unsafe.SkipInit(out v)` | out 変数の初期化スキップ | MEM-01 / SEQ-02 |
 | `Unsafe.SizeOf<T>()` | unmanaged 型のサイズ(JIT 定数) | SEQ-01 / SEQ-02 |
-| `Unsafe.IsAddressLessThan` | ref 同士の位置比較(終端判定) | MEM-01 |
+| `Unsafe.IsAddressLessThan` | ref 同士の位置比較(終端判定) | R-02(構造上の用途のみ) |
 | `Unsafe.BitCast<TFrom, TTo>`(.NET 8+) | 同サイズ値型の安全なビット再解釈(As の安全版) | SEQ-02 / TYP-02 |
-| `MemoryMarshal.GetReference(span)` | Span 先頭への ref 取得 | MEM-01 |
-| `MemoryMarshal.GetArrayDataReference(array)` | 配列先頭への ref 取得 | MEM-02 |
+| `MemoryMarshal.GetReference(span)` | Span 先頭への ref 取得 | R-02(構造上の用途のみ) |
+| `MemoryMarshal.GetArrayDataReference(array)` | 配列先頭への ref 取得 | R-02(構造上の用途のみ) |
 | `MemoryMarshal.Cast<TFrom, TTo>(span)` | Span の要素型再解釈(ゼロコスト) | TYP-02 / 拡充候補 XxHash3 |
 | `MemoryMarshal.AsBytes(span)` | Span の byte ビュー化 | TYP-02 |
 | `MemoryMarshal.CreateSpan(ref r, len)` | ref からの Span 構築 | SEQ-02 |
