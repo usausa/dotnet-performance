@@ -4,7 +4,7 @@
 
 - Verdict: conditional
 - Contiguous source (array/span): ToImmutableArray wins outright (7.2 ns / 88 B at 16; builder paths 2.5-3.4x slower) - bulk copy beats per-element Add
-- Incremental build: MoveToImmutable vs ToImmutable = 17.7 ns/88 B vs 24.3 ns/176 B at 16 (halves allocation, saves the final copy)
+- Incremental build: MoveToImmutable vs ToImmutable = 17.7 ns/88 B vs 24.3 ns/176 B at 16 (halves allocation, saves the final copy); at 256 the time gap is within overlapping CIs (measurement-noise; codegen differs, 903 vs 2,035 B) while the allocation halving remains
 - Rule: know your source shape; only reach for Builder when elements arrive one by one, and size the builder exactly to use MoveToImmutable
 
 ```

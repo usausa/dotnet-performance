@@ -2,7 +2,8 @@
 
 - Verdict: adopted
 - InlineArray 0.69x / stackalloc 0.66x vs new int[8], both zero-alloc (heap array: 56 B)
-- InlineArray == stackalloc in speed; choose InlineArray when the buffer must live inside a struct field
+- stackalloc is slightly faster: 4.71 vs 4.93 ns, non-overlapping CIs - a real sub-ns difference, not noise
+- InlineArray's value is not speed but that the buffer can live inside a struct field
 
 ```
 

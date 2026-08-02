@@ -39,6 +39,7 @@ public static class Program
         VerifyUnmeasuredBatch();
         VerifyUnmeasuredBatch2();
         VerifyUnmeasuredBatch3();
+        VerifyImplementationBatch3();
 
         // 実行例: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -77,6 +78,10 @@ public static class Program
                 typeof(PipelinesBenchmark),
                 typeof(AsyncEnumerableBenchmark),
                 typeof(DisposeGuardBenchmark),
+                typeof(BufferWriterSlimBenchmark),
+                typeof(MemoryOwnerBenchmark),
+                typeof(BatchBenchmark),
+                typeof(BitwiseComparerBenchmark),
                 typeof(TypeMapBenchmark),
                 typeof(HandlerListBenchmark),
                 typeof(StructPassBenchmark),
@@ -643,6 +648,51 @@ public static class Program
             {
                 throw new InvalidOperationException("Verify failed. EmitStrategy");
             }
+        }
+    }
+
+    private static void VerifyImplementationBatch3()
+    {
+        // BUF-03: 3 実装が同じチェックサムになること(16 バイト刻み、チャンク合計 120 × 回数)
+        var writerSlim = new BufferWriterSlimBenchmark { TotalBytes = 4096 };
+        writerSlim.Setup();
+        var expectedChecksum = 120 * (4096 / 16);
+        if ((writerSlim.ArrayBufferWriter() != expectedChecksum) ||
+            (writerSlim.PooledWriter() != expectedChecksum) ||
+            (writerSlim.WriterSlim() != expectedChecksum))
+        {
+            throw new InvalidOperationException("Verify failed. BufferWriterSlim");
+        }
+
+        // BUF-04: 4 実装が同じ合計になること
+        var memoryOwner = new MemoryOwnerBenchmark();
+        var expectedSum = memoryOwner.NewArray();
+        if ((memoryOwner.ArrayPoolRaw() != expectedSum) ||
+            (memoryOwner.MemoryOwnerAllocate() != expectedSum) ||
+            (memoryOwner.TemporaryBufferPooled() != expectedSum))
+        {
+            throw new InvalidOperationException("Verify failed. MemoryOwner");
+        }
+
+        // SEQ-04 / STK-03: 3 実装が同じ合計になること(0..1023 の総和)
+        var batch = new BatchBenchmark();
+        batch.Setup();
+        var expectedTotal = 1023L * 1024 / 2;
+        if ((batch.LinqChunk() != expectedTotal) ||
+            (batch.ArrayBatch() != expectedTotal) ||
+            (batch.SpanBatch() != expectedTotal))
+        {
+            throw new InvalidOperationException("Verify failed. Batch");
+        }
+
+        // TYP-02: 3 経路が同じ合計になること(0..15 の総和)
+        var bitwise = new BitwiseComparerBenchmark();
+        bitwise.Setup();
+        if ((bitwise.DefaultComparerPlain() != 120) ||
+            (bitwise.DefaultComparerEquatable() != 120) ||
+            (bitwise.BitwiseComparerPlain() != 120))
+        {
+            throw new InvalidOperationException("Verify failed. BitwiseComparer");
         }
     }
 
