@@ -28,7 +28,6 @@ public static class Program
         VerifySpanTokenizer();
         VerifyTemporaryBuffer();
         VerifyValueStringBuilder();
-        VerifySpanReaderWriter();
         VerifyUtf8DateTimeFormatter();
         VerifyLab();
         VerifyLabBatch2();
@@ -53,7 +52,6 @@ public static class Program
 #if NET9_0_OR_GREATER
                 typeof(SpanTokenizerBclComparisonBenchmark),
 #endif
-                typeof(SpanReaderBenchmark),
                 typeof(TemporaryBufferBenchmark),
                 typeof(ValueStringBuilderBenchmark),
                 typeof(Utf8DateTimeFormatterBenchmark),
@@ -168,55 +166,6 @@ public static class Program
         if ((small.Span.Length != 64) || (large.Span.Length != 4096) || (small.Span[63] != 1) || (large.Span[4095] != 2))
         {
             throw new InvalidOperationException("Verify failed. TemporaryBuffer");
-        }
-    }
-
-    private static void VerifySpanReaderWriter()
-    {
-        const int count = 4;
-        var packet = SpanReaderBenchmark.CreatePacket(count);
-
-        // SpanReader によるパース
-        var reader = new SpanReader<byte>(packet);
-        var total = (long)reader.ReadUnmanaged<uint>();
-        var readCount = reader.ReadUnmanaged<int>();
-        for (var i = 0; i < readCount; i++)
-        {
-            total += reader.ReadUnmanaged<long>();
-            total += reader.ReadUnmanaged<int>();
-        }
-
-        // BinaryPrimitives による独立実装と一致することを検証
-        var span = packet.AsSpan();
-        var offset = 0;
-        var expected = (long)BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(offset, sizeof(uint)));
-        offset += sizeof(uint);
-        var expectedCount = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(offset, sizeof(int)));
-        offset += sizeof(int);
-        for (var i = 0; i < expectedCount; i++)
-        {
-            expected += BinaryPrimitives.ReadInt64LittleEndian(span.Slice(offset, sizeof(long)));
-            offset += sizeof(long);
-            expected += BinaryPrimitives.ReadInt32LittleEndian(span.Slice(offset, sizeof(int)));
-            offset += sizeof(int);
-        }
-
-        // SpanWriter で構築したパケットが CreatePacket と一致することを検証(リトルエンディアン環境)
-        var rebuilt = new byte[packet.Length];
-        var writer = new SpanWriter<byte>(rebuilt);
-        writer.WriteUnmanaged(0xCAFEBABEu);
-        writer.WriteUnmanaged(count);
-        for (var i = 0; i < count; i++)
-        {
-            writer.WriteUnmanaged(1000L + i);
-            writer.WriteUnmanaged(i * 3);
-        }
-
-        if ((total != expected) ||
-            (writer.Position != packet.Length) ||
-            (BitConverter.IsLittleEndian && !packet.AsSpan().SequenceEqual(rebuilt)))
-        {
-            throw new InvalidOperationException("Verify failed. SpanReader/SpanWriter");
         }
     }
 
@@ -426,7 +375,7 @@ public static class Program
         cursor.Setup();
         var expectedCursor = 1023 * 1024 / 2;
         if ((cursor.SumSpanIndex() != expectedCursor) ||
-            (cursor.SumSpanReader() != expectedCursor) ||
+            (cursor.SumSpanCursor() != expectedCursor) ||
             (cursor.SumRefFieldCursor() != expectedCursor))
         {
             throw new InvalidOperationException("Verify failed. RefFieldCursor");

@@ -1,5 +1,7 @@
 # 🏭 Source Generator 生成コードパターン集
 
+**日本語** | [English](generated-code-patterns.md)
+
 Source Generator で**どのようなコードを生成すればパフォーマンスを実現できるか**のカタログ。
 ジェネレータの実装方法(Roslyn API)ではなく、**出力すべきコードの形**と、その形が速いことの実測根拠を記録する。
 本書のコード例はすべて「ジェネレータの出力イメージ」であり、同じ形を手書きしても同じ性能になる(実測は手書き形で取得済み)。
@@ -186,7 +188,7 @@ return string.Create(length, state, static (span, s) => { /* CopyTo の列 */ })
 - 固定書式のテーブル化 → [TXT-01-Utf8DateTimeFormatter.md](../benchmarks/results/TXT-01-Utf8DateTimeFormatter.md)
 - **手書きの桁詰めループを生成してはいけない**(`TryFormat` の 2.5〜4.8 倍遅い、R-16)→ [TXT-09-FixedFieldFormat.md](../benchmarks/results/TXT-09-FixedFieldFormat.md)
 
-**注意:** 逐次書き込みの受け皿は `IBufferWriter<T>`(BUF-02)か Span 直書き(SEQ-03)を生成の既定にする。
+**注意:** 逐次書き込みの受け皿は `IBufferWriter<T>`(BUF-02)か Span 直書き(SEQ-02)を生成の既定にする。
 
 ---
 

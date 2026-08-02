@@ -1,4 +1,4 @@
-# SEQ-02: SpanTokenizer
+# SEQ-01: SpanTokenizer
 
 - Verdict: adopted (implemented)
 - 0.30-0.34x (4 tokens) / 0.62-0.70x (64 tokens) vs string.Split, 216-3096 B -> 0 B

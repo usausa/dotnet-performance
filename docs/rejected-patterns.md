@@ -1,197 +1,199 @@
-# ❌ 採用しない手法(不採用パターン詳細)
+# ❌ Techniques Not Adopted (Rejected Pattern Details)
 
-実測の結果、効果なし・逆効果・リスクに見合わないと判定した手法の記録。
-「なぜ採用しないのか / なぜ改善しないのか」を [README](../README.md) の各パターンと同じ粒度で記述する。
-測定環境は Ryzen 9 5900X / .NET 10(世代依存の項目は個別に記載)。
+[日本語](rejected-patterns.ja.md) | **English**
 
----
-
-### R-01: typeof(X) の static readonly キャッシュ
-
-🎯 **狙い:** `typeof(X)` の評価コストを `static readonly Type` フィールドへの事前キャッシュで省く。
-
-📉 **実測・不採用の理由:** 速度・コードサイズとも完全に同値。**生成コード確認(JitDisasm、Tier1): 両者とも同一の凍結 RuntimeType ポインタの即値ロード(`mov rax, <ptr>; ret`、11 バイト)で完全一致** — 差なし確定。むしろ階層コンパイル昇格前は static readonly 側に静的初期化チェック + ヘルパー呼び出しが残る(48 バイト)ため、コールドパスではキャッシュ側が不利ですらある。
-
-✅ **代わりにやること:** そのまま `typeof(X)` と書く(可読性優先)。型「比較」の特殊化は JIT-03(typeof(T) 分岐)を参照。
+A record of techniques that measurement showed to be ineffective, counterproductive, or not worth the risk.
+"Why it is not adopted / why it does not improve anything" is documented at the same granularity as the patterns in [README](../README.md).
+Measurement environment: Ryzen 9 5900X / .NET 10 (generation-dependent items are noted individually).
 
 ---
 
-### R-02: 単一 Span ループの GetReference + Unsafe.Add 化
+### R-01: static readonly caching of typeof(X)
 
-🎯 **狙い:** ループ内の境界チェックを `MemoryMarshal.GetReference` + `Unsafe.Add` の手動 ref 走査で排除する。
+🎯 **Intent:** Avoid the evaluation cost of `typeof(X)` by pre-caching it into a `static readonly Type` field.
 
-📉 **実測・不採用の理由:** 単一 Span の標準 for ループでは JIT の境界チェック除去が完全に効いており、手動 ref 化はセットアップコスト分だけ遅い(1.07〜1.13 倍)。手動走査は終端計算ミス等のバグ混入率も高い(検証中に実バグを複数検出)。
+📉 **Measured — why it is rejected:** Identical in both speed and code size. **Generated code check (JitDisasm, Tier1): both emit the same immediate load of a frozen RuntimeType pointer (`mov rax, <ptr>; ret`, 11 bytes) — a perfect match** — confirmed no difference. If anything, before tiered-compilation promotion the static readonly version still carries a static-initialization check plus a helper call (48 bytes), so on cold paths the cached version is actually worse.
 
-✅ **代わりにやること:** 単一 Span は `for (var i = 0; i < span.Length; i++)` の標準形で書く。手動 ref 走査が効くのは「複数 Span の同時走査」のみ(MEM-01 の適用判断表)。
-
----
-
-### R-03: CollectionsMarshal.AsSpan 後の手動 ref ウォーク
-
-🎯 **狙い:** List を AsSpan 化した後、さらに ref カーソル走査で速くする。
-
-📉 **実測・不採用の理由:** AsSpan 化(約 2 倍)で改善は頭打ちになり、その先の ref ウォークは時間が分解不能(誤差)のままコードサイズだけが増える。**コードサイズ軸の悪化**を根拠に不採用(誤差のみを理由とした不採用ではない)。
-
-✅ **代わりにやること:** `CollectionsMarshal.AsSpan(list)` + 標準 for / foreach で止める(COL-01)。
+✅ **Do this instead:** Just write `typeof(X)` (favor readability). For specializing type *comparison*, see JIT-03 (typeof(T) branching).
 
 ---
 
-### R-04: ループ構文の選択(for / while / do-while / 昇順・降順)
+### R-02: Converting single-Span loops to GetReference + Unsafe.Add
 
-🎯 **狙い:** ループ構文や反復方向の選択でコードを速くする。
+🎯 **Intent:** Eliminate in-loop bounds checks with a manual ref walk using `MemoryMarshal.GetReference` + `Unsafe.Add`.
 
-📉 **実測・不採用の理由:** 全形式が同一性能に収束する(サイズ 256 以上で完全一致)。**生成コード確認(JitDisasm)で内訳が判明**:
+📉 **Measured — why it is rejected:** In a standard for loop over a single Span the JIT already eliminates bounds checks completely, so the manual ref form is slower by exactly its setup cost (1.07–1.13x). Manual walking also has a far higher bug rate — miscomputed end conditions and the like (several real bugs were found during verification).
 
-- for / while: **命令列が完全一致(28 バイト)— 差なし**。「同等へ正規化」が成り立つのはこの 2 形式
-- do-while(ガード + do 形): ループ内に境界チェックが**残存**(63 バイト)— 生成コードは異なるが時間は分解不能(➖誤差)
-- 降順 for: ループクローンが発生(85 バイト、ホットパスはチェックなし)— 同じく生成コードは異なるが時間は分解不能(➖誤差)
-
-✅ **代わりにやること:** 可読性で選ぶ(既定は for / while)。do-while・降順は生成コードが別物になるため、境界チェック除去を期待する場面では for の昇順を使う。効くのは構文でなくデータアクセス形(MEM-01 / COL-01 / MEM-04)。
+✅ **Do this instead:** Write single-Span loops in the standard form `for (var i = 0; i < span.Length; i++)`. Manual ref walking only pays off when walking multiple Spans simultaneously (see the applicability table in MEM-01).
 
 ---
 
-### R-05: class 要素配列への ArrayPool 適用
+### R-03: Manual ref walking after CollectionsMarshal.AsSpan
 
-🎯 **狙い:** class 要素のエントリ配列をプール化して確保コストを消す。
+🎯 **Intent:** After converting a List to a Span, go further and speed it up with a ref cursor walk.
 
-📉 **実測・不採用の理由:** 配列本体はプールできても要素オブジェクトの個別確保が残るため、効果なし〜逆効果(プール管理コストだけ載る)。
+📉 **Measured — why it is rejected:** The improvement plateaus at the AsSpan conversion (about 2x); the ref walk beyond that leaves the time unresolvable (measurement noise) while only growing code size. Rejected on the grounds of a **regression on the code-size axis** (not rejected merely because of measurement noise).
 
-✅ **代わりにやること:** 要素を struct 化してから配列をプールする(MEM-04 + BUF-01)。struct + プールなら約 6 倍・0B を実測済み。
-
----
-
-### R-06: 自前ソート実装
-
-🎯 **狙い:** 用途特化の自前ソート(マージソート等)で BCL より速くする。
-
-📉 **実測・不採用の理由:** BCL の `Span.Sort`(イントロソート)が自前マージソート比で約 9 倍高速、コードサイズも 1/5。BCL 側は pdqsort 系の継続的最適化を受けており、汎用比較ソートで勝る余地はほぼない。
-
-✅ **代わりにやること:** BCL のソートを使う。比較子は struct + ジェネリック制約で渡す(JIT-02)。
+✅ **Do this instead:** Stop at `CollectionsMarshal.AsSpan(list)` + a standard for / foreach (COL-01).
 
 ---
 
-### R-07: 候補 2〜3 文字での SearchValues
+### R-04: Choosing the loop construct (for / while / do-while / ascending vs descending)
 
-🎯 **狙い:** 探索候補文字を常に `SearchValues<T>` 化して SIMD 検索にする。
+🎯 **Intent:** Make code faster by picking a particular loop construct or iteration direction.
 
-📉 **実測・不採用の理由:** 候補 2〜3 個では `IndexOfAny(char, char)` 等の専用オーバーロードの方が速い(0.885ns vs 1.494ns)。SearchValues は候補が多い場合の最適化。
+📉 **Measured — why it is rejected:** All forms converge on identical performance (an exact match at size 256 and above). **A generated code check (JitDisasm) revealed the breakdown:**
 
-✅ **代わりにやること:** 候補が少数なら専用オーバーロード、多数(目安 4〜5 個以上)なら SearchValues を static readonly でキャッシュして使う。
+- for / while: **instruction sequences match exactly (28 bytes) — no difference**. "Normalized to the same thing" holds only for these two forms
+- do-while (guard + do form): bounds checks **remain** inside the loop (63 bytes) — the generated code differs, but the time is unresolvable (➖ measurement noise)
+- descending for: loop cloning kicks in (85 bytes, no checks on the hot path) — again the generated code differs but the time is unresolvable (➖ measurement noise)
 
----
-
-### R-08: FrozenDictionary の無条件採用
-
-🎯 **狙い:** 読み取り専用辞書をすべて `FrozenDictionary` に置き換えて検索を速くする。
-
-📉 **実測・不採用の理由:** 構築コストが Dictionary の 15〜20 倍。検索もキー集合次第で逆転する(enum 名 64 件で 1.15〜1.31 倍遅い実測)。小規模名前解決では一度も最速にならなかった測定もある。
-
-✅ **代わりにやること:** 「起動時に一度構築して読み続ける + 実データで検索勝ちを確認」した場合のみ採用(COL-02)。Type キーは専用実装(TYP-01)が約 3 倍速い。
+✅ **Do this instead:** Choose for readability (default to for / while). do-while and descending loops produce genuinely different code, so use an ascending for wherever you are relying on bounds-check elimination. What matters is not the syntax but the data access shape (MEM-01 / COL-01 / MEM-04).
 
 ---
 
-### R-09: Span で書ける処理の fixed ポインタ化
+### R-05: Applying ArrayPool to arrays of class elements
 
-🎯 **狙い:** `fixed` + 生ポインタで Span より速くする。
+🎯 **Intent:** Pool the backing entry array to eliminate its allocation cost.
 
-📉 **実測・不採用の理由:** `MemoryMarshal.Cast` / `Unsafe.As` による再解釈と同速か、fixed の固定コスト分だけ遅い。unsafe コンテキストの導入コスト(監査・安全性)に見合う利得がない。
+📉 **Measured — why it is rejected:** Even with the array itself pooled, each element object is still allocated individually, so the result ranges from no effect to counterproductive (you only add the pool management cost).
 
-✅ **代わりにやること:** Span / ref ベースで書く。再解釈は `MemoryMarshal.Cast`(ゼロコスト実測済み。BIT-05 の再測定では 8 / 512 文字で fixed より Cast が信頼区間非重複で速い — pinning が不要なぶん)、unmanaged 読み書きは SEQ-01 / SEQ-03。
-
-🔗 **測定記録:** [BIT-05-XxHash3.md](../benchmarks/results/BIT-05-XxHash3.md)(Cast vs fixed の比較を含む)
+✅ **Do this instead:** Make the elements structs first, then pool the array (MEM-04 + BUF-01). struct + pooling measures at about 6x and 0B.
 
 ---
 
-### R-10: readonly フィールド化による JIT 最適化の期待
+### R-06: Hand-rolled sort implementations
 
-🎯 **狙い:** フィールドを readonly にして JIT の定数畳み込み・devirtualization を引き出す。
+🎯 **Intent:** Beat the BCL with a purpose-built sort (merge sort, etc.).
 
-📉 **実測・不採用の理由:** 呼び出しがインライン化される状況では readonly の有無による差は測定不能(全バリアント 0.006〜0.016ns)。**生成コード確認(JitDisasm): readonly / 通常フィールドの読み出しはどちらも `mov eax, [rcx+offset]; ret`(4 バイト)でオフセット以外同一 — 差なし確定**(インスタンス readonly は JIT の最適化に寄与しない)。
+📉 **Measured — why it is rejected:** The BCL's `Span.Sort` (introsort) is about 9x faster than a hand-written merge sort, at 1/5 the code size. The BCL side keeps receiving pdqsort-family optimization, leaving essentially no room to win on general-purpose comparison sorts.
 
-✅ **代わりにやること:** readonly は設計意図(不変性)として付ける。性能目的なら sealed(DSP-01)や static readonly の JIT 定数化(TXT-04 のトークン定数等)など、効果が実証された形を使う。
-
----
-
-### R-11: static メソッド直バインドデリゲートの保持
-
-🎯 **狙い:** static メソッドをそのままデリゲートに束縛してコールバック保持する。
-
-📉 **実測・不採用の理由:** static 直バインドのデリゲートは this 引数を詰め替える thunk を経由するため、最も遅い呼び出し形態になりうる(他形態が完全インライン化される状況で単独で約 8 倍残存)。
-
-✅ **代わりにやること:** インターフェース/sealed クラス実装、またはコンパイラがキャッシュするラムダ形(`static x => Foo(x)`)で保持する(DSP-02)。
+✅ **Do this instead:** Use the BCL sort. Pass the comparer as a struct under a generic constraint (JIT-02).
 
 ---
 
-### R-12: 反復目的の ref フィールドカーソル(C# 11)
+### R-07: SearchValues for 2–3 candidate characters
 
-🎯 **狙い:** カーソルを Span + インデックスでなく ref フィールド(ref T + 終端 ref)で保持して走査を速くする。
+🎯 **Intent:** Always turn search candidate characters into `SearchValues<T>` for SIMD search.
 
-📉 **実測・不採用の理由:** 全要素走査では素の Span for ループ(249ns/1024 要素)に勝てず 1.21 倍。カーソル型で要素を 1 個ずつ読む形(SpanReader.Read() 連打)は 2.06 倍。
+📉 **Measured — why it is rejected:** With 2–3 candidates the dedicated overloads such as `IndexOfAny(char, char)` are faster (0.885ns vs 1.494ns). SearchValues is an optimization for large candidate sets.
 
-✅ **代わりにやること:** 全要素処理は Span の for で書く。カーソル(SEQ-01)は「フィールド粒度の構造読み」専用として使う。
-
-🔗 **測定記録:** [LAB-RefFieldCursor.md](../benchmarks/results/LAB-RefFieldCursor.md)
+✅ **Do this instead:** Use the dedicated overload for a few candidates; for many (roughly 4–5 or more), cache a `SearchValues` instance in a static readonly field.
 
 ---
 
-### R-13: 性能目的の pinned(POH)バッファ化
+### R-08: Unconditional adoption of FrozenDictionary
 
-🎯 **狙い:** `GC.AllocateArray(pinned: true)` の常駐バッファで都度の fixed ピン止めコストを省く。
+🎯 **Intent:** Replace every read-only dictionary with `FrozenDictionary` to speed up lookups.
 
-📉 **実測・不採用の理由:** 都度 fixed のピン止めは実測ほぼ無料(0.74ns)で、POH ポインタ直接利用(0.85ns)にしても速くならない。POH 確保自体は通常確保の 17.5 倍 + Gen2 GC を誘発する。
+📉 **Measured — why it is rejected:** Construction costs 15–20x that of Dictionary. Lookups can invert too, depending on the key set (measured 1.15–1.31x slower for 64 enum names). In some small-scale name resolution measurements it was never once the fastest.
 
-✅ **代わりにやること:** `fixed` をそのまま使う。POH は「長寿命 I/O バッファの GC 移動・断片化回避」専用とし、起動時に一度だけ確保する(BUF-06 注意)。
-
-🔗 **測定記録:** [LAB-PinnedArray.md](../benchmarks/results/LAB-PinnedArray.md)
+✅ **Do this instead:** Adopt only when it is "built once at startup and read from then on" *and* you have confirmed a lookup win on real data (COL-02). For Type keys, the dedicated implementation (TYP-01) is about 3x faster.
 
 ---
 
-### R-14: Span.CopyTo の Unsafe.CopyBlockUnaligned 置換
+### R-09: Using fixed pointers where Span would do
 
-🎯 **狙い:** コピーを `Unsafe.CopyBlockUnaligned` に置き換えて速くする。
+🎯 **Intent:** Beat Span with `fixed` + raw pointers.
 
-📉 **実測・不採用の理由:** 可変長では 0.98〜1.03 倍で信頼区間が重なる(➖誤差 — 呼び出し側の生成コードは異なるが、両者とも同じ Memmove に到達するため差が出ない)。JIT が展開できる定数長 16B では 0.83 倍・コードサイズ 45B 減の**実差**があるが、安全性(境界チェックなし・型情報なし)を捨てる対価に見合わない。`Array.Copy` はコードサイズ肥大(1.7KB)で最遅。
+📉 **Measured — why it is rejected:** Either the same speed as reinterpretation via `MemoryMarshal.Cast` / `Unsafe.As`, or slower by the fixed overhead. The gain does not justify the cost of introducing an unsafe context (auditing, safety).
 
-✅ **代わりにやること:** `Span.CopyTo` を既定にする(MEM-05 の明示スライスと併用)。
+✅ **Do this instead:** Write Span / ref based code. For reinterpretation use `MemoryMarshal.Cast` (measured zero-cost; in the BIT-05 re-measurement Cast beats fixed with non-overlapping CIs at 8 and 512 characters — precisely because no pinning is needed); for unmanaged reads and writes see SEQ-02 (struct I/O over Stream).
 
-🔗 **測定記録:** [LAB-CopyBlockUnaligned.md](../benchmarks/results/LAB-CopyBlockUnaligned.md)
-
----
-
-### R-15: 末尾要素の事前タッチによる境界チェック誘導
-
-🎯 **狙い:** `_ = array[length - 1];` の事前アクセスや符号なしガードで、外部長ループの境界チェックを JIT に除去させる。
-
-📉 **実測・不採用の理由:** .NET 10 では全バリアント差なし。.NET 8 でも 1024 要素の合計ループでは差なし(旧世代で報告されていた効果は極小ループ限定の小差)。`array.Length` を直接条件に使う形がコードサイズも最小(34B vs 94〜140B)。
-
-✅ **代わりにやること:** ループ条件に `array.Length` / `span.Length` を直接使う形へ書き換える。
-
-🔗 **測定記録:** [LAB-BoundsCheckHint.md](../benchmarks/results/LAB-BoundsCheckHint.md)
+🔗 **Measurement record:** [BIT-05-XxHash3.md](../benchmarks/results/BIT-05-XxHash3.md) (includes the Cast vs fixed comparison)
 
 ---
 
-### R-16: 手書きの桁順整形トリック(右詰め生成→前方シフト・逆順書き込み)
+### R-10: Expecting JIT optimizations from readonly fields
 
-🎯 **狙い:** 数値の固定長整形で、桁数の事前計算(`Log10` 相当)や生成後の Reverse を避けるため、バッファ末尾から右詰めで書いて前方へシフトする、または下位桁から前向きに書く。
+🎯 **Intent:** Mark fields readonly to draw out JIT constant folding and devirtualization.
 
-📉 **実測・不採用の理由:** net10 では `TryFormat` + `Fill` が 5.32 ns で最速。手書きの LSB 書き → Reverse は 2.51 倍、右詰め → 前方シフトは 4.79 倍遅い。`TryFormat` の内部が桁数計算・2 桁テーブル・アンロールまで最適化済みのため、`% 10` / `/ 10` の手書きループでは上回れない。`TryFormat` / `ISpanFormattable` 整備以前の世代では有効だった技法。
+📉 **Measured — why it is rejected:** Where the call is inlined, the difference with or without readonly is unmeasurable (all variants 0.006–0.016ns). **Generated code check (JitDisasm): reading a readonly field and a normal field both compile to `mov eax, [rcx+offset]; ret` (4 bytes), identical apart from the offset — confirmed no difference** (instance readonly contributes nothing to JIT optimization).
 
-✅ **代わりにやること:** `value.TryFormat(buffer, out var written)` で書き、残りを `Fill(filler)` する。右詰めが必要なら一時領域に `TryFormat` してから末尾へ `CopyTo` する。
-
-🔗 **測定記録:** [TXT-09-FixedFieldFormat.md](../benchmarks/results/TXT-09-FixedFieldFormat.md)
+✅ **Do this instead:** Apply readonly as a statement of design intent (immutability). For performance, use forms with demonstrated effect: sealed (DSP-01), or static readonly fields the JIT turns into constants (the token constants in TXT-04, for example).
 
 ---
 
-### R-17: デリゲート Invoke の Call 置換(Callvirt 回避)
+### R-11: Holding delegates bound directly to static methods
 
-🎯 **狙い:** sealed な具象デリゲート型の `Invoke` を `callvirt` でなく `call` で emit し、null チェック・仮想ディスパッチのコストを省く(Emit 生成コードの定石として知られていた技法)。
+🎯 **Intent:** Bind a static method straight to a delegate and hold it as a callback.
 
-📉 **実測・不採用の理由:** 計測は 14.2 vs 14.6 ns で信頼区間重複。判定ポリシーに従い **JitDisasm で生成コードを比較した結果、68 命令・229 バイトが完全一致** — デリゲート Invoke ではターゲットフィールドの読み出し(`mov rcx, [delegate+0x08]`)がハードウェア null チェックを兼ねるため、`callvirt` の null チェックを JIT が消す。省くべきコストが最初から存在しない。差なし確定(net10)。
+📉 **Measured — why it is rejected:** A delegate bound directly to a static method goes through a thunk that shuffles the this argument, which can make it the slowest call form of all (it alone remained about 8x slower in a situation where every other form was fully inlined).
 
-✅ **代わりにやること:** `callvirt` のまま emit する(Roslyn と同じ)。Emit 生成コードで効くのは子デリゲート連鎖の排除(2.3 倍)と Holder フィールドターゲット化(closure 配列比 1.5 倍)— GEN-01 を参照。
-
-🔗 **測定記録:** [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md)
+✅ **Do this instead:** Hold an interface / sealed class implementation, or the compiler-cached lambda form (`static x => Foo(x)`) (DSP-02).
 
 ---
 
-📝 なお「マイクロベンチ結果の直接外挿」(単体で 30 倍差でも実処理では 1.1 倍に希釈される)は手法ではなく測定方法論のため、[benchmark-methodology.md](benchmark-methodology.md) の落とし穴として記載している。
+### R-12: ref field cursors for iteration (C# 11)
+
+🎯 **Intent:** Speed up walking by holding the cursor in ref fields (ref T + end ref) instead of a Span plus index.
+
+📉 **Measured — why it is rejected:** For full traversal it cannot beat a plain Span for loop (249ns/1024 elements), landing at 1.21x. Reading elements one at a time through the cursor type (repeated SpanReader.Read()) is 2.06x.
+
+✅ **Do this instead:** Write whole-collection processing as a Span for loop. Use cursor types only for field-granularity structured reads.
+
+🔗 **Measurement record:** [LAB-RefFieldCursor.md](../benchmarks/results/LAB-RefFieldCursor.md)
+
+---
+
+### R-13: Pinned (POH) buffers for performance
+
+🎯 **Intent:** Use a resident `GC.AllocateArray(pinned: true)` buffer to avoid the cost of pinning with fixed on every call.
+
+📉 **Measured — why it is rejected:** Pinning with fixed each time is essentially free in practice (0.74ns), and using the POH pointer directly (0.85ns) is no faster. POH allocation itself costs 17.5x a normal allocation and induces Gen2 GCs.
+
+✅ **Do this instead:** Just use `fixed`. Reserve POH for avoiding GC relocation and fragmentation of long-lived I/O buffers, allocated once at startup (BUF-06 caveat).
+
+🔗 **Measurement record:** [LAB-PinnedArray.md](../benchmarks/results/LAB-PinnedArray.md)
+
+---
+
+### R-14: Replacing Span.CopyTo with Unsafe.CopyBlockUnaligned
+
+🎯 **Intent:** Speed up copies by replacing them with `Unsafe.CopyBlockUnaligned`.
+
+📉 **Measured — why it is rejected:** At variable lengths it lands at 0.98–1.03x with overlapping CIs (➖ measurement noise — the generated code at the call site differs, but both reach the same Memmove, so no difference shows up). At the constant length of 16B, which the JIT can unroll, there is a **real difference** of 0.83x and 45B less code, but it does not justify giving up safety (no bounds checks, no type information). `Array.Copy` is the slowest and bloats code size (1.7KB).
+
+✅ **Do this instead:** Default to `Span.CopyTo` (combined with the explicit slicing of MEM-05).
+
+🔗 **Measurement record:** [LAB-CopyBlockUnaligned.md](../benchmarks/results/LAB-CopyBlockUnaligned.md)
+
+---
+
+### R-15: Touching the last element up front to steer bounds-check elimination
+
+🎯 **Intent:** Get the JIT to eliminate bounds checks in loops driven by an external length, via a pre-access such as `_ = array[length - 1];` or an unsigned guard.
+
+📉 **Measured — why it is rejected:** On .NET 10 there is no difference across any variant. Even on .NET 8 there is no difference for a 1024-element summation loop (the effect reported in older generations was a tiny difference limited to extremely small loops). Using `array.Length` directly in the condition also gives the smallest code (34B vs 94–140B).
+
+✅ **Do this instead:** Rewrite the loop condition to use `array.Length` / `span.Length` directly.
+
+🔗 **Measurement record:** [LAB-BoundsCheckHint.md](../benchmarks/results/LAB-BoundsCheckHint.md)
+
+---
+
+### R-16: Hand-rolled digit-ordering formatting tricks (right-aligned generation → forward shift, reverse-order writing)
+
+🎯 **Intent:** In fixed-width numeric formatting, avoid computing the digit count up front (a `Log10` equivalent) or reversing after generation, by writing right-aligned from the end of the buffer and shifting forward, or by writing forward starting from the least significant digit.
+
+📉 **Measured — why it is rejected:** On net10, `TryFormat` + `Fill` is fastest at 5.32 ns. Hand-written LSB-first writing + Reverse is 2.51x slower, and right-aligned + forward shift is 4.79x slower. `TryFormat` is already optimized internally down to digit counting, a two-digit table, and unrolling, so a hand-written `% 10` / `/ 10` loop cannot beat it. This technique was effective in generations before `TryFormat` / `ISpanFormattable` were in place.
+
+✅ **Do this instead:** Write with `value.TryFormat(buffer, out var written)` and `Fill(filler)` the remainder. If you need right alignment, `TryFormat` into scratch space and `CopyTo` it to the tail.
+
+🔗 **Measurement record:** [TXT-09-FixedFieldFormat.md](../benchmarks/results/TXT-09-FixedFieldFormat.md)
+
+---
+
+### R-17: Emitting delegate Invoke with Call instead of Callvirt
+
+🎯 **Intent:** Emit `Invoke` on a sealed concrete delegate type with `call` rather than `callvirt`, to save the null check and virtual dispatch cost (a technique long treated as standard practice for Emit-generated code).
+
+📉 **Measured — why it is rejected:** Measurements were 14.2 vs 14.6 ns with overlapping CIs. Following the decision policy, **comparing the generated code with JitDisasm showed 68 instructions / 229 bytes matching exactly** — for delegate Invoke, the load of the target field (`mov rcx, [delegate+0x08]`) doubles as a hardware null check, so the JIT already removes the `callvirt` null check. The cost you set out to save never existed in the first place. Confirmed no difference (net10).
+
+✅ **Do this instead:** Emit `callvirt` as-is (the same as Roslyn). What does pay off in Emit-generated code is eliminating child delegate chains (2.3x) and targeting a Holder field (1.5x versus a closure array) — see GEN-01.
+
+🔗 **Measurement record:** [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md)
+
+---
+
+📝 Note that "extrapolating microbenchmark results directly" (a 30x difference in isolation dilutes to 1.1x in real processing) is measurement methodology rather than a technique, so it is documented as a pitfall in [benchmark-methodology.md](benchmark-methodology.md).

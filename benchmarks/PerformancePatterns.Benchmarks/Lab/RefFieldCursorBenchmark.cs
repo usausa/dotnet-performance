@@ -40,9 +40,9 @@ public class RefFieldCursorBenchmark
     }
 
     [Benchmark]
-    public int SumSpanReader()
+    public int SumSpanCursor()
     {
-        var reader = new SpanReader<int>(values);
+        var reader = new SpanCursor<int>(values);
         var total = 0;
         while (reader.Remaining > 0)
         {
@@ -92,4 +92,22 @@ internal ref struct RefFieldCursor<T>
         value = default!;
         return false;
     }
+}
+
+// Minimal Span + index cursor used only to measure the rejected "read one element at a time" shape (R-12).
+internal ref struct SpanCursor<T>
+    where T : unmanaged
+{
+    private readonly ReadOnlySpan<T> source;
+
+    private int position;
+
+    public SpanCursor(ReadOnlySpan<T> source)
+    {
+        this.source = source;
+    }
+
+    public readonly int Remaining => source.Length - position;
+
+    public T Read() => source[position++];
 }

@@ -1,5 +1,7 @@
 # ❌ 採用しない手法(不採用パターン詳細)
 
+**日本語** | [English](rejected-patterns.md)
+
 実測の結果、効果なし・逆効果・リスクに見合わないと判定した手法の記録。
 「なぜ採用しないのか / なぜ改善しないのか」を [README](../README.md) の各パターンと同じ粒度で記述する。
 測定環境は Ryzen 9 5900X / .NET 10(世代依存の項目は個別に記載)。
@@ -96,7 +98,7 @@
 
 📉 **実測・不採用の理由:** `MemoryMarshal.Cast` / `Unsafe.As` による再解釈と同速か、fixed の固定コスト分だけ遅い。unsafe コンテキストの導入コスト(監査・安全性)に見合う利得がない。
 
-✅ **代わりにやること:** Span / ref ベースで書く。再解釈は `MemoryMarshal.Cast`(ゼロコスト実測済み。BIT-05 の再測定では 8 / 512 文字で fixed より Cast が信頼区間非重複で速い — pinning が不要なぶん)、unmanaged 読み書きは SEQ-01 / SEQ-03。
+✅ **代わりにやること:** Span / ref ベースで書く。再解釈は `MemoryMarshal.Cast`(ゼロコスト実測済み。BIT-05 の再測定では 8 / 512 文字で fixed より Cast が信頼区間非重複で速い — pinning が不要なぶん)、unmanaged 読み書きは SEQ-02(Stream 構造体 I/O)。
 
 🔗 **測定記録:** [BIT-05-XxHash3.md](../benchmarks/results/BIT-05-XxHash3.md)(Cast vs fixed の比較を含む)
 
@@ -128,7 +130,7 @@
 
 📉 **実測・不採用の理由:** 全要素走査では素の Span for ループ(249ns/1024 要素)に勝てず 1.21 倍。カーソル型で要素を 1 個ずつ読む形(SpanReader.Read() 連打)は 2.06 倍。
 
-✅ **代わりにやること:** 全要素処理は Span の for で書く。カーソル(SEQ-01)は「フィールド粒度の構造読み」専用として使う。
+✅ **代わりにやること:** 全要素処理は Span の for で書く。カーソル型は「フィールド粒度の構造読み」専用として使う。
 
 🔗 **測定記録:** [LAB-RefFieldCursor.md](../benchmarks/results/LAB-RefFieldCursor.md)
 

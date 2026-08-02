@@ -1,4 +1,4 @@
-# SEQ-04 / STK-03: Batch with struct enumerators
+# SEQ-03 / STK-03: Batch with struct enumerators
 
 - Verdict: adopted
 - 1024 ints in chunks of 100: LINQ Chunk 570 ns + 4,424 B (allocates every chunk array) vs ArrayBatch (ArraySegment) 444 ns / 0 B (0.80x) vs SpanBatch 342 ns / 0 B (0.61x)

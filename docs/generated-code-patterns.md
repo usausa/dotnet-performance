@@ -1,29 +1,31 @@
-# 🏭 Source Generator 生成コードパターン集
+# 🏭 Source Generator Codegen Pattern Catalog
 
-Source Generator で**どのようなコードを生成すればパフォーマンスを実現できるか**のカタログ。
-ジェネレータの実装方法(Roslyn API)ではなく、**出力すべきコードの形**と、その形が速いことの実測根拠を記録する。
-本書のコード例はすべて「ジェネレータの出力イメージ」であり、同じ形を手書きしても同じ性能になる(実測は手書き形で取得済み)。
+[日本語](generated-code-patterns.ja.md) | **English**
 
-対応する本体パターン: [README](../README.md) の **GEN-02**。AOT 文脈の位置づけは [aot-compatibility.md](aot-compatibility.md) の **AOTS-01**(根本対策)と **AOTS-08**(二重パス)。
+A catalog of **what code a Source Generator should emit in order to achieve performance**.
+It records the **shape of the code to emit** and the measured evidence that the shape is fast, rather than how to implement the generator (the Roslyn API).
+Every code example here is "what the generator's output looks like"; hand-writing the same shape gives the same performance (the measurements were taken with the hand-written form).
 
----
-
-## 🧭 生成コード設計の 3 原則
-
-1. **実行時解決をビルド時へ移す** — 辞書引き・リフレクション・ハッシュ計算・文字列組み立てのうち、生成時に確定できるものはコード(定数・switch・直書き `new`)に焼き込む
-2. **件数・形状で出し分ける** — ジェネレータは対象の件数・型・レイアウトを知っている。実行時ライブラリにはできない「N に応じた実装の切り替え」を生成時に行う
-3. **測定済みパターンの組み合わせで出力する** — 生成コードの中身は本カタログの採用パターンで構成し、不採用パターン(R-01〜R-17)を含めない
+Corresponding main pattern: **GEN-02** in [README](../README.md). For where this sits in the AOT context, see **AOTS-01** (root-cause fix) and **AOTS-08** (dual path) in [aot-compatibility.md](aot-compatibility.md).
 
 ---
 
-## 1. 名前 → インデックス解決(列名・プロパティ名・キー文字列)
+## 🧭 Three principles of codegen design
 
-**シナリオ:** DB 列名、プロパティ名、JSON キーなど「既知の文字列集合 → 番号」の解決。
+1. **Move runtime resolution to build time** — of the dictionary lookups, reflection, hash computation, and string assembly involved, bake whatever can be settled at generation time into code (constants, switch, direct `new`)
+2. **Branch on count and shape** — the generator knows the target's count, types, and layout. Do at generation time the "switch implementations based on N" that a runtime library cannot do
+3. **Emit combinations of measured patterns** — build the body of the generated code out of this catalog's adopted patterns, and never include rejected patterns (R-01–R-17)
 
-**生成すべきコード:** 件数で出し分ける。
+---
+
+## 1. Name → index resolution (column names, property names, key strings)
+
+**Scenario:** Resolving a known set of strings — DB column names, property names, JSON keys — to a number.
+
+**What to generate:** Branch on the count.
 
 ```csharp
-// 件数 ≤ 4: Equals 連鎖(生成イメージ)
+// Count <= 4: Equals chain (generated form)
 public static int GetIndex(ReadOnlySpan<char> name)
 {
     if (name.SequenceEqual("Id")) return 0;
@@ -32,7 +34,7 @@ public static int GetIndex(ReadOnlySpan<char> name)
     return -1;
 }
 
-// 件数 ≥ 5: サンプリングハッシュ switch(ハッシュ定数は生成時に計算して焼き込む)
+// Count >= 5: sampling-hash switch (hash constants are computed and baked in at generation time)
 public static int GetIndex(ReadOnlySpan<char> name)
 {
     switch (SamplingHash.Calculate(name))   // (length << 16) ^ (first << 8) ^ (mid << 4) ^ last
@@ -45,54 +47,54 @@ public static int GetIndex(ReadOnlySpan<char> name)
 }
 ```
 
-**なぜ速いか:** 全文字を読む一般ハッシュと違い、長さ + 3 文字のサンプリングで候補を絞り、確定比較は SIMD 化された `SequenceEqual` 1 回。ハッシュ定数が JIT 定数になるため switch はジャンプテーブル化される。
+**Why it is faster:** Unlike a general hash that reads every character, sampling the length plus 3 characters narrows the candidates, and the confirming comparison is a single SIMD-accelerated `SequenceEqual`. Since the hash constants become JIT constants, the switch turns into a jump table.
 
-**実測の裏付け:**
+**Measured evidence:**
 
-- サンプリングハッシュ表(実行時版)が `Dictionary` の 0.56〜0.84 倍、Span キーでは `FrozenDictionary` にも全サイズで勝つ → [COL-04-SampledNameTable.md](../benchmarks/results/COL-04-SampledNameTable.md)
-- 線形探索(Equals 連鎖の実行時版)が勝つのは 4 件まで、16 件で 2.73 倍に劣化 → 同上(出し分け閾値の根拠)
-- 生成時に位置を選べるため、衝突するキー集合ではサンプリング位置の変更で回復できる(実行時版にはできない生成ならではの自由度)
+- The sampling hash table (runtime version) runs at 0.56–0.84x of `Dictionary`, and with Span keys beats even `FrozenDictionary` at every size → [COL-04-SampledNameTable.md](../benchmarks/results/COL-04-SampledNameTable.md)
+- Linear search (the runtime version of the Equals chain) only wins up to 4 entries, degrading to 2.73x at 16 → same record (the basis for the branch threshold)
+- Because the positions are chosen at generation time, a colliding key set can be recovered by moving the sampling positions (a degree of freedom unique to codegen that the runtime version does not have)
 
-**注意:** 大文字小文字を無視する場合はサンプリング文字を大文字化して計算し、確定比較を `OrdinalIgnoreCase` にする。比較は常に序数系(TXT-03)。
+**Caveats:** For case-insensitive matching, upper-case the sampled characters before computing the hash and make the confirming comparison `OrdinalIgnoreCase`. Comparisons are always ordinal (TXT-03).
 
 ---
 
-## 2. 型別成果物の焼き込み(SQL 断片・型名・書式文字列)
+## 2. Baking in per-type artifacts (SQL fragments, type names, format strings)
 
-**シナリオ:** 型ごとに決まる SQL、ログ用型名、シリアライズのキー名など。
+**Scenario:** SQL that is fixed per type, type names for logging, serialization key names, and so on.
 
-**生成すべきコード:** 実行時に組み立てず、**const / static readonly へ直書き**する。
+**What to generate:** Do not assemble at runtime — **write it directly into const / static readonly**.
 
 ```csharp
-// 生成イメージ: 実行時の StringBuilder も辞書引きも存在しない
+// Generated form: no runtime StringBuilder and no dictionary lookup
 internal static class OrderSql
 {
     public const string Insert = "INSERT INTO Order (Id, Name, Amount, CreatedAt) VALUES (@Id, @Name, @Amount, @CreatedAt)";
 }
 
-// UTF-8 が必要なら u8 リテラルで焼き込む(実行時エンコードなし)
+// If UTF-8 is needed, bake it in as a u8 literal (no runtime encoding)
 internal static class OrderJson
 {
     public static ReadOnlySpan<byte> IdKey => "\"id\":"u8;
 }
 ```
 
-**なぜ速いか:** 読み出しは定数ロードのみ。`ReadOnlySpan<byte>` プロパティ + u8 リテラルはアセンブリのデータ領域を直接指すため確保ゼロ。
+**Why it is faster:** Reading is nothing but a constant load. A `ReadOnlySpan<byte>` property backed by a u8 literal points straight into the assembly's data section, so allocation is zero.
 
-**実測の裏付け:** 毎回組み立て 116 ns + 760 B → 辞書キャッシュ 4.8 ns → **ジェネリック static 読み 0.09 ns / コードサイズ 6 B**。生成コードは最速の形(static 読み)をさらに const へ倒せる → [TYP-06-StaticArtifact.md](../benchmarks/results/TYP-06-StaticArtifact.md)
+**Measured evidence:** Assembling every time costs 116 ns + 760 B → dictionary cache 4.8 ns → **generic static read 0.09 ns / 6 B of code**. Generated code can push the fastest form (the static read) one step further, down to a const → [TYP-06-StaticArtifact.md](../benchmarks/results/TYP-06-StaticArtifact.md)
 
-**注意:** ジェネリック型引数に依存する成果物は `static class Cache<T>` 形(TYP-04 / TYP-06)で生成する。型初期化子で例外を出さない設計にする。
+**Caveats:** Artifacts that depend on generic type arguments should be generated in the `static class Cache<T>` form (TYP-04 / TYP-06). Design the type initializer so it never throws.
 
 ---
 
-## 3. DB 行マッパー
+## 3. DB row mappers
 
-**シナリオ:** `DbDataReader` → POCO のマッピング(Dapper 系が実行時にやることをビルド時に)。
+**Scenario:** Mapping `DbDataReader` → POCO (doing at build time what Dapper-style libraries do at runtime).
 
-**生成すべきコード:** 序数 struct + 1 パス列解決 + 型別 getter。
+**What to generate:** An ordinal struct + one-pass column resolution + typed getters.
 
 ```csharp
-// 生成イメージ
+// Generated form
 private readonly struct OrderOrdinals(int id, int name, int flag)
 {
     public readonly int Id = id;
@@ -106,7 +108,7 @@ public static OrderOrdinals ResolveOrdinals(DbDataReader reader)
     for (var i = 0; i < reader.FieldCount; i++)
     {
         var column = reader.GetName(i);
-        // 列数が多い場合はシナリオ 1 の名前スイッチを生成して使う
+        // For many columns, generate and use the name switch from scenario 1
         if (string.Equals(column, "Id", StringComparison.OrdinalIgnoreCase)) { id = i; }
         else if (string.Equals(column, "Name", StringComparison.OrdinalIgnoreCase)) { name = i; }
         else if (string.Equals(column, "Flag", StringComparison.OrdinalIgnoreCase)) { flag = i; }
@@ -116,28 +118,28 @@ public static OrderOrdinals ResolveOrdinals(DbDataReader reader)
 
 public static Order Map(DbDataReader reader, in OrderOrdinals ordinals) => new()
 {
-    Id = reader.GetInt32(ordinals.Id),        // GetValue + キャストは生成しない(ボックス化)
+    Id = reader.GetInt32(ordinals.Id),        // Do not generate GetValue + cast (boxing)
     Name = reader.GetString(ordinals.Name),
     Flag = reader.GetBoolean(ordinals.Flag),
 };
 ```
 
-**なぜ速いか:** 列解決がリーダー 1 本につき 1 回になり、行ループは struct フィールド読み + 型別 getter 直呼びだけになる。
+**Why it is faster:** Column resolution happens once per reader, and the row loop becomes nothing but struct field reads and direct calls to typed getters.
 
-**実測の裏付け:** 毎行 `GetOrdinal` 11.3 ns/行 → **序数 struct + `in` 渡し 1.42 ns/行(0.13 倍)**、コードサイズ 2,225 → 537 B。`GetValue` + キャストを生成すると 7.18 ns/行 + **48 B/行のボックス化** → [DAT-01-OrdinalResolve.md](../benchmarks/results/DAT-01-OrdinalResolve.md)
+**Measured evidence:** `GetOrdinal` per row is 11.3 ns/row → **ordinal struct passed by `in`, 1.42 ns/row (0.13x)**, code size 2,225 → 537 B. Generating `GetValue` + cast instead costs 7.18 ns/row plus **48 B/row of boxing** → [DAT-01-OrdinalResolve.md](../benchmarks/results/DAT-01-OrdinalResolve.md)
 
-**注意:** 欠落列を許すなら -1 のままにして Map 側で分岐を生成(`GetOrdinal` は例外を投げるため使わない)。enum 列は基底型で読んでキャストするコードを生成する。
+**Caveats:** If missing columns are allowed, leave the ordinal at -1 and generate a branch on the Map side (do not use `GetOrdinal`, which throws). For enum columns, generate code that reads the underlying type and casts.
 
 ---
 
-## 4. ファクトリ / DI 解決
+## 4. Factory / DI resolution
 
-**シナリオ:** 型登録済みの依存グラフからインスタンスを構築する(DI コンテナが Emit でやることをビルド時に)。
+**Scenario:** Constructing instances from a dependency graph of registered types (doing at build time what a DI container does with Emit).
 
-**生成すべきコード:** **依存グラフを `new` の直書きへインライン展開**する。子ファクトリ呼び出しの連鎖を生成しない。
+**What to generate:** **Inline the dependency graph into direct `new` expressions.** Do not generate chains of child factory calls.
 
 ```csharp
-// ✅ 生成イメージ: グラフを 1 メソッドに展開(シングルトンは static readonly 読み)
+// ✅ Generated form: the graph expanded into a single method (singletons are static readonly reads)
 internal static class ServiceFactory
 {
     private static readonly DepA SharedDepA = new();
@@ -145,86 +147,86 @@ internal static class ServiceFactory
     public static Service Create() => new(SharedDepA, new DepB(new DepC()));
 }
 
-// ❌ 生成してはいけない形: 子ファクトリを Func で持ち回って呼ぶ
+// ❌ Never generate this: carrying child factories around as Func and calling them
 public static Service Create() => new(
-    (DepA)childFactories[0](),   // デリゲート呼び出し + castclass の連鎖
+    (DepA)childFactories[0](),   // A chain of delegate calls + castclass
     (DepB)childFactories[1]());
 ```
 
-**なぜ速いか:** 呼び出し連鎖・castclass・デリゲート間接がすべて消え、JIT がコンストラクタをインライン化できる直呼びになる。
+**Why it is faster:** The call chains, castclass, and delegate indirection all disappear, leaving direct calls whose constructors the JIT can inline.
 
-**実測の裏付け:** GEN-01(Emit 側の同一シナリオ)で、子ファクトリ連鎖は直書き比 **2.3 倍**、closure 配列ターゲットは 1.5 倍のペナルティ。直書き相当(DirectLambda)は 6.23 ns → [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md)。生成コードは Emit の最良形(Holder フィールド 6.55 ns)と同等の形を、AOT 安全に出力できる。
+**Measured evidence:** In GEN-01 (the same scenario on the Emit side), a child factory chain costs **2.3x** versus direct code, and a closure-array target 1.5x. The direct-code equivalent (DirectLambda) is 6.23 ns → [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md). Generated code can emit a shape equivalent to Emit's best form (Holder field, 6.55 ns), AOT-safely.
 
-**注意:** ライフタイム(シングルトン / 都度生成)は生成時に確定して形で表現する(シングルトン = static readonly、都度 = `new` 直書き)。実行時 `Type` からの解決が必要な入口だけ `Dictionary<Type, Func<object>>` を生成し、中身は上記の直書きファクトリを指す(TYP-01 の実行時 Type 経路が素の辞書より遅い実測に注意 — 型が静的に分かる呼び出しをジェネリック API で受けるのが先)。
+**Caveats:** Settle lifetimes (singleton / per-call) at generation time and express them in the shape (singleton = static readonly, per-call = direct `new`). Generate a `Dictionary<Type, Func<object>>` only for the entry points that genuinely need resolution from a runtime `Type`, with its values pointing at the direct factories above (note the measurement showing TYP-01's runtime Type path is slower than a plain dictionary — routing statically known calls through a generic API comes first).
 
 ---
 
-## 5. 整形・シリアライズ
+## 5. Formatting and serialization
 
-**シナリオ:** JSON・ログ・固定長など、値 → テキスト/バイナリの書き出しコード。
+**Scenario:** Code that writes values out as text or binary — JSON, logs, fixed-width records, and so on.
 
-**生成すべきコード:**
+**What to generate:**
 
 ```csharp
-// ✅ 数値・日時は TryFormat 直呼び(中間 string を作らない)
+// ✅ Call TryFormat directly for numbers and dates (no intermediate string)
 value.TryFormat(destination, out written);
 
-// ✅ 既知のキー・区切りは u8 リテラルの CopyTo(実行時エンコードなし)
+// ✅ CopyTo from u8 literals for known keys and separators (no runtime encoding)
 "\"name\":"u8.CopyTo(destination);
 
-// ✅ 長さが事前計算できる文字列連結は string.Create を生成
-return string.Create(length, state, static (span, s) => { /* CopyTo の列 */ });
+// ✅ Generate string.Create for concatenations whose length can be precomputed
+return string.Create(length, state, static (span, s) => { /* a sequence of CopyTo calls */ });
 
-// ✅ 固定書式(日時など)は 2 桁テーブル参照を生成(TXT-01)
+// ✅ For fixed formats (dates and the like), generate two-digit table lookups (TXT-01)
 ```
 
-**なぜ速いか:** 中間 string / 中間 byte[] が消え、書き出しがバッファ直書きの列になる。
+**Why it is faster:** Intermediate strings and byte[]s disappear, and writing becomes a sequence of direct buffer writes.
 
-**実測の裏付け:**
+**Measured evidence:**
 
-- `string.Create` は補間の 0.57 倍・割り当ては結果のみ → [TXT-07-StringCreate.md](../benchmarks/results/TXT-07-StringCreate.md)
-- 固定書式のテーブル化 → [TXT-01-Utf8DateTimeFormatter.md](../benchmarks/results/TXT-01-Utf8DateTimeFormatter.md)
-- **手書きの桁詰めループを生成してはいけない**(`TryFormat` の 2.5〜4.8 倍遅い、R-16)→ [TXT-09-FixedFieldFormat.md](../benchmarks/results/TXT-09-FixedFieldFormat.md)
+- `string.Create` runs at 0.57x of interpolation and allocates only the result → [TXT-07-StringCreate.md](../benchmarks/results/TXT-07-StringCreate.md)
+- Table-driven fixed formats → [TXT-01-Utf8DateTimeFormatter.md](../benchmarks/results/TXT-01-Utf8DateTimeFormatter.md)
+- **Never generate hand-written digit-packing loops** (2.5–4.8x slower than `TryFormat`, R-16) → [TXT-09-FixedFieldFormat.md](../benchmarks/results/TXT-09-FixedFieldFormat.md)
 
-**注意:** 逐次書き込みの受け皿は `IBufferWriter<T>`(BUF-02)か Span 直書き(SEQ-03)を生成の既定にする。
+**Caveats:** Make `IBufferWriter<T>` (BUF-02) or direct Span writes (SEQ-02) the default sink for sequential writing in generated code.
 
 ---
 
-## 6. enum 特化(TryParse / ToString)
+## 6. enum specialization (TryParse / ToString)
 
-**シナリオ:** 既知の enum に対する名前⇔値変換。
+**Scenario:** Name ⇔ value conversion for a known enum.
 
-**生成すべきコード:** シナリオ 1(名前スイッチ)の適用 + ToString は switch 定数返し。
+**What to generate:** Apply scenario 1 (the name switch), and make ToString a switch returning constants.
 
 ```csharp
-// 生成イメージ
+// Generated form
 public static bool TryParse(ReadOnlySpan<char> name, out Color value)
 {
-    // 件数に応じて Equals 連鎖 / サンプリングハッシュ switch(シナリオ 1 と同型)
+    // Equals chain or sampling-hash switch depending on the count (same shape as scenario 1)
 }
 
 public static string FastToString(this Color value) => value switch
 {
-    Color.Red => "Red",       // 定数返し(実行時の名前解決・確保なし)
+    Color.Red => "Red",       // Constant return (no runtime name resolution, no allocation)
     Color.Green => "Green",
-    _ => value.ToString(),    // 未知値は BCL へフォールバック
+    _ => value.ToString(),    // Unknown values fall back to the BCL
 };
 ```
 
-**実測の裏付け:** 名前解決部はシナリオ 1 と同型(COL-04 の実測に帰着)。ToString の定数返しは確保ゼロが構造的に保証される(`Enum.ToString` は文字列生成を伴う)。
+**Measured evidence:** The name resolution part is the same shape as scenario 1 (it reduces to the COL-04 measurements). Returning constants from ToString structurally guarantees zero allocation (`Enum.ToString` involves string creation).
 
-**注意:** まず BCL の `Enum.TryParse<T>(ReadOnlySpan<char>, ...)` で足りるかを確認してから生成する。`(T)Enum.Parse(typeof(T), name)` 形のコードは生成しない(ボックス化、AOTP-05 系の懸念も)。
+**Caveats:** First check whether the BCL's `Enum.TryParse<T>(ReadOnlySpan<char>, ...)` is enough before generating anything. Do not generate code of the form `(T)Enum.Parse(typeof(T), name)` (boxing, plus AOTP-05 style concerns).
 
 ---
 
-## 7. コレクション変換
+## 7. Collection conversion
 
-**シナリオ:** 配列 / List / DB 結果 → DTO リストの変換コード。
+**Scenario:** Code that converts an array / List / DB result into a DTO list.
 
-**生成すべきコード:** 件数既知を前提に確保を確定させる。
+**What to generate:** Assume the count is known and settle the allocation up front.
 
 ```csharp
-// 生成イメージ: 容量確定 + SetCount + Span 直書き(COL-01 / COL-06)
+// Generated form: fixed capacity + SetCount + direct Span writes (COL-01 / COL-06)
 var list = new List<TDestination>(source.Length);
 CollectionsMarshal.SetCount(list, source.Length);
 var span = CollectionsMarshal.AsSpan(list);
@@ -234,18 +236,18 @@ for (var i = 0; i < source.Length; i++)
 }
 ```
 
-**実測の裏付け:** SetCount + Span 直書きは Add ループの 0.21〜0.27 倍・割り当てゼロ(再利用時)→ [COL-06-CollectionConvert.md](../benchmarks/results/COL-06-CollectionConvert.md)。連続領域からの `ImmutableArray` は `ToImmutableArray()` を生成(Builder 経由は 2.5〜3.4 倍遅い)。
+**Measured evidence:** SetCount + direct Span writes run at 0.21–0.27x of an Add loop, with zero allocation when reused → [COL-06-CollectionConvert.md](../benchmarks/results/COL-06-CollectionConvert.md). For `ImmutableArray` from a contiguous region, generate `ToImmutableArray()` (going through a Builder is 2.5–3.4x slower).
 
 ---
 
-## 8. 変更通知・イベント(INotifyPropertyChanged 生成など)
+## 8. Change notification and events (generating INotifyPropertyChanged, etc.)
 
-**シナリオ:** プロパティ変更通知、イベント発火コードの生成。
+**Scenario:** Generating property change notification and event-raising code.
 
-**生成すべきコード:**
+**What to generate:**
 
 ```csharp
-// ✅ PropertyChangedEventArgs は static readonly へ焼き込む(発火ごとの確保をゼロに)
+// ✅ Bake PropertyChangedEventArgs into static readonly (zero allocation per raise)
 private static readonly PropertyChangedEventArgs NameChangedArgs = new(nameof(Name));
 
 public string Name
@@ -256,40 +258,40 @@ public string Name
         if (!string.Equals(name, value, StringComparison.Ordinal))
         {
             name = value;
-            PropertyChanged?.Invoke(this, NameChangedArgs);   // 確保なし
+            PropertyChanged?.Invoke(this, NameChangedArgs);   // No allocation
         }
     }
 }
 ```
 
-**なぜ速いか:** 発火のたびの `new PropertyChangedEventArgs(...)` が消える(構造的に確保ゼロ)。イベント購読構造を自前で生成する場合は購読者数で形を選ぶ。
+**Why it is faster:** The `new PropertyChangedEventArgs(...)` on every raise disappears (structurally zero allocation). If you generate your own event subscription structure, pick the shape based on the number of subscribers.
 
-**実測の裏付け:** 購読 1 個ならマルチキャストデリゲートが最速(配列形は 2.87 倍遅)、**2 個以上で不変配列形が逆転**(4 個で 0.36 倍)→ [DSP-03-HandlerList.md](../benchmarks/results/DSP-03-HandlerList.md)。コールバックは static ラムダ + TState 形で生成する(DSP-04)。
+**Measured evidence:** With a single subscriber a multicast delegate is fastest (the array form is 2.87x slower), but **from two subscribers up the immutable array form takes the lead** (0.36x at four) → [DSP-03-HandlerList.md](../benchmarks/results/DSP-03-HandlerList.md). Generate callbacks in the static lambda + TState form (DSP-04).
 
 ---
 
-## 9. ❌ 生成してはいけないコード(アンチ生成リスト)
+## 9. ❌ Code you must never generate (anti-generation list)
 
-「速そうに見える」ために生成コードへ混入しがちだが、**実測・生成コード確認で効果なし〜逆効果と確定済み**の形。ジェネレータ(および AI のコード生成)はこれらを出力しないこと。
+Shapes that tend to creep into generated code because they "look fast", but which measurement and generated-code inspection have **confirmed to be ineffective or outright counterproductive**. Generators (and AI code generation) must not emit these.
 
-| 生成してはいけない形 | 理由(実測) | 記録 |
+| Shape you must never generate | Reason (measured) | Record |
 |---|---|---|
-| `typeof(X)` の static readonly キャッシュ | Tier1 で生成コード完全一致。昇格前はキャッシュ側が不利ですらある | R-01 |
-| 読み取り専用辞書の無条件 `FrozenDictionary` 化 | 構築 15〜20 倍、検索もキー集合次第で逆転 | R-08 |
-| インスタンスフィールドへの性能目的 readonly | 生成コード同一(オフセット以外)を確認 | R-10 |
-| `Span.CopyTo` の `Unsafe.CopyBlockUnaligned` 置換 | 可変長は同じ Memmove に到達(誤差)。安全性だけ失う | R-14 |
-| 手書きの桁詰め整形ループ(右詰めシフト・逆順書き) | `TryFormat` + `Fill` の 2.5〜4.8 倍遅い | R-16 |
-| デリゲート Invoke の `call` 置換(`callvirt` 回避) | 生成コード 68 命令・229 B 完全一致を JIT 確認 | R-17 |
-| 単一 Span ループの `GetReference` + `Unsafe.Add` 化 | 標準 for で境界チェック除去済み。手動化は 1.07〜1.13 倍遅 + バグ源 | R-02 |
-| 自前ハッシュループ(FNV-1a 等)の生成 | 64 文字以降 `string.GetHashCode` より遅い。XxHash3 かサンプリング(シナリオ 1)を使う | [BIT-05](../benchmarks/results/BIT-05-XxHash3.md) |
-| 実行時 `Type` キー辞書を主経路にする生成 | 実行時 Type 経路は素の Dictionary より遅い(1.93 倍)。ジェネリック API で受けて static 解決する | [TYP-01](../benchmarks/results/TYP-01-TypeMap.md) |
+| static readonly caching of `typeof(X)` | Generated code matches exactly at Tier1; before promotion the cached version is actually worse | R-01 |
+| Unconditionally turning read-only dictionaries into `FrozenDictionary` | Construction 15–20x; lookups can invert too, depending on the key set | R-08 |
+| readonly on instance fields for performance | Generated code confirmed identical (apart from the offset) | R-10 |
+| Replacing `Span.CopyTo` with `Unsafe.CopyBlockUnaligned` | Variable lengths reach the same Memmove (measurement noise); you only lose safety | R-14 |
+| Hand-written digit-packing format loops (right-align shift, reverse-order writes) | 2.5–4.8x slower than `TryFormat` + `Fill` | R-16 |
+| Emitting delegate Invoke with `call` instead of `callvirt` | JIT check showed the generated code matching exactly at 68 instructions / 229 B | R-17 |
+| Converting single-Span loops to `GetReference` + `Unsafe.Add` | A standard for already has bounds checks eliminated; going manual is 1.07–1.13x slower and a bug source | R-02 |
+| Generating hand-rolled hash loops (FNV-1a and the like) | Slower than `string.GetHashCode` from 64 characters up; use XxHash3 or sampling (scenario 1) | [BIT-05](../benchmarks/results/BIT-05-XxHash3.md) |
+| Generating a runtime `Type`-keyed dictionary as the primary path | The runtime Type path is slower than a plain Dictionary (1.93x); take a generic API and resolve statically | [TYP-01](../benchmarks/results/TYP-01-TypeMap.md) |
 
-詳細は [rejected-patterns.md](rejected-patterns.md)。
+For details, see [rejected-patterns.md](rejected-patterns.md).
 
 ---
 
-## 🧪 生成コードの検証
+## 🧪 Verifying generated code
 
-- 生成コードにも本カタログの検証プロセスを適用する: **等価性テスト**(生成形 = 素直な実装の結果一致)を必ず用意する(GEN-01 の注意と同じ)
-- 性能主張は測定してから記録する。計測が誤差範囲なら生成コード(JitDisasm)まで確認して「➖誤差 / 差なし」を区別する([benchmark-methodology.md](benchmark-methodology.md) の判断基準)
-- JIT 環境向けに Emit の高速パスを併設する場合は `RuntimeFeature.IsDynamicCodeCompiled` で分岐する(AOTS-08)。ただし GEN-01 の実測が示すとおり、**直書き生成コードは Emit の最良形と同等**なので、二重パスが必要になる場面は「生成できない動的シナリオ」に限られる
+- Apply this catalog's verification process to generated code as well: always provide an **equivalence test** (the generated form matches the results of the straightforward implementation) — the same caveat as GEN-01
+- Measure before recording any performance claim. If the measurement falls within measurement noise, go down to the generated code (JitDisasm) to distinguish "➖ measurement noise" from "no difference" (the decision criteria in [benchmark-methodology.md](benchmark-methodology.md))
+- If you also ship an Emit fast path for JIT environments, branch on `RuntimeFeature.IsDynamicCodeCompiled` (AOTS-08). But as the GEN-01 measurements show, **directly generated code is on par with Emit's best form**, so a dual path is only needed for dynamic scenarios that cannot be generated

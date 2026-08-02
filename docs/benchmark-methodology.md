@@ -1,14 +1,16 @@
-# 📐 ベンチマーク実施ガイドライン
+# 📐 Benchmarking Guidelines
 
-パターンの効果検証に使う BenchmarkDotNet の構成と、測定を無意味にする落とし穴の回避策。
-[README](../README.md) の「実測例」は本ガイドラインに沿った測定を前提とする。
+[日本語](benchmark-methodology.ja.md) | **English**
 
-## 🧰 基本構成
+The BenchmarkDotNet setup used to verify pattern effectiveness, plus how to avoid the pitfalls that make measurements meaningless.
+The "measured examples" in [README](../README.md) assume measurements taken according to these guidelines.
 
-- **MemoryDiagnoser を常時有効化** — 速度とアロケーションは常にセットで判断する
-- **DisassemblyDiagnoser(printSource, exportDiff)を有効化** — 生成コードとコードサイズを確認する。速度差が誤差レベルでも、コードサイズで優劣を判断できるケースがある(インライン化への影響はコードサイズに現れる)
-- ベンチマークを介さず単発で生成コードを見たい場合は、環境変数 `DOTNET_JitDisasm="メソッド名"` を設定して実行すると JIT アセンブリが標準出力に出る(Release ビルド + `DOTNET_TieredCompilation=0` 併用で最終コードを直接確認)
-- **既定は最新ランタイム(net10.0)単独で測定する**。複数ランタイム並走は「世代で効果が変わるか」自体を問う検証(境界チェック除去イディオム、uint キャスト小細工のように新世代で消える最適化)に限定して使う
+## 🧰 Base configuration
+
+- **Keep MemoryDiagnoser enabled at all times** — always judge speed and allocation together
+- **Enable DisassemblyDiagnoser (printSource, exportDiff)** — to inspect generated code and code size. Even when the speed difference is at the measurement-noise level, code size can settle which variant is better (the impact on inlining shows up in code size)
+- To look at generated code as a one-off without going through a benchmark, set the environment variable `DOTNET_JitDisasm="MethodName"` and run: the JIT assembly goes to stdout (a Release build plus `DOTNET_TieredCompilation=0` lets you inspect the final code directly)
+- **By default, measure on the latest runtime (net10.0) alone**. Reserve running multiple runtimes side by side for verifications that specifically ask whether the effect changes across generations (optimizations that disappear in a newer generation, such as bounds-check elimination idioms or uint-cast tricks)
 
 ```csharp
 public class BenchmarkConfig : ManualConfig
@@ -23,71 +25,71 @@ public class BenchmarkConfig : ManualConfig
     }
 }
 
-// クラス側: 既定は net10.0 のみ。世代検証の対象クラスに限り net8 等のジョブを追加する
+// On the class: net10.0 only by default. Add jobs for net8 and the like only on classes targeted for generation verification
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 ```
 
-## ⚠️ 測定を無意味にする落とし穴
+## ⚠️ Pitfalls that make measurements meaningless
 
-### 1. 最適化による測定対象の消滅
+### 1. The measurement target vanishing under optimization
 
-結果が「空ループの下限値」に張り付いている場合、そのバリアントは JIT に完全に除去されており、実コストの比較になっていない。戻り値を返す・`[MethodImpl(MethodImplOptions.NoInlining)]` を付ける・BenchmarkDotNet の Consumer を使うなどで消滅を防ぐ。逆に、除去されたという事実自体が「その抽象化はゼロコスト」という結論になる場合もあるため、どちらを測っているのか自覚的であること。
+If a result is pinned to the "empty loop floor", the JIT has eliminated that variant entirely and you are not comparing real costs. Prevent that by returning a value, applying `[MethodImpl(MethodImplOptions.NoInlining)]`, or using BenchmarkDotNet's Consumer. Conversely, the fact that it was eliminated is sometimes itself the conclusion — "that abstraction is zero-cost" — so be deliberate about which of the two you are measuring.
 
-### 2. 文字列インターンによる比較の短絡
+### 2. String interning short-circuiting the comparison
 
-文字列リテラルをそのままキーに使うと、参照等価により `string.Equals` が中身を比較せず短絡し、比較コードの測定にならない。実運用では外部入力(非インターン文字列)が来るため、プローブ文字列は必ずコピーして生成し、非インターンであることを検証してから測る。
+If you use string literals directly as keys, reference equality makes `string.Equals` short-circuit without comparing contents, so you are not measuring the comparison code at all. Production traffic brings external input (non-interned strings), so always build probe strings as copies and confirm they are non-interned before measuring.
 
 ```csharp
-var probe = new string(literal.AsSpan());          // 非インターンのコピーを作る
+var probe = new string(literal.AsSpan());          // Create a non-interned copy
 Debug.Assert(string.IsInterned(probe) is null || !ReferenceEquals(string.IsInterned(probe), probe));
 ```
 
-### 3. バリアント間の等価性未検証
+### 3. Not verifying equivalence across variants
 
-測定前に全バリアントが同じ結果を返すことを `Verify()` として実行する(`BenchmarkRunner.Run` の前に呼ぶ)。速いが間違っている実装を測っても意味がない。手動 ref 走査系は特にバグが混入しやすい(終端 ref の計算ミス、二重走査での ref 進め忘れ等)。実例として、誤った終端判定が「常に真」になっていたループは JIT が判定ごと除去し、境界チェックなしの異常に速い偽の結果を長期間信じさせていた(修正後に再測定したところ最速から中位に転落した)。
+Before measuring, run a `Verify()` that confirms all variants return the same result (call it before `BenchmarkRunner.Run`). Measuring an implementation that is fast but wrong is pointless. Manual ref walking is especially prone to bugs (miscomputed end refs, forgetting to advance a ref in a dual walk, and so on). As a real example, a loop whose faulty end condition was "always true" had the whole condition removed by the JIT, producing an abnormally fast, bounds-check-free false result that was believed for a long time (after the fix, re-measurement dropped it from fastest to mid-pack).
 
-### 4. 最良ケースだけの測定
+### 4. Measuring only the best case
 
-宣言順アクセスなど理想形状だけで測ると、実運用で劣化する実装を選んでしまう。アクセス形状(順方向 / 逆順 / 部分アクセス / ミス混在)をパラメータ化し、「平均が速い」ではなく「形状に対して安定」な実装を選ぶ。
+Measuring only ideal shapes such as declaration-order access leads you to pick an implementation that degrades in production. Parameterize the access shape (forward / reverse / partial access / mixed misses) and choose the implementation that is stable across shapes, not the one with the fastest average.
 
-### 5. 例外パスの混入・未分離
+### 5. Exception paths mixed in or not separated
 
-成功ケースと失敗ケースは `[Params]` で分離して測る。例外スロー 1 回のコストは数 μs 規模で、他の最適化差を完全に覆い隠す(失敗パスが例外の場合、周辺をどれだけ最適化しても無意味になる)。
+Measure success and failure cases separately via `[Params]`. A single exception throw costs on the order of several μs, which completely masks every other optimization difference (if the failure path throws, optimizing everything around it is meaningless).
 
-### 6. マイクロベンチ結果の過信
+### 6. Over-trusting microbenchmark results
 
-プリミティブ単体で 30 倍の差があっても、実処理(I/O・描画・支配的な計算)に埋め込むと 1.1 倍程度に希釈された実測例がある。最終判断は実ワークロードに近い形状のベンチマークで行い、マイクロベンチは「どの実装を候補にするか」の選別に使う。
+We have measured cases where a 30x difference on an isolated primitive dilutes to roughly 1.1x once embedded in real processing (I/O, rendering, dominant computation). Make the final call with a benchmark shaped like the real workload, and use microbenchmarks to select which implementations are candidates.
 
-### 7. #if による TFM 依存メソッドの混在(複数ランタイム実行時)
+### 7. Mixing TFM-dependent methods via #if (when running multiple runtimes)
 
-新しいランタイムにしかない API のベンチマークを `#if NET9_0_OR_GREATER` 等で同一クラスに混在させると、ホスト(最新 TFM)が発見したメソッドを下位ランタイムの子ビルドが解決できず、**そのランタイムの全ケースが NA になる**。TFM 依存の比較はクラスごと `#if` で分離し、そのクラスには対応するランタイムのジョブだけを付ける。
+If you mix benchmarks for APIs that exist only on newer runtimes into one class with `#if NET9_0_OR_GREATER` and the like, the child build for the older runtime cannot resolve the methods the host (latest TFM) discovered, and **every case on that runtime comes out NA**. Separate TFM-dependent comparisons into their own classes behind `#if`, and attach only the corresponding runtime's job to each class.
 
-### 8. 準備処理の混入
+### 8. Setup work leaking into the measurement
 
-衝突キーの探索・データ生成などの準備は `[GlobalSetup]` で行い、測定対象から外す。`IterationSetup` は測定精度を落とすため、可能な限り GlobalSetup + 状態リセット不要の設計にする。
+Do preparation such as searching for colliding keys or generating data in `[GlobalSetup]` and keep it out of the measurement. `IterationSetup` degrades measurement accuracy, so design for GlobalSetup plus no need for state resets wherever possible.
 
-## ⚖️ 判断基準
+## ⚖️ Decision criteria
 
-- **速度・アロケーション・コードサイズの 3 軸**で評価する。1 軸だけの改善は採用理由として弱い
-- Ratio のベースラインは「現状の素直な実装」にし、改善幅がそのまま読めるようにする
-- 効果が世代で消えた最適化は、パターンとしては「不要になった」と記録する([rejected-patterns.md](rejected-patterns.md) へ)
+- Evaluate on **three axes: speed, allocation, and code size**. An improvement on one axis alone is weak justification for adoption
+- Make the Ratio baseline "the straightforward implementation you have today" so the improvement reads off directly
+- Record optimizations whose effect vanished in a newer generation as patterns that are "no longer needed" (move them to [rejected-patterns.md](rejected-patterns.md))
 
-### 計測が誤差範囲だった場合の扱い
+### Handling measurements that fall within measurement noise
 
-**「ナノ秒単位の差」は誤差ではない。** 本リポジトリの主対象はまさにナノ秒級の差であり、信頼区間が重ならない差は 0.2 ns でも実差として記録する。「誤差」と呼ぶのは**信頼区間(エラーバー)が重なり、統計的に分解できない場合のみ**。その場合も「不採用」と断定せず、**生成コードまで確認して二分する**:
+**"A nanosecond-scale difference" is not measurement noise.** Nanosecond-scale differences are exactly what this repository is about, and a difference with non-overlapping CIs is recorded as a real difference even at 0.2 ns. Call it "measurement noise" **only when the confidence intervals (error bars) overlap and the difference cannot be resolved statistically**. Even then, do not declare it "rejected" outright — **go down to the generated code and split the case in two**:
 
-| 生成コードの確認結果 | 記録 |
+| Generated code check result | Record as |
 |---|---|
-| 差がある(命令列・コードサイズが異なる) | **➖ 誤差** として記録する。不採用にはしない — 計測分解能以下の差が実在するということであり、コードサイズ・環境・インライン文脈しだいで効く余地を数値つきで残す |
-| 一致する(命令列が同一) | **差なし** として不採用側へ。「生成コードが一致した」ことを根拠として記録する |
+| Differs (instruction sequence or code size differs) | Record it as **➖ measurement noise**. Do not reject it — a real difference exists below measurement resolution, so keep the numbers on record along with the room it has to pay off depending on code size, environment, and inlining context |
+| Matches (identical instruction sequence) | **No difference** — move it to the rejected side. Record "the generated code matched" as the basis |
 
-確認手段は 2 段階:
+The check has two stages:
 
-1. **一次確認**: DisassemblyDiagnoser の Code Size 列。バリアント間でサイズが違えば生成コードは異なる
-2. **確定確認**: JitDisasm による命令列の比較。DynamicMethod も名前でマッチできる
+1. **First pass**: the Code Size column from DisassemblyDiagnoser. If the size differs between variants, the generated code differs
+2. **Confirmation**: comparing instruction sequences with JitDisasm. DynamicMethod can be matched by name too
 
 ```
 DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 ```
 
-実例: GEN-01 の「デリゲート Invoke を `Call` で呼ぶ」置換は計測 14.2 vs 14.6 ns の誤差だったが、JitDisasm 比較で **68 命令・229 バイトが完全一致**したため「差なし」と確定した(ターゲットフィールドの読み出しが null チェックを兼ねるため、`callvirt` のチェックが JIT で消える)。
+Example: GEN-01's replacement of delegate Invoke with a `Call` measured as noise at 14.2 vs 14.6 ns, but the JitDisasm comparison showed **68 instructions / 229 bytes matching exactly**, which confirmed "no difference" (the load of the target field doubles as the null check, so the JIT removes the `callvirt` check).
