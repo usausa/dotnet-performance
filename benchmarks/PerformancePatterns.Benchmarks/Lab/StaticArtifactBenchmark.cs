@@ -1,0 +1,57 @@
+namespace PerformancePatterns.Benchmarks.Lab;
+
+using System.Text;
+
+using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Jobs;
+
+// TYP-06 検証: 型ごとに決まる文字列(SQL 断片)を、毎回組み立て / 辞書キャッシュ / ジェネリック static で比較
+[Config(typeof(BenchmarkConfig))]
+[MediumRunJob(RuntimeMoniker.Net10_0)]
+public class StaticArtifactBenchmark
+{
+    private static readonly Dictionary<Type, string> Cache = [];
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        Cache[typeof(OrderEntity)] = BuildSql(typeof(OrderEntity));
+    }
+
+    [Benchmark(Baseline = true)]
+    public int BuildEveryCall() => BuildSql(typeof(OrderEntity)).Length;
+
+    [Benchmark]
+    public int DictionaryCache()
+    {
+        Cache.TryGetValue(typeof(OrderEntity), out var sql);
+        return sql!.Length;
+    }
+
+    [Benchmark]
+    public int StaticGenericField() => SqlInsert<OrderEntity>.Sql.Length;
+
+    private static string BuildSql(Type type)
+    {
+        var builder = new StringBuilder();
+        builder.Append("INSERT INTO ").Append(type.Name).Append(" (");
+        foreach (var property in ColumnNames)
+        {
+            builder.Append(property).Append(", ");   // 常に後置して最後に削る
+        }
+
+        builder.Length -= 2;
+        return builder.Append(") VALUES (@Id, @Name, @Amount, @CreatedAt)").ToString();
+    }
+
+    private static readonly string[] ColumnNames = ["Id", "Name", "Amount", "CreatedAt"];
+
+    // 型初期化子で 1 回だけ組み立て、以後は静的フィールドの読み出しのみ
+    private static class SqlInsert<T>
+    {
+        public static readonly string Sql = BuildSql(typeof(T));
+    }
+}
+
+// 型引数として使うエンティティ型(ベンチマーク用)
+public sealed class OrderEntity;

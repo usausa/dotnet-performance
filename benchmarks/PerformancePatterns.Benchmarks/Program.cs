@@ -36,6 +36,9 @@ public static class Program
         VerifyLabBatch4();
         VerifyLabBatch5();
         VerifyPatternImplementations();
+        VerifyUnmeasuredBatch();
+        VerifyUnmeasuredBatch2();
+        VerifyUnmeasuredBatch3();
 
         // 実行例: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -76,6 +79,24 @@ public static class Program
                 typeof(DisposeGuardBenchmark),
                 typeof(TypeMapBenchmark),
                 typeof(HandlerListBenchmark),
+                typeof(StructPassBenchmark),
+                typeof(HashCompareBenchmark),
+                typeof(InlineArrayBenchmark),
+                typeof(ParamsSpanBenchmark),
+                typeof(StringBuildBenchmark),
+                typeof(SearchValuesBenchmark),
+                typeof(ImmutableBuildBenchmark),
+                typeof(ListReuseBenchmark),
+                typeof(StaticArtifactBenchmark),
+                typeof(PipelineComposeBenchmark),
+                typeof(ObjectPoolBenchmark),
+                typeof(FixedFieldFormatBenchmark),
+                typeof(ValueTaskBenchmark),
+                typeof(SchedulerPrimitiveBenchmark),
+                typeof(StreamBufferingBenchmark),
+                typeof(RingSplitBenchmark),
+                typeof(OrdinalResolveBenchmark),
+                typeof(EmitStrategyBenchmark),
                 typeof(SampledNameTableBenchmark),
 #if NET9_0_OR_GREATER
                 typeof(SampledNameTableSpanKeyBenchmark),
@@ -454,6 +475,175 @@ public static class Program
             throw new InvalidOperationException("Verify failed. SampledNameTableSpanKey");
         }
 #endif
+    }
+
+    private static void VerifyUnmeasuredBatch()
+    {
+        // MEM-06: 値渡し / in 渡しが同じ結果になること
+        var structPass = new StructPassBenchmark();
+        structPass.Setup();
+        if ((structPass.Size8ByValue() != structPass.Size8ByIn()) ||
+            (structPass.Size32ByValue() != structPass.Size32ByIn()) ||
+            (structPass.Size64ByValue() != structPass.Size64ByIn()) ||
+            (structPass.InWithReadonlyMember() != structPass.InWithMutableMember()))
+        {
+            throw new InvalidOperationException("Verify failed. StructPass");
+        }
+
+        // STK-08 / STK-09 / COL-06: 各バリアントの結果一致
+        var inlineArray = new InlineArrayBenchmark();
+        if ((inlineArray.NewArray() != 28) || (inlineArray.Stackalloc() != 28) || (inlineArray.InlineArrayBuffer() != 28))
+        {
+            throw new InvalidOperationException("Verify failed. InlineArray");
+        }
+
+        var paramsSpan = new ParamsSpanBenchmark();
+        paramsSpan.Setup();
+        if (paramsSpan.ParamsArray() != paramsSpan.ParamsSpan())
+        {
+            throw new InvalidOperationException("Verify failed. ParamsSpan");
+        }
+
+        var immutable = new ImmutableBuildBenchmark { Count = 256 };
+        immutable.Setup();
+        if ((immutable.ToImmutableArrayExtension() != 256) || (immutable.BuilderToImmutable() != 256) || (immutable.BuilderMoveToImmutable() != 256))
+        {
+            throw new InvalidOperationException("Verify failed. ImmutableBuild");
+        }
+
+        var listReuse = new ListReuseBenchmark { Count = 256 };
+        listReuse.Setup();
+        if ((listReuse.NewListNoCapacity() != 256) || (listReuse.NewListWithCapacity() != 256) ||
+            (listReuse.ReuseWithClear() != 256) || (listReuse.ReuseWithSetCountSpan() != 256))
+        {
+            throw new InvalidOperationException("Verify failed. ListReuse");
+        }
+
+        // TXT-07: 文字列組み立て 5 方式が同じ文字列を返すこと
+        var stringBuild = new StringBuildBenchmark();
+        stringBuild.Setup();
+        var expectedText = stringBuild.Interpolation();
+        if (!string.Equals(expectedText, stringBuild.Concat(), StringComparison.Ordinal) ||
+            !string.Equals(expectedText, stringBuild.StringBuilderCapacity(), StringComparison.Ordinal) ||
+            !string.Equals(expectedText, stringBuild.ValueStringBuilderBuild(), StringComparison.Ordinal) ||
+            !string.Equals(expectedText, stringBuild.StringCreate(), StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Verify failed. StringBuild");
+        }
+
+        // TXT-08: 検索位置の一致
+        var searchValues = new SearchValuesBenchmark { Candidates = 8 };
+        searchValues.Setup();
+        if (searchValues.IndexOfAnyArray() != searchValues.IndexOfAnySearchValues())
+        {
+            throw new InvalidOperationException("Verify failed. SearchValues");
+        }
+
+        // TYP-06: 3 経路が同じ SQL を返すこと
+        var staticArtifact = new StaticArtifactBenchmark();
+        staticArtifact.Setup();
+        if ((staticArtifact.BuildEveryCall() != staticArtifact.DictionaryCache()) ||
+            (staticArtifact.BuildEveryCall() != staticArtifact.StaticGenericField()))
+        {
+            throw new InvalidOperationException("Verify failed. StaticArtifact");
+        }
+    }
+
+    private static void VerifyUnmeasuredBatch2()
+    {
+        // DSP-05: 合成方式によらず同じ結果になること(((10+100)-3)*2)+1 = 215
+        var pipeline = new PipelineComposeBenchmark();
+        pipeline.Setup();
+        if ((pipeline.ComposeEveryCall() != 215) || (pipeline.PreComposed() != 215) || (pipeline.TerminalDirect() != 110))
+        {
+            throw new InvalidOperationException("Verify failed. PipelineCompose");
+        }
+
+        // BUF-07: プール経由でも同じ文字列になること
+        var pool = new ObjectPoolBenchmark();
+        pool.Setup();
+        if (!string.Equals(pool.NewEveryTime(), "key:customer:12345", StringComparison.Ordinal) ||
+            !string.Equals(pool.ThreadStaticPool(), "key:customer:12345", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Verify failed. ObjectPool");
+        }
+
+        // TXT-09: 3 方式が同じフィールド内容を生成し、トリムが一致すること
+        var fixedField = new FixedFieldFormatBenchmark();
+        fixedField.Setup();
+        fixedField.TryFormatThenFill();
+        var expectedField = fixedField.SnapshotField();
+        fixedField.ManualLsbThenReverse();
+        var lsbField = fixedField.SnapshotField();
+        fixedField.ManualRightAlignShift();
+        var shiftField = fixedField.SnapshotField();
+        if (!string.Equals(expectedField, "12345678    ", StringComparison.Ordinal) ||
+            !string.Equals(lsbField, expectedField, StringComparison.Ordinal) ||
+            !string.Equals(shiftField, expectedField, StringComparison.Ordinal) ||
+            (fixedField.TrimManualLoop() != 10) ||
+            (fixedField.TrimVectorized() != 10))
+        {
+            throw new InvalidOperationException("Verify failed. FixedFieldFormat");
+        }
+
+        // ASY-05: 4 経路とも同じ合計になること
+        var valueTask = new ValueTaskBenchmark();
+        valueTask.Setup();
+        if ((valueTask.TaskFromResult().GetAwaiter().GetResult() != 1234500L) ||
+            (valueTask.ValueTaskDirect().GetAwaiter().GetResult() != 1234500L) ||
+            (valueTask.AsyncMethodTask().GetAwaiter().GetResult() != 1234500L) ||
+            (valueTask.AsyncMethodValueTask().GetAwaiter().GetResult() != 1234500L))
+        {
+            throw new InvalidOperationException("Verify failed. ValueTask");
+        }
+
+        // ASY-06: 通知が成立すること
+        var scheduler = new SchedulerPrimitiveBenchmark();
+        scheduler.TimerPerJob();
+        if (!scheduler.TcsSwapNotify())
+        {
+            throw new InvalidOperationException("Verify failed. SchedulerPrimitive");
+        }
+
+        // ASY-07: 全読み・逐次読みの合計一致
+        var streaming = new StreamBufferingBenchmark();
+        streaming.Setup();
+        if (streaming.FullBufferThenProcess() != streaming.StreamingPooledChunks())
+        {
+            throw new InvalidOperationException("Verify failed. StreamBuffering");
+        }
+    }
+
+    private static void VerifyUnmeasuredBatch3()
+    {
+        // SEQ-05: 素朴版と増分版が同じ合計になること
+        var ringSplit = new RingSplitBenchmark();
+        ringSplit.Setup();
+        if (ringSplit.NaiveRescanCompact() != ringSplit.IncrementalDeferredCompact())
+        {
+            throw new InvalidOperationException("Verify failed. RingSplit");
+        }
+
+        // DAT-01: 3 経路が同じ合計になること(id 合計 499500 + 名前長 5000 + 偶数フラグ 500)
+        var ordinal = new OrdinalResolveBenchmark();
+        ordinal.Setup();
+        if ((ordinal.GetOrdinalPerRow() != 505000L) ||
+            (ordinal.CachedOrdinalsStruct() != 505000L) ||
+            (ordinal.CachedOrdinalsGetValueBoxing() != 505000L))
+        {
+            throw new InvalidOperationException("Verify failed. OrdinalResolve");
+        }
+
+        // GEN-01: 全ファクトリが正しい依存で GenService を構築すること
+        var emit = new EmitStrategyBenchmark();
+        emit.Setup();
+        foreach (var created in new[] { emit.DirectLambda(), emit.EmitHolderField(), emit.EmitClosureArray(), emit.EmitChainedCallvirt(), emit.EmitChainedCall() })
+        {
+            if (created is not GenService { A: not null, B: not null })
+            {
+                throw new InvalidOperationException("Verify failed. EmitStrategy");
+            }
+        }
     }
 
     private static void VerifyValueStringBuilder()

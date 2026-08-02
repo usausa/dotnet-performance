@@ -164,4 +164,16 @@
 
 ---
 
+### R-16: 手書きの桁順整形トリック(右詰め生成→前方シフト・逆順書き込み)
+
+🎯 **狙い:** 数値の固定長整形で、桁数の事前計算(`Log10` 相当)や生成後の Reverse を避けるため、バッファ末尾から右詰めで書いて前方へシフトする、または下位桁から前向きに書く。
+
+📉 **実測・不採用の理由:** net10 では `TryFormat` + `Fill` が 5.32 ns で最速。手書きの LSB 書き → Reverse は 2.51 倍、右詰め → 前方シフトは 4.79 倍遅い。`TryFormat` の内部が桁数計算・2 桁テーブル・アンロールまで最適化済みのため、`% 10` / `/ 10` の手書きループでは上回れない。`TryFormat` / `ISpanFormattable` 整備以前の世代では有効だった技法。
+
+✅ **代わりにやること:** `value.TryFormat(buffer, out var written)` で書き、残りを `Fill(filler)` する。右詰めが必要なら一時領域に `TryFormat` してから末尾へ `CopyTo` する。
+
+🔗 **測定記録:** [TXT-09-FixedFieldFormat.md](../benchmarks/results/TXT-09-FixedFieldFormat.md)
+
+---
+
 📝 なお「マイクロベンチ結果の直接外挿」(単体で 30 倍差でも実処理では 1.1 倍に希釈される)は手法ではなく測定方法論のため、[benchmark-methodology.md](benchmark-methodology.md) の落とし穴として記載している。
