@@ -40,6 +40,7 @@ public static class Program
         VerifyUnmeasuredBatch2();
         VerifyUnmeasuredBatch3();
         VerifyImplementationBatch3();
+        VerifyStarFiveBatch();
 
         // 実行例: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -78,6 +79,8 @@ public static class Program
                 typeof(PipelinesBenchmark),
                 typeof(AsyncEnumerableBenchmark),
                 typeof(DisposeGuardBenchmark),
+                typeof(SkipLocalsInitBenchmark),
+                typeof(PowerOfTwoMaskBenchmark),
                 typeof(BufferWriterSlimBenchmark),
                 typeof(MemoryOwnerBenchmark),
                 typeof(BatchBenchmark),
@@ -693,6 +696,25 @@ public static class Program
             (bitwise.BitwiseComparerPlain() != 120))
         {
             throw new InvalidOperationException("Verify failed. BitwiseComparer");
+        }
+    }
+
+    private static void VerifyStarFiveBatch()
+    {
+        // MEM-03: 初期化スキップの有無で結果が変わらないこと(書き込み位置のみ読む)
+        var skipLocals = new SkipLocalsInitBenchmark { Size = 512 };
+        if ((skipLocals.ZeroInit() != 3 * 16) || (skipLocals.SkipInit() != 3 * 16))
+        {
+            throw new InvalidOperationException("Verify failed. SkipLocalsInit");
+        }
+
+        // BIT-03: 3 方式が同じバケット合計になること
+        var mask = new PowerOfTwoMaskBenchmark();
+        mask.Setup();
+        var expected = mask.RuntimeSizeModulo();
+        if ((mask.PowerOfTwoMask() != expected) || (mask.ConstSizeModulo() != expected))
+        {
+            throw new InvalidOperationException("Verify failed. PowerOfTwoMask");
         }
     }
 
