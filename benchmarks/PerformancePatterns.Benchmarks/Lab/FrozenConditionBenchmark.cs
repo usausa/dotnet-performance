@@ -5,7 +5,7 @@ using System.Collections.Frozen;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// COL-02 検証: FrozenDictionary の構築コスト(採用条件の分母)
+// COL-02 study: the build cost of FrozenDictionary (the denominator of the adoption trade-off)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class FrozenBuildBenchmark
@@ -45,7 +45,7 @@ public class FrozenBuildBenchmark
     }
 }
 
-// COL-02 検証: 検索コスト(採用条件の分子)— 非インターンキーで全件検索
+// COL-02 study: the lookup cost (the numerator of the adoption trade-off) — a full scan with non-interned keys
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class FrozenLookupBenchmark
@@ -68,7 +68,7 @@ public class FrozenLookupBenchmark
         {
             var key = "Key" + i;
             pairs[key] = i;
-            probes[i] = new string(key.AsSpan());   // 非インターンの実行時キー
+            probes[i] = new string(key.AsSpan());   // Non-interned runtime key
         }
 
         dictionary = pairs;

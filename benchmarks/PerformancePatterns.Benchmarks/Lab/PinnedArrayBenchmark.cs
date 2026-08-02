@@ -6,9 +6,9 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー④: pinned バッファ(POH)
-// 問い: 都度 fixed でピン止めするコストと、POH 常駐バッファのポインタ直接利用の差。
-// および POH 確保自体のコスト(通常確保比)。
+// Study queue 4: pinned buffers (POH)
+// Question: what is the difference between pinning with fixed on every call and using a pointer into a POH-resident buffer directly,
+// and what does the POH allocation itself cost (compared with a normal allocation)?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class PinnedArrayBenchmark
@@ -40,7 +40,7 @@ public class PinnedArrayBenchmark
     [Benchmark]
     public unsafe int PinnedPointerDirect()
     {
-        // POH 上の配列は移動しないため fixed なしでポインタ利用できる
+        // An array on the POH never moves, so a pointer can be used without fixed
         var p = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetArrayDataReference(pinnedBuffer));
         p[0] = 1;
         p[Size - 1] = 2;

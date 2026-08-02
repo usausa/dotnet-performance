@@ -78,7 +78,7 @@ Do preparation such as searching for colliding keys or generating data in `[Glob
 
 **"A nanosecond-scale difference" is not measurement noise.** Nanosecond-scale differences are exactly what this repository is about, and a difference with non-overlapping CIs is recorded as a real difference even at 0.2 ns. Call it "measurement noise" **only when the confidence intervals (error bars) overlap and the difference cannot be resolved statistically**. Even then, do not declare it "rejected" outright — **go down to the generated code and split the case in two**:
 
-| Generated code check result | Record as |
+| Codegen check result | Record as |
 |---|---|
 | Differs (instruction sequence or code size differs) | Record it as **➖ measurement noise**. Do not reject it — a real difference exists below measurement resolution, so keep the numbers on record along with the room it has to pay off depending on code size, environment, and inlining context |
 | Matches (identical instruction sequence) | **No difference** — move it to the rejected side. Record "the generated code matched" as the basis |
@@ -93,3 +93,65 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 ```
 
 Example: GEN-01's replacement of delegate Invoke with a `Call` measured as noise at 14.2 vs 14.6 ns, but the JitDisasm comparison showed **68 instructions / 229 bytes matching exactly**, which confirmed "no difference" (the load of the target field doubles as the null check, so the JIT removes the `callvirt` check).
+
+---
+
+## 🧪 Verification queue (record of adopt/reject decisions)
+
+The following are candidates to be adopted or rejected once a sample has been built and benchmarks have been run. The decision flow:
+
+1. For each candidate, build a verification benchmark (plus a minimal implementation if needed) and measure it on net8 / net9 / net10
+2. **Effective** → document it in the main text as a pattern (with an implementation example and measurements)
+3. **Ineffective** → record it in [docs/rejected-patterns.md](rejected-patterns.md) together with "which generation it stayed effective through"
+4. **Conditional** → document it with the conditions for applying it spelled out
+5. **Measurement within measurement noise** → go down to the generated code (disassembly) and split the case in two. **If the generated code differs, record it as "➖ measurement noise"** (do not reject it — a difference below measurement resolution really exists, so keep the numbers on record along with the room it has to pay off on a different axis or in a different environment). **If the generated code matches as well, it is "no difference" and gets rejected** (recorded with the code match as the basis). For the procedure, see the decision criteria above. Note that **a nanosecond-scale difference is not in itself measurement noise** — if the confidence intervals do not overlap, even 0.2 ns is treated as a real difference. It is "measurement noise" only when the confidence intervals overlap and the difference cannot be resolved statistically
+
+### ➖ Record of measurement-noise / no-difference verdicts
+
+Differences that measurement could not resolve, listed together with the result of the codegen check (applied cases of step 5 of the decision flow):
+
+| Subject | Measurement | Codegen check | Verdict |
+|---|---|---|---|
+| GEN-01 `Call` / `Callvirt` swap for delegate Invoke | 14.2 vs 14.6 ns, overlapping CIs | JitDisasm comparison shows **68 instructions / 229 bytes matching exactly** | ❌ **No difference** (the target field load doubles as the null check, so the JIT removes the callvirt check) |
+| BUF-03 Time on the growth path (4 KB) | 2,395 vs 2,651 ns, overlapping CIs | Code size is 1,016 vs 4,681 B — **different code** | ➖ **Measurement noise** (time axis). Adopted on the allocation axis instead (8,056 B → 0 B) |
+| BUF-04 Wrapper vs raw Rent/Return time | 2.8 vs 3.0 μs, overlapping CIs | — | ➖ **Measurement noise** (time axis). The wrapper cost is below measurement resolution. Adopted on the safety and allocation axes |
+| COL-06 `ToImmutable` vs `MoveToImmutable` time (256 elements) | 288 vs 279 ns, overlapping CIs | Code size 2,035 vs 903 B — **different code** | ➖ **Measurement noise** (time axis under this condition only). At 16 elements there is a real difference (24.3 vs 17.7 ns), and allocation is always halved |
+| STK-08 InlineArray vs stackalloc | 4.93 vs 4.71 ns, **non-overlapping CIs** | Code size 112 vs 134 B | **Real difference** (not measurement noise). stackalloc is slightly faster; InlineArray's value is that it can sit in a struct field |
+| BIT-01 Hand-written unsigned range check | 548.5 vs 553.7 ns, overlapping CIs | **Effectively identical** at Tier1 (only the encoding differs — `sub r8d,100` vs `add r8d,-100` — 45 B) | ❌ **No difference** (the net10 JIT automatically fuses the two-comparison form into a single unsigned comparison) |
+| JIT-01 AggressiveInlining attribute (helper containing a loop) | 1.451 vs 1.338 μs, overlapping CIs | Tier1 code at the call site is an **exact match** (94 B) | ❌ **No difference** (the default policy already inlines it. Only NoInlining shows a real difference, at +17% — which does prove the value of inlining itself) |
+| STK-07 `new int[0]` vs `Array.Empty` | 0.28 vs 0.31 ns, overlapping CIs | **Different code** (helper call 27 B vs shared reference load 11 B) | ➖ **Measurement noise** (time axis). On net10 both allocate nothing (the runtime shares the empty array). Code size and portability make `[]` the default |
+| DSP-01 sealed or not, through an interface reference | 536.8 vs 509.1 ns, overlapping CIs | Code size matches at 84 B (first pass) | ➖ **Measurement noise**. What pays off is holding the concrete sealed type (a real difference of 0.44x) |
+| COL-02 Frozen lookup (string keys, 16 / 256 entries) | 1.05 / 1.04x, overlapping CIs | — | ➖ **Measurement noise**. With no lookup gain, the 7-10x construction cost never amortizes, which meets the rejection condition |
+| MEM-02 Switching range-guaranteed random access to refs | 461.4 vs 466.2 ns, overlapping CIs | Code size 55 vs 72 B | ➖ **Measurement noise**. The gain from bounds-check elimination is effectively zero (and it actively costs 1.30x on a sequential walk) |
+| R-01 static readonly cache for typeof | Exactly equal | At Tier1 both **collapse to the same immediate load** (11 B. Before promotion, the cached side still carries an init check at 48 B) | ❌ **No difference** (on a cold path the cached side is actually worse) |
+| R-04 Loop syntax: for / while | Exactly equal | **Identical instruction sequence** (28 B) | ❌ **No difference** ("normalization" holds for these two forms) |
+| R-04 do-while / descending for | Exactly equal | **Different code** (do-while keeps a bounds check inside the loop, 63 B; the descending form is cloned, 85 B) | ➖ **Measurement noise**. Default to for / while |
+| R-10 Instance readonly field | 0.006-0.016 ns, below the measurable range | The load is **identical apart from the offset** (4 B) | ❌ **No difference** (instance readonly contributes nothing to JIT optimization) |
+| R-14 Replacing variable-length copies with CopyBlockUnaligned | 0.98-1.03x, overlapping CIs | The call shape differs, but both **reach the same Memmove** | ➖ **Measurement noise**. At a constant length of 16 B there is a real difference (0.83x), but it is rejected on safety grounds |
+
+| Batch | Candidate | Summary / question under test | Related | Status |
+|:---:|---|---|---|:---:|
+| ① | RuntimeHelpers.IsReferenceOrContainsReferences\<T\> branch | Skip clear/copy work for a T that holds no references. Does the JIT fold it to a constant and remove the branch entirely? | JIT-03 | ✅ Documented ([JIT-05](../README.md#️-jit-05-skipping-work-with-isreferenceorcontainsreferences)) |
+| ① | Unsafe.CopyBlockUnaligned | Pin down the conditions under which it beats Span.CopyTo / Array.Copy (only when a constant length expands into a mov sequence?) | MEM-03 / SEQ-02 | ❌ Moved to the rejected list |
+| ① | Bounds-check elimination by touching the last element first | Pre-touching with `_ = array[length - 1]`, and reverse unrolling. Re-confirm that it worked on .NET 8 and that the difference is gone on .NET 10 (rejection expected) | MEM-01 | ❌ Moved to the rejected list |
+| ① | GC.AllocateUninitializedArray\<T\> | Skipping zero-initialization for large arrays. Pin down the size threshold at which it pays off | BUF-01 / BUF-05 | ✅ Documented conditionally ([BUF-06](../README.md#-buf-06-skipping-zero-init-with-gcallocateuninitializedarray)) |
+| ① | Constant-size stackalloc | Cost difference between a constant allocation plus slicing and a variable size (the localloc instruction) | BUF-03 / BUF-05 | ✅ Documented ([STK-06](../README.md#-stk-06-constant-size-stackalloc)) |
+| ② | CollectionsMarshal.SetCount (.NET 8+) | An Add loop (N capacity checks) vs SetCount plus direct Span writes. With a warning about the exposed uninitialized region | COL-01 | ✅ Documented (COL-01 extension, 0.22-0.26x) |
+| ② | Concrete-type branching on an IEnumerable\<T\> argument | The LINQ-internal idiom of escaping to a Span path via `is T[]` / `is List<T>` / TryGetNonEnumeratedCount | COL-04 / STK-02 | ✅ Documented conditionally ([COL-05](../README.md#️-col-05-concrete-type-dispatch-for-ienumerable-parameters). 1.8x for List; no gain for arrays thanks to GDV) |
+| ② | Implementation examples for COL-01, re-measured on our own environment | AsSpan / GetValueRefOrAddDefault (building implementation examples for an already-documented pattern) | COL-01 | ✅ Verified (AsSpan 0.52 / ref form 0.66) |
+| ③ | Constant comparison of a byte sequence read as an int | Deciding short ASCII tokens (HTTP methods and the like) with a single uint/ulong constant comparison vs `SequenceEqual("..."u8)` | BIT-01 / TXT-01 | ✅ Documented ([TXT-04](../README.md#-txt-04-matching-byte-sequence-tokens-directly). Avoiding the string conversion is the real win; uint and SequenceEqual are equally fast) |
+| ③ | Utf8.TryWrite (.NET 8+) | Formatting straight into a Span\<byte\> via the UTF-8 interpolation handler. Compared against the TXT-01 table approach | TXT-01 / BUF-02 | ✅ Documented ([TXT-05](../README.md#-txt-05-direct-utf-8-formatting-with-utf8trywrite), 0.54x / 0B) |
+| ③ | ASCII-specialized processing | Fast paths that assume ASCII, via the Ascii class (.NET 8) / char.IsAsciiXxx / uppercasing with `& 0x5F` | BIT-01 / TXT-01 | ✅ Documented ([TXT-06](../README.md#-txt-06-ascii-specialized-comparison), 0.62x. With a warning that hand-written normalization collides with punctuation) |
+| ③ | Implementation example for BUF-02 (wired straight to I/O) | Accumulating in a MemoryStream vs ArrayBufferWriter vs a hand-rolled PooledBufferWriter (demonstrating an already-documented pattern) | BUF-02 | ✅ Implemented (PooledBufferWriter. Allocation 2,976B → 32B) |
+| ④ | Eliminating the async state machine | Returning the Task directly for a plain forward vs async/await. With a warning that the throw site and the using scope change | TXT-03 / ValueTask expansion candidate | ✅ Documented ([ASY-01](../README.md#-asy-01-eliding-the-async-state-machine), 0.16x / 73B → 0B) |
+| ④ | Environment.TickCount64 / Stopwatch.GetTimestamp | Reading the time or elapsed time while avoiding DateTime.UtcNow (a dozen-plus ns). For cache TTLs and timeouts | — | ✅ Documented ([SYS-01](../README.md#️-sys-01-low-cost-time-and-elapsed-time-reads), TickCount64 is 22x) |
+| ④ | Pinned buffers (GC.AllocateArray(pinned: true)) | Avoiding pinning cost with I/O buffers resident in the POH | BUF-01 / BUF-02 | ❌ Moved to the rejected list for performance purposes (fixed measures as free. The POH is strictly a countermeasure for long-lived fragmentation) |
+| ④ | Putting BitOperations to work | Removing scan/compute loops with TrailingZeroCount / PopCount / Log2 | BIT-02 | ✅ Documented ([BIT-03](../README.md#-bit-03-bit-scanning-and-counting-with-bitoperations), scanning 7.6x / PopCount 67x) |
+| ⑤ | SIMD implementation examples (Vector128/256) | Explicit SIMD for sum, search, and conversion. Comparing scalar, `Vector<T>`, and intrinsics | JIT-02 / BIT | ✅ Documented ([VEC-01](../README.md#-vec-01-explicit-simd-vectort--vector256), Vector256 8.9x. With guidance to prefer BCL APIs that already do this) |
+| ⑤ | ref struct design built on ref fields (C# 11) | Cost comparison for holding the cursor as a ref T rather than a Span plus index | STK-01 | ❌ Iteration use moved to the rejected list (1.21x against for, so no gain) |
+| ⑤ | Speeding up P/Invoke | Effects and constraints of \[LibraryImport\] plus passing Spans plus \[SuppressGCTransition\] (skipping the GC transition for short native calls) | BUF-05 | ✅ Documented ([SYS-02](../README.md#️-sys-02-faster-pinvoke-libraryimport--suppressgctransition), SuppressGC 1.8x. LibraryImport's value is AOT support) |
+| ⑤ | System.Threading.Channels | Producer-consumer queues. Effect of the Bounded/Unbounded and SingleReader/SingleWriter options | DSP-03 | ✅ Documented ([ASY-02](../README.md#-asy-02-producerconsumer-with-systemthreadingchannels), ~45ns/element. Bounded is 2x) |
+| ⑤ | System.IO.Pipelines | I/O pipelines via PipeReader/PipeWriter. Compared against processing a Stream directly | BUF-02 | ✅ Documented conditionally ([ASY-03](../README.md#-asy-03-systemiopipelines), 1.63x on small data / 1/80 the allocation. Watch out for the 64KB deadlock) |
+| ⑤ | The cost of IAsyncEnumerable | Per-element overhead of await foreach (vs IEnumerable / Channel), and the conventions around \[EnumeratorCancellation\] | SEQ-03 | ✅ Documented ([ASY-04](../README.md#-asy-04-knowing-the-cost-of-iasyncenumerable-and-when-to-use-it), being aware of the 11.6x per-element cost) |
+
+---

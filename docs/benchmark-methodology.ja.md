@@ -131,27 +131,27 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 
 | 批次 | 候補 | 概要 / 検証の問い | 関連 | 状態 |
 |:---:|---|---|---|:---:|
-| ① | RuntimeHelpers.IsReferenceOrContainsReferences\<T\> 分岐 | 参照を含まない T でクリア・コピー処理をスキップ。JIT が定数化して分岐ごと消えるか | JIT-03 | ✅ 収録([JIT-05](#️-jit-05-isreferenceorcontainsreferences-による処理スキップ)) |
-| ① | Unsafe.CopyBlockUnaligned | Span.CopyTo / Array.Copy に対して優位になる条件の特定(定数長で mov 列に展開される場合のみか) | MEM-05 / SEQ-02 | ❌ 不採用一覧へ |
+| ① | RuntimeHelpers.IsReferenceOrContainsReferences\<T\> 分岐 | 参照を含まない T でクリア・コピー処理をスキップ。JIT が定数化して分岐ごと消えるか | JIT-03 | ✅ 収録([JIT-05](../README.ja.md#️-jit-05-isreferenceorcontainsreferences-による処理スキップ)) |
+| ① | Unsafe.CopyBlockUnaligned | Span.CopyTo / Array.Copy に対して優位になる条件の特定(定数長で mov 列に展開される場合のみか) | MEM-03 / SEQ-02 | ❌ 不採用一覧へ |
 | ① | 末尾要素の事前アクセスによる境界チェック除去 | `_ = array[length - 1]` の事前タッチ・逆順アンロール。.NET 8 有効 / .NET 10 で差消滅の再確認(不採用想定) | MEM-01 | ❌ 不採用一覧へ |
-| ① | GC.AllocateUninitializedArray\<T\> | 大配列のゼロ初期化スキップ。効果が出るサイズ閾値の特定 | BUF-01 / BUF-05 | ✅ 条件付き収録([BUF-06](#-buf-06-gcallocateuninitializedarray-によるゼロ初期化スキップ)) |
-| ① | 定数サイズ stackalloc | 定数確保+スライス vs 可変サイズ(localloc 命令)のコスト差 | BUF-03 / BUF-05 | ✅ 収録([STK-06](#-stk-06-定数サイズ-stackalloc)) |
+| ① | GC.AllocateUninitializedArray\<T\> | 大配列のゼロ初期化スキップ。効果が出るサイズ閾値の特定 | BUF-01 / BUF-05 | ✅ 条件付き収録([BUF-06](../README.ja.md#-buf-06-gcallocateuninitializedarray-によるゼロ初期化スキップ)) |
+| ① | 定数サイズ stackalloc | 定数確保+スライス vs 可変サイズ(localloc 命令)のコスト差 | BUF-03 / BUF-05 | ✅ 収録([STK-06](../README.ja.md#-stk-06-定数サイズ-stackalloc)) |
 | ② | CollectionsMarshal.SetCount(.NET 8+) | Add ループ(容量チェック×N)vs SetCount + Span 直接書き込み。未初期化領域が見える危険の注意付き | COL-01 | ✅ 収録(COL-01 拡張、0.22〜0.26 倍) |
-| ② | IEnumerable\<T\> 引数の具象型分岐 | `is T[]` / `is List<T>` / TryGetNonEnumeratedCount で Span パスへ逃がす LINQ 内部の定石 | COL-04 / STK-02 | ✅ 条件付き収録([COL-05](#️-col-05-ienumerable-引数の具象型ディスパッチ)。List 1.8 倍、配列は GDV により利得なし) |
+| ② | IEnumerable\<T\> 引数の具象型分岐 | `is T[]` / `is List<T>` / TryGetNonEnumeratedCount で Span パスへ逃がす LINQ 内部の定石 | COL-04 / STK-02 | ✅ 条件付き収録([COL-05](../README.ja.md#️-col-05-ienumerable-引数の具象型ディスパッチ)。List 1.8 倍、配列は GDV により利得なし) |
 | ② | COL-01 の実装例・自環境再測定 | AsSpan / GetValueRefOrAddDefault(収録済みパターンの実装例化) | COL-01 | ✅ 検証済(AsSpan 0.52 / ref 化 0.66) |
-| ③ | byte 列の int 化定数比較 | 短い ASCII トークン(HTTP メソッド等)を uint/ulong 定数 1 比較で判定 vs `SequenceEqual("..."u8)` | BIT-02 / TXT-01 | ✅ 収録([TXT-04](#-txt-04-バイト列トークンの直接判定)。string 化回避が本質、uint と SequenceEqual は同速) |
-| ③ | Utf8.TryWrite(.NET 8+) | UTF-8 補間ハンドラによる Span\<byte\> 直接整形。TXT-01 テーブル方式との比較 | TXT-01 / BUF-02 | ✅ 収録([TXT-05](#-txt-05-utf8trywrite-による-utf-8-直接整形)、0.54 倍・0B) |
-| ③ | ASCII 特化処理 | Ascii クラス(.NET 8)/ char.IsAsciiXxx / `& 0x5F` 大文字化による ASCII 前提の高速パス | BIT-02 / TXT-01 | ✅ 収録([TXT-06](#-txt-06-ascii-特化比較)、0.62 倍。手書き正規化は記号衝突の注意付き) |
+| ③ | byte 列の int 化定数比較 | 短い ASCII トークン(HTTP メソッド等)を uint/ulong 定数 1 比較で判定 vs `SequenceEqual("..."u8)` | BIT-01 / TXT-01 | ✅ 収録([TXT-04](../README.ja.md#-txt-04-バイト列トークンの直接判定)。string 化回避が本質、uint と SequenceEqual は同速) |
+| ③ | Utf8.TryWrite(.NET 8+) | UTF-8 補間ハンドラによる Span\<byte\> 直接整形。TXT-01 テーブル方式との比較 | TXT-01 / BUF-02 | ✅ 収録([TXT-05](../README.ja.md#-txt-05-utf8trywrite-による-utf-8-直接整形)、0.54 倍・0B) |
+| ③ | ASCII 特化処理 | Ascii クラス(.NET 8)/ char.IsAsciiXxx / `& 0x5F` 大文字化による ASCII 前提の高速パス | BIT-01 / TXT-01 | ✅ 収録([TXT-06](../README.ja.md#-txt-06-ascii-特化比較)、0.62 倍。手書き正規化は記号衝突の注意付き) |
 | ③ | BUF-02 の実装例(I/O 直結) | MemoryStream 蓄積 vs ArrayBufferWriter vs 自前 PooledBufferWriter(収録済みパターンの実証) | BUF-02 | ✅ 実装済(PooledBufferWriter。アロケーション 2,976B→32B) |
-| ④ | async ステートマシンの省略 | 単純フォワードの Task 直接返し vs async/await。例外発生位置・using スコープが変わる注意付き | TXT-03 / 拡充候補 ValueTask | ✅ 収録([ASY-01](#-asy-01-async-ステートマシンの省略)、0.16 倍・73B→0B) |
-| ④ | Environment.TickCount64 / Stopwatch.GetTimestamp | DateTime.UtcNow(十数 ns)を回避する時刻・経過時間取得。キャッシュ TTL・タイムアウト用途 | — | ✅ 収録([SYS-01](#️-sys-01-低コストの時刻経過時間取得)、TickCount64 は 22 倍) |
+| ④ | async ステートマシンの省略 | 単純フォワードの Task 直接返し vs async/await。例外発生位置・using スコープが変わる注意付き | TXT-03 / 拡充候補 ValueTask | ✅ 収録([ASY-01](../README.ja.md#-asy-01-async-ステートマシンの省略)、0.16 倍・73B→0B) |
+| ④ | Environment.TickCount64 / Stopwatch.GetTimestamp | DateTime.UtcNow(十数 ns)を回避する時刻・経過時間取得。キャッシュ TTL・タイムアウト用途 | — | ✅ 収録([SYS-01](../README.ja.md#️-sys-01-低コストの時刻経過時間取得)、TickCount64 は 22 倍) |
 | ④ | pinned バッファ(GC.AllocateArray(pinned: true)) | POH 常駐 I/O バッファによるピン止めコスト回避 | BUF-01 / BUF-02 | ❌ 性能目的は不採用一覧へ(fixed は実測無料。POH は長寿命断片化対策専用) |
-| ④ | BitOperations 活用 | TrailingZeroCount / PopCount / Log2 によるスキャン・計算のループ除去 | BIT-03 | ✅ 収録([BIT-04](#-bit-04-bitoperations-によるビット走査計数)、走査 7.6 倍・PopCount 67 倍) |
-| ⑤ | SIMD 実装例(Vector128/256) | 合計・検索・変換の明示的 SIMD 化。スカラー・`Vector<T>`・組み込み関数の比較 | JIT-02 / BIT | ✅ 収録([VEC-01](#-vec-01-明示的-simdvectort--vector256)、Vector256 8.9 倍。BCL 済み API 優先の指針付き) |
+| ④ | BitOperations 活用 | TrailingZeroCount / PopCount / Log2 によるスキャン・計算のループ除去 | BIT-02 | ✅ 収録([BIT-03](../README.ja.md#-bit-03-bitoperations-によるビット走査計数)、走査 7.6 倍・PopCount 67 倍) |
+| ⑤ | SIMD 実装例(Vector128/256) | 合計・検索・変換の明示的 SIMD 化。スカラー・`Vector<T>`・組み込み関数の比較 | JIT-02 / BIT | ✅ 収録([VEC-01](../README.ja.md#-vec-01-明示的-simdvectort--vector256)、Vector256 8.9 倍。BCL 済み API 優先の指針付き) |
 | ⑤ | ref フィールドによる ref struct 設計(C# 11) | カーソルを Span + index でなく ref T で保持する設計のコスト比較 | STK-01 | ❌ 反復用途は不採用一覧へ(for 比 1.21 倍で利得なし) |
-| ⑤ | P/Invoke 高速化 | \[LibraryImport\] + Span 渡し + \[SuppressGCTransition\](短時間ネイティブ呼び出しの GC 遷移省略)の効果と制約 | BUF-05 | ✅ 収録([SYS-02](#️-sys-02-pinvoke-高速化libraryimport--suppressgctransition)、SuppressGC 1.8 倍・LibraryImport は AOT 対応が価値) |
-| ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | ✅ 収録([ASY-02](#-asy-02-systemthreadingchannels-による生産者消費者)、~45ns/要素・Bounded は 2 倍) |
-| ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 | ✅ 条件付き収録([ASY-03](#-asy-03-systemiopipelines)、小データは 1.63 倍・アロケーション 1/80。64KB デッドロック注意) |
-| ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-03 | ✅ 収録([ASY-04](#-asy-04-iasyncenumerable-のコスト認知と使い分け)、要素あたり 11.6 倍のコスト認知) |
+| ⑤ | P/Invoke 高速化 | \[LibraryImport\] + Span 渡し + \[SuppressGCTransition\](短時間ネイティブ呼び出しの GC 遷移省略)の効果と制約 | BUF-05 | ✅ 収録([SYS-02](../README.ja.md#️-sys-02-pinvoke-高速化libraryimport--suppressgctransition)、SuppressGC 1.8 倍・LibraryImport は AOT 対応が価値) |
+| ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | ✅ 収録([ASY-02](../README.ja.md#-asy-02-systemthreadingchannels-による生産者消費者)、~45ns/要素・Bounded は 2 倍) |
+| ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 | ✅ 条件付き収録([ASY-03](../README.ja.md#-asy-03-systemiopipelines)、小データは 1.63 倍・アロケーション 1/80。64KB デッドロック注意) |
+| ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-03 | ✅ 収録([ASY-04](../README.ja.md#-asy-04-iasyncenumerable-のコスト認知と使い分け)、要素あたり 11.6 倍のコスト認知) |
 
 ---

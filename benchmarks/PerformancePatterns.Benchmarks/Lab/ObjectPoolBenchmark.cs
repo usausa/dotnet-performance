@@ -5,7 +5,7 @@ using System.Text;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// BUF-07 検証: StringBuilder を毎回確保 vs [ThreadStatic] 1 要素プール
+// BUF-07 study: allocating a StringBuilder every time vs a [ThreadStatic] single-slot pool
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ObjectPoolBenchmark

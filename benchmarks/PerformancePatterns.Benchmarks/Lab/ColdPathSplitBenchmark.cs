@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// JIT-04 検証: 稀パス(成長処理)をホットメソッドに同居させる vs NoInlining で分離する
+// JIT-04 study: keeping a rare path (growth) inside the hot method vs splitting it out with NoInlining
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ColdPathSplitBenchmark
@@ -46,7 +46,7 @@ public class ColdPathSplitBenchmark
     }
 }
 
-// 成長処理をホットメソッド内に同居させた形(メソッドが太り、呼び出し元へのインライン化が阻害される)
+// Growth kept inside the hot method (the method gets large and is no longer inlined into its caller)
 internal sealed class FatWriter(int capacity)
 {
     private byte[] buffer = new byte[capacity];
@@ -73,7 +73,7 @@ internal sealed class FatWriter(int capacity)
     }
 }
 
-// 成長処理を NoInlining の別メソッドへ分離した形(ホットパスが小さくなりインライン化される)
+// Growth split into a separate NoInlining method (the hot path stays small and gets inlined)
 internal sealed class SplitWriter(int capacity)
 {
     private byte[] buffer = new byte[capacity];

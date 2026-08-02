@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Typ;
 
-// TYP-01 実装例: 型キーのルックアップを辞書から静的スロット配列へ
+// TYP-01 example: moving type-keyed lookup from a dictionary to a static slot array
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class TypeMapBenchmark

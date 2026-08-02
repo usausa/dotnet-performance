@@ -3,9 +3,9 @@ namespace PerformancePatterns.Txt;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// TXT-01: 2 桁ルックアップテーブルによる固定書式(yyyyMMddHHmmss)の UTF-8 整形。
-/// 00〜99 の ASCII 表現を事前計算テーブルから 2 バイトずつコピーするため、
-/// 除算 1 回 + テーブルコピーのみで各フィールドを整形できる。
+/// TXT-01: UTF-8 formatting of a fixed format (yyyyMMddHHmmss) through a two-digit lookup table.
+/// The ASCII representations of 00-99 are copied two bytes at a time from a precomputed table, so
+/// each field is formatted with a single division plus a table copy.
 /// </summary>
 public static class Utf8DateTimeFormatter
 {

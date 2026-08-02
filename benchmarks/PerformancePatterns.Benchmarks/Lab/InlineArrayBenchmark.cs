@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// STK-08 検証: 構造体内固定長バッファ(InlineArray)と他の確保手段
+// STK-08 study: a fixed-length buffer inside a struct (InlineArray) versus other allocation options
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class InlineArrayBenchmark

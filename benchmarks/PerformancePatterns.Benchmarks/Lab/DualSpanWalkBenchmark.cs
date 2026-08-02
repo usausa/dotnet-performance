@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// MEM-01 検証: 複数 Span の同時走査(単一 Span では標準 for が最適 = R-02)
+// MEM-01 study: walking several Spans at once (for a single Span the plain for loop is optimal = R-02)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class DualSpanWalkBenchmark
@@ -27,7 +27,7 @@ public class DualSpanWalkBenchmark
         }
     }
 
-    // 素朴形: second[i] 側の境界チェックが残る
+    // Naive form: the bounds check on second[i] remains
     [Benchmark(Baseline = true)]
     public long Indexed()
     {
@@ -42,7 +42,7 @@ public class DualSpanWalkBenchmark
         return total;
     }
 
-    // 事前スライスで両方の境界チェックを除去させる(安全な代替)
+    // Slice both up front so the JIT eliminates both bounds checks (the safe alternative)
     [Benchmark]
     public long IndexedPreSliced()
     {
@@ -57,7 +57,7 @@ public class DualSpanWalkBenchmark
         return total;
     }
 
-    // 手動 ref 走査(MEM-01 の本命形)
+    // Manual ref walk (the primary MEM-01 form)
     [Benchmark]
     public long RefWalk()
     {

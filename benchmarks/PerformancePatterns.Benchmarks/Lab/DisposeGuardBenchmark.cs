@@ -3,9 +3,9 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証: CON-01 Interlocked ワンショットガード
-// 問い: Dispose 多重実行防止として、Interlocked は他方式(素の bool / volatile bool / lock)に対して
-// 明確なメリットがあるか。測定は「破棄済みインスタンスへの再呼び出し」の定常パス。
+// Study: CON-01 Interlocked one-shot guard
+// Question: for preventing repeated Dispose, does Interlocked have a clear advantage over the alternatives
+// (plain bool / volatile bool / lock)? The measurement is the steady-state path of calling again on an already disposed instance.
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class DisposeGuardBenchmark
@@ -26,7 +26,7 @@ public class DisposeGuardBenchmark
 
     private int interlockedFlag = 1;
 
-    // スレッド安全なし(単一スレッド前提の型の基準値)
+    // Not thread safe (baseline for a type that assumes a single thread)
     [Benchmark(Baseline = true, OperationsPerInvoke = N)]
     public int PlainBool()
     {
@@ -45,7 +45,7 @@ public class DisposeGuardBenchmark
         return count;
     }
 
-    // 可視性のみ保証(正確に 1 回の保証はない)
+    // Guarantees visibility only (no exactly-once guarantee)
     [Benchmark(OperationsPerInvoke = N)]
     public int VolatileBool()
     {
@@ -64,7 +64,7 @@ public class DisposeGuardBenchmark
         return count;
     }
 
-    // lock による排他(スレッド安全・正確に 1 回)
+    // Mutual exclusion with lock (thread safe, exactly once)
     [Benchmark(OperationsPerInvoke = N)]
     public int LockGuard()
     {
@@ -86,7 +86,7 @@ public class DisposeGuardBenchmark
         return count;
     }
 
-    // Interlocked CAS(スレッド安全・正確に 1 回)
+    // Interlocked CAS (thread safe, exactly once)
     [Benchmark(OperationsPerInvoke = N)]
     public int InterlockedCas()
     {
@@ -102,7 +102,7 @@ public class DisposeGuardBenchmark
         return count;
     }
 
-    // Interlocked Exchange(スレッド安全・正確に 1 回)
+    // Interlocked Exchange (thread safe, exactly once)
     [Benchmark(OperationsPerInvoke = N)]
     public int InterlockedExchange()
     {

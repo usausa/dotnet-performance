@@ -1,4 +1,4 @@
-# MEM-06: Struct argument passing (by value vs in)
+# MEM-04: Struct argument passing (by value vs in)
 
 - Verdict: adopted
 - 8-byte struct: in 0.83x / 32-byte: 0.73x / 64-byte: 0.55x vs by-value (non-inlined call)

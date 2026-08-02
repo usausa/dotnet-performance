@@ -5,9 +5,9 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー①: 定数サイズ stackalloc
-// 問い: 定数確保+スライス(フレーム固定)と可変サイズ確保(localloc 命令)のコスト差、
-// および SkipLocalsInit の有無によるゼロ初期化コストの内訳。
+// Study queue 1: constant-size stackalloc
+// Question: what is the cost difference between a constant allocation plus a slice (a fixed frame) and a variable-size allocation (the localloc instruction),
+// and how much of it is the zero-initialization cost, with and without SkipLocalsInit?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class StackallocSizeBenchmark

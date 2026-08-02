@@ -1,4 +1,4 @@
-# MEM-04: Class-element array vs struct-element array (+ref access)
+# MEM-02: Class-element array vs struct-element array (+ref access)
 
 - Verdict: adopted (ref access; structural memory win)
 - StructArrayRef 483.0 ns == ClassArray 493.5 ns (CIs overlap) in this sequential-allocation micro; StructArrayCopy 595.7 ns (1.21x - the 16-byte copy penalty ref access removes)

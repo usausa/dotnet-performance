@@ -1,4 +1,4 @@
-# MEM-05: Slice(offset, length) vs range operator
+# MEM-03: Slice(offset, length) vs range operator
 
 - Verdict: adopted (small but real)
 - 122.8 vs 136.8 ns for 256 slices (0.90x, non-overlapping CIs); code size 100 vs 103 B

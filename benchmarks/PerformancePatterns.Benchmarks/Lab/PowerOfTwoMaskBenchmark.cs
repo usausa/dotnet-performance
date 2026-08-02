@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// BIT-03 検証: バケットインデックス計算の 剰余(実行時サイズ) vs マスク vs 剰余(定数サイズ)
+// BIT-02 study: bucket index computation with modulo (runtime size) vs mask vs modulo (constant size)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class PowerOfTwoMaskBenchmark
@@ -25,13 +25,13 @@ public class PowerOfTwoMaskBenchmark
         var value = 2166136261u;
         for (var i = 0; i < hashes.Length; i++)
         {
-            // 疑似ランダムなハッシュ列(再現可能)
+            // Pseudo-random hash sequence (reproducible)
             value = (value ^ (uint)i) * 16777619;
             hashes[i] = value;
         }
     }
 
-    // 実行時サイズの剰余(除算命令が出る形)
+    // Modulo by a runtime size (emits a division instruction)
     [Benchmark(Baseline = true)]
     public long RuntimeSizeModulo()
     {
@@ -45,7 +45,7 @@ public class PowerOfTwoMaskBenchmark
         return total;
     }
 
-    // 2 の累乗マスク(AND 1 命令)
+    // Power-of-two mask (a single AND instruction)
     [Benchmark]
     public long PowerOfTwoMask()
     {
@@ -59,7 +59,7 @@ public class PowerOfTwoMaskBenchmark
         return total;
     }
 
-    // 定数サイズの剰余(JIT が AND へ最適化することの確認用)
+    // Modulo by a constant size (to confirm the JIT optimizes it into an AND)
     [Benchmark]
     public long ConstSizeModulo()
     {

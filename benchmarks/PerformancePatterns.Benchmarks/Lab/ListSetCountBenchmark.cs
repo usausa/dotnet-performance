@@ -5,9 +5,9 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー②: CollectionsMarshal.SetCount(.NET 8+)
-// 問い: Add ループ(容量チェック+バージョン更新×N)を SetCount + Span 直接書き込みに
-// 置き換える価値はあるか。容量指定との組み合わせ効果も確認する。
+// Study queue 2: CollectionsMarshal.SetCount (.NET 8+)
+// Question: is it worth replacing an Add loop (N capacity checks plus version bumps) with
+// SetCount plus direct Span writes? Also check how it combines with a preset capacity.
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ListSetCountBenchmark

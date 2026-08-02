@@ -5,9 +5,9 @@ using System.IO.Pipelines;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー⑤: System.IO.Pipelines
-// 問い: PipeWriter/PipeReader を介したデータ受け渡しの固定コストはどれくらいか
-// (同スレッド・同期完了の 4KB × 16 チャンク転送で MemoryStream と比較)。
+// Study queue 5: System.IO.Pipelines
+// Question: what is the fixed cost of handing data over through PipeWriter/PipeReader
+// (compared with MemoryStream over a same-thread, synchronously completing transfer of 16 chunks of 4KB)?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class PipelinesBenchmark
@@ -54,8 +54,8 @@ public class PipelinesBenchmark
     {
         var pipe = new Pipe();
 
-        // 既定 PauseWriterThreshold(64KB)に達すると FlushAsync が読み手の消費を待つため、
-        // 書き手と読み手は必ず並行させる(「書き切ってから読む」逐次構造はデッドロックする)
+        // Once the default PauseWriterThreshold (64KB) is reached FlushAsync waits for the reader to consume, so
+        // the writer and the reader must always run concurrently (a sequential "write everything, then read" structure deadlocks)
         var writerTask = Task.Run(async () =>
         {
             for (var i = 0; i < ChunkCount; i++)

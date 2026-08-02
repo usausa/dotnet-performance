@@ -3,21 +3,21 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// ASY-06 検証: ジョブごとの Timer 生成 vs 単一ループ方式の起床プリミティブ(TCS 差し替え)
+// ASY-06 study: creating a Timer per job vs a single-loop wake-up primitive (swapping the TCS)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class SchedulerPrimitiveBenchmark
 {
     private TaskCompletionSource wakeup = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    // ジョブ 1 件の登録コスト: Timer を生成して破棄(タイマーキューへの登録を含む)
+    // Cost of registering one job: create and dispose a Timer (including enqueueing it on the timer queue)
     [Benchmark(Baseline = true)]
     public void TimerPerJob()
     {
         using var timer = new Timer(static _ => { }, null, Timeout.Infinite, Timeout.Infinite);
     }
 
-    // ジョブ 1 件の通知コスト: 新しい TCS に差し替えてから旧 TCS を完了させる
+    // Cost of signalling one job: swap in a new TCS, then complete the old one
     [Benchmark]
     public bool TcsSwapNotify()
     {

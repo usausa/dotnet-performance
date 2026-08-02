@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Txt;
 
-// TXT-07 検証: 長さが事前に分かる文字列組み立ての手段を比較
+// TXT-07 study: comparing ways to build a string whose length is known in advance
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class StringBuildBenchmark
@@ -62,7 +62,7 @@ public class StringBuildBenchmark
         id.TryFormat(digits, out var written);
         var length = prefix.Length + 1 + name.Length + 1 + written;
 
-        // state はタプルで渡し、ラムダは static(DSP-04)
+        // The state is passed as a tuple and the lambda is static (DSP-04)
         return string.Create(length, (prefix, name, id), static (span, state) =>
         {
             state.prefix.CopyTo(span);

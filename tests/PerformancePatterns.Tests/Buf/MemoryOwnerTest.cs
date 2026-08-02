@@ -9,7 +9,7 @@ public sealed class MemoryOwnerTest
     [Fact]
     public void AllocateProvidesExactLength()
     {
-        // 要求長がプールの丸め(2 の累乗)に一致しないサイズで確認
+        // Check with a size whose requested length does not match the pool's rounding (a power of two)
         using var owner = MemoryOwner<byte>.Allocate(1000);
 
         Assert.Equal(1000, owner.Length);

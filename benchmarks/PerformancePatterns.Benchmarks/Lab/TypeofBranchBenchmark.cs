@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// JIT-03 検証: ジェネリック内の typeof(T) 分岐は JIT が畳み込みゼロコストになるか
+// JIT-03 study: does the JIT fold a typeof(T) branch inside a generic down to zero cost
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class TypeofBranchBenchmark
@@ -40,7 +40,7 @@ public class TypeofBranchBenchmark
     private static long SumSpecialized<T>(T[] source)
         where T : struct
     {
-        // typeof(T) 比較は JIT がインスタンス化ごとに定数化し、不要な側の分岐を消す
+        // The JIT turns the typeof(T) comparison into a constant per instantiation and removes the dead branch
         if (typeof(T) == typeof(int))
         {
             var ints = Unsafe.As<T[], int[]>(ref source);
@@ -53,10 +53,10 @@ public class TypeofBranchBenchmark
             return total;
         }
 
-        // フォールバック(int 以外)
+        // Fallback (anything other than int)
         return source.Length;
     }
 
-    // Verify 用: フォールバック経路の確認
+    // For Verify: checks the fallback path
     public static long SumFallback(long[] source) => SumSpecialized(source);
 }

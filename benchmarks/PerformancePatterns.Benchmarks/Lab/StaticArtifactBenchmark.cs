@@ -5,7 +5,7 @@ using System.Text;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// TYP-06 検証: 型ごとに決まる文字列(SQL 断片)を、毎回組み立て / 辞書キャッシュ / ジェネリック static で比較
+// TYP-06 study: comparing rebuild-every-time / dictionary cache / generic static for a string determined by type (a SQL fragment)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class StaticArtifactBenchmark
@@ -37,7 +37,7 @@ public class StaticArtifactBenchmark
         builder.Append("INSERT INTO ").Append(type.Name).Append(" (");
         foreach (var property in ColumnNames)
         {
-            builder.Append(property).Append(", ");   // 常に後置して最後に削る
+            builder.Append(property).Append(", ");   // Always append the separator and trim it at the end
         }
 
         builder.Length -= 2;
@@ -46,12 +46,12 @@ public class StaticArtifactBenchmark
 
     private static readonly string[] ColumnNames = ["Id", "Name", "Amount", "CreatedAt"];
 
-    // 型初期化子で 1 回だけ組み立て、以後は静的フィールドの読み出しのみ
+    // Built once in the type initializer; after that it is only a static field read
     private static class SqlInsert<T>
     {
         public static readonly string Sql = BuildSql(typeof(T));
     }
 }
 
-// 型引数として使うエンティティ型(ベンチマーク用)
+// Entity types used as type arguments (for the benchmark)
 public sealed class OrderEntity;

@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Col;
 
-// BIT-05 検証: 汎用ハッシュの選択肢を入力長別に比較
+// BIT-04 study: comparing general-purpose hash options by input length
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class HashCompareBenchmark
@@ -27,7 +27,7 @@ public class HashCompareBenchmark
             chars[i] = (char)('a' + (i % 26));
         }
 
-        // 実行時生成(インターンを避ける)
+        // Built at run time (avoids interning)
         value = new string(chars);
     }
 
@@ -62,7 +62,7 @@ public class HashCompareBenchmark
         }
     }
 
-    // BIT-02: 長さ + 3 文字だけのサンプリングハッシュ(入力長に依存しない)
+    // BIT-01: Sampling hash over the length plus three characters only (independent of the input length)
     [Benchmark]
     public int SamplingHash() => SampledNameTable<int>.CalculateHash(value.AsSpan());
 }

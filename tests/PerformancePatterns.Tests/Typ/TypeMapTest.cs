@@ -26,7 +26,7 @@ public sealed class TypeMapTest
         var map = new TypeMap<int>();
         map.Set<TypeMapTest>(42);
 
-        // 実行時に決まる Type からの解決(ジェネリック版と同じスロットを引く)
+        // Resolution from a Type known only at run time (looks up the same slot as the generic overload)
         var runtimeType = GetRuntimeType();
 
         Assert.True(map.TryGetValue<TypeMapTest>(out var byGeneric));
@@ -64,7 +64,7 @@ public sealed class TypeMapTest
     [Fact]
     public void GrowsBeyondInitialSlots()
     {
-        // 多数の型を登録して配列成長パスを通す
+        // Register many types to exercise the array growth path
         var map = new TypeMap<int>();
         map.Set<byte>(0);
         map.Set<sbyte>(1);

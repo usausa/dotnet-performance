@@ -84,7 +84,7 @@ public sealed class HandlerListTest
         list.Add(_ =>
         {
             count++;
-            // 発火中に購読を追加しても、この発火のスナップショットには影響しない
+            // Subscribing during a raise does not affect the snapshot of that raise
             list.Add(static _ => { });
         });
 

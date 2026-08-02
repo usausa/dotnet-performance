@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// TYP-05 検証: 型保証済み参照の castclass vs Unsafe.As vs is パターン
+// TYP-05 study: castclass vs Unsafe.As vs an is pattern for a reference whose type is already guaranteed
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class UnsafeAsCastBenchmark
@@ -15,7 +15,7 @@ public class UnsafeAsCastBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // 型不変条件: 全要素 string(構成的に保証)
+        // Type invariant: every element is a string (guaranteed by construction)
         values = new object[1024];
         for (var i = 0; i < values.Length; i++)
         {

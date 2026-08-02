@@ -25,7 +25,7 @@ Corresponding main pattern: **GEN-02** in [README](../README.md). For where this
 **What to generate:** Branch on the count.
 
 ```csharp
-// Count <= 4: Equals chain (generated form)
+// Count ≤ 4: Equals chain (generated form)
 public static int GetIndex(ReadOnlySpan<char> name)
 {
     if (name.SequenceEqual("Id")) return 0;
@@ -34,7 +34,7 @@ public static int GetIndex(ReadOnlySpan<char> name)
     return -1;
 }
 
-// Count >= 5: sampling-hash switch (hash constants are computed and baked in at generation time)
+// Count ≥ 5: sampling-hash switch (hash constants are computed and baked in at generation time)
 public static int GetIndex(ReadOnlySpan<char> name)
 {
     switch (SamplingHash.Calculate(name))   // (length << 16) ^ (first << 8) ^ (mid << 4) ^ last
@@ -283,7 +283,7 @@ Shapes that tend to creep into generated code because they "look fast", but whic
 | Hand-written digit-packing format loops (right-align shift, reverse-order writes) | 2.5–4.8x slower than `TryFormat` + `Fill` | R-16 |
 | Emitting delegate Invoke with `call` instead of `callvirt` | JIT check showed the generated code matching exactly at 68 instructions / 229 B | R-17 |
 | Converting single-Span loops to `GetReference` + `Unsafe.Add` | A standard for already has bounds checks eliminated; going manual is 1.07–1.13x slower and a bug source | R-02 |
-| Generating hand-rolled hash loops (FNV-1a and the like) | Slower than `string.GetHashCode` from 64 characters up; use XxHash3 or sampling (scenario 1) | [BIT-05](../benchmarks/results/BIT-05-XxHash3.md) |
+| Generating hand-rolled hash loops (FNV-1a and the like) | Slower than `string.GetHashCode` from 64 characters up; use XxHash3 or sampling (scenario 1) | [BIT-04](../benchmarks/results/BIT-04-XxHash3.md) |
 | Generating a runtime `Type`-keyed dictionary as the primary path | The runtime Type path is slower than a plain Dictionary (1.93x); take a generic API and resolve statically | [TYP-01](../benchmarks/results/TYP-01-TypeMap.md) |
 
 For details, see [rejected-patterns.md](rejected-patterns.md).

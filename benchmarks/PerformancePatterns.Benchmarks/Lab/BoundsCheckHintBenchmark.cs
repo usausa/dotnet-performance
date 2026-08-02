@@ -5,10 +5,10 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー①: 末尾要素の事前アクセスによる境界チェック除去
-// 問い: 長さを引数で受けるループで「末尾を先にタッチ」「符号なしガード」は
-// まだ有効か。.NET 8 で有効・.NET 10 で消滅の見込みを世代比較で確認する(反パターン化想定)。
-// 世代検証のため、このクラスのみ例外的に net8 ジョブを併走する。
+// Study queue 1: bounds check elimination by touching the last element first
+// Question: in a loop whose length comes from a parameter, are the "touch the last element first" and
+// "unsigned guard" idioms still effective? Compare generations to confirm they help on .NET 8 and are expected to disappear on .NET 10 (likely an anti-pattern going forward).
+// Only this class additionally runs a net8 job so the generations can be compared.
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net80)]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
@@ -42,7 +42,7 @@ public class BoundsCheckHintBenchmark
     [Benchmark]
     public int SumWithUnsignedGuard() => SumWithGuardCore(array, length);
 
-    // 長さを外部から受ける形: JIT は境界チェックを除去できない(基準)
+    // Length supplied from outside: the JIT cannot eliminate the bounds check (baseline)
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int SumWithExternalLength(int[] array, int length)
     {
@@ -55,7 +55,7 @@ public class BoundsCheckHintBenchmark
         return total;
     }
 
-    // array.Length を条件に使う形: 境界チェック除去が効く(理想形の参照値)
+    // Using array.Length as the condition: bounds check elimination kicks in (the ideal reference value)
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int SumWithOwnLength(int[] array)
     {
@@ -68,7 +68,7 @@ public class BoundsCheckHintBenchmark
         return total;
     }
 
-    // 末尾要素を先にタッチして JIT に範囲を教えるイディオム
+    // Idiom that touches the last element first to teach the JIT the range
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int SumWithTailTouchCore(int[] array, int length)
     {
@@ -82,7 +82,7 @@ public class BoundsCheckHintBenchmark
         return total;
     }
 
-    // 先頭ガードで範囲を証明するイディオム(BCL throw ヘルパー)
+    // Idiom that proves the range with a leading guard (BCL throw helper)
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int SumWithGuardCore(int[] array, int length)
     {

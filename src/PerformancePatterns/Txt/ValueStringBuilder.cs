@@ -4,8 +4,8 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// TXT-02: stackalloc 初期バッファ + ArrayPool 拡張による低アロケーション文字列構築。
-/// Grow はコールドパスとして NoInlining で分離する(JIT-04)。
+/// TXT-02: Low-allocation string building with a stackalloc initial buffer that grows into ArrayPool.
+/// Grow is split off as a NoInlining cold path (JIT-04).
 /// <code>
 /// var builder = new ValueStringBuilder(stackalloc char[128]);
 /// builder.Append(name);
@@ -90,7 +90,7 @@ public ref struct ValueStringBuilder
         }
     }
 
-    // コールドパス: 分離してホット側の Append をインライン可能に保つ(JIT-04)
+    // Cold path: kept separate so the hot Append stays inlineable (JIT-04)
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void GrowAndAppend(char c)
     {

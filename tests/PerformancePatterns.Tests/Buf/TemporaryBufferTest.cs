@@ -54,7 +54,7 @@ public sealed class TemporaryBufferTest
     [InlineData(520)]
     public void ThresholdSelectionPattern(int size)
     {
-        // カタログ記載の閾値切替イディオムがそのまま動作することを確認する
+        // Verify that the threshold-switching idiom described in the catalog works as written
         using var buffer = size <= 512
             ? new TemporaryBuffer<byte>(stackalloc byte[512], size)
             : new TemporaryBuffer<byte>(size);

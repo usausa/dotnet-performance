@@ -8,8 +8,8 @@ using System.Runtime.Intrinsics;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー⑤: SIMD 実装例(Vector<T> / Vector256)
-// 問い: 集計処理の明示的 SIMD 化の効果と、BCL(Enumerable.Sum)の既存ベクトル化との位置関係。
+// Study queue 5: SIMD example (Vector<T> / Vector256)
+// Question: what does explicit SIMD buy for aggregation, and how does it relate to the vectorization already in the BCL (Enumerable.Sum)?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class VectorSumBenchmark

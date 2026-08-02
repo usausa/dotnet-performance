@@ -6,16 +6,6 @@
 
 この README が主知識(パターンの分類・一覧・各パターンの解説)の単一ソースであり、これ 1 つで実装判断が完結するように構成している。ライブラリ開発時に AI へ本リポジトリを参照させることで、高性能かつ AOT 対応の実装を再現できる状態にすることを目的とする。
 
-## 📖 ドキュメント構成
-
-| ドキュメント | 内容 |
-|---|---|
-| README.md(本書) | パフォーマンス実装パターンの分類・一覧・解説(主知識) |
-| [docs/rejected-patterns.md](docs/rejected-patterns.md) | 採用しない手法の詳細(なぜ効果がない・逆効果か) |
-| [docs/aot-compatibility.md](docs/aot-compatibility.md) | AOT / トリミング対応パターン一覧(非互換パターンと対策) |
-| [docs/benchmark-methodology.md](docs/benchmark-methodology.md) | ベンチマーク実施ガイドライン(BenchmarkDotNet 構成と測定の落とし穴) |
-| [docs/generated-code-patterns.md](docs/generated-code-patterns.md) | Source Generator 生成コードパターン集(何を生成すれば速いか・アンチ生成リスト) |
-
 ## 🧭 本書の読み方
 
 - パターンには一意の ID(例: MEM-01)を付ける。実装例・テスト・ベンチマーク・測定結果はこの ID で対応付ける
@@ -51,12 +41,10 @@
 
 | ID | パターン | 目的 | AOT | 実装例 |
 |---|---|---|:---:|:---:|
-| [MEM-01](#-mem-01-memorymarshalgetreference--unsafeadd) | MemoryMarshal.GetReference + Unsafe.Add | 境界チェックの完全除去 | ✅ | [検証済](benchmarks/results/MEM-01-DualSpanWalk.md) |
-| [MEM-02](#-mem-02-getarraydatareference) | GetArrayDataReference | 配列先頭への直接参照取得 | ✅ | [検証済](benchmarks/results/MEM-02-ArrayDataReference.md) |
-| [MEM-03](#-mem-03-skiplocalsinit) | SkipLocalsInit | ローカル変数ゼロ初期化のスキップ | ✅ | [検証済](benchmarks/results/MEM-03-SkipLocalsInit.md) |
-| [MEM-04](#-mem-04-struct-要素配列--ref-アクセスデータ指向レイアウト) | struct 要素配列 + ref アクセス | 要素ごとのヒープ確保と間接参照の排除 | ✅ | [実装](src/PerformancePatterns/Typ/TypeMap.cs) |
-| [MEM-05](#-mem-05-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より高速なスライス | ✅ | [検証済](benchmarks/results/MEM-05-SliceStyle.md) |
-| [MEM-06](#-mem-06-構造体引数の-in--ref-渡し戦略) | 構造体引数の in / ref 渡し | 大きな構造体の値コピー回避 | ✅ | [検証済](benchmarks/results/MEM-06-StructPass.md) |
+| [MEM-01](#-mem-01-skiplocalsinit) | SkipLocalsInit | ローカル変数ゼロ初期化のスキップ | ✅ | [検証済](benchmarks/results/MEM-01-SkipLocalsInit.md) |
+| [MEM-02](#-mem-02-struct-要素配列--ref-アクセスデータ指向レイアウト) | struct 要素配列 + ref アクセス | 要素ごとのヒープ確保と間接参照の排除 | ✅ | [実装](src/PerformancePatterns/Typ/TypeMap.cs) |
+| [MEM-03](#-mem-03-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より高速なスライス | ✅ | [検証済](benchmarks/results/MEM-03-SliceStyle.md) |
+| [MEM-04](#-mem-04-構造体引数の-in--ref-渡し戦略) | 構造体引数の in / ref 渡し | 大きな構造体の値コピー回避 | ✅ | [検証済](benchmarks/results/MEM-04-StructPass.md) |
 | [STK-01](#-stk-01-ref-structスタック専用型) | ref struct(スタック専用型) | ヒープエスケープの型レベル禁止 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-spant--readonlyspant-によるゼロコピーアクセス) | Span\<T\> / ReadOnlySpan\<T\> | ゼロコピーの型付きビュー | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [STK-03](#-stk-03-struct-iterator-パターン) | struct iterator パターン | foreach の仮想呼び出し・ヒープ確保除去 | ✅ | [実装](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -89,11 +77,10 @@
 | [TYP-04](#️-typ-04-ジェネリック-static-クラスによる型別キャッシュ) | ジェネリック static 型別キャッシュ | 型ごとの成果物の辞書レス取得 | ✅ | [実装](src/PerformancePatterns/Typ/TypeSlot.cs) |
 | [TYP-05](#️-typ-05-unsafeas-による型チェック省略キャスト) | Unsafe.As キャスト | 型保証済みキャストの高速化 | ✅ | [検証済](benchmarks/results/TYP-05-UnsafeAsCast.md) |
 | [TYP-06](#️-typ-06-型別成果物の静的事前組み立て) | 型別成果物の静的事前組み立て | 型ごとの文字列・SQL を初期化時に確定 | ✅ | [検証済](benchmarks/results/TYP-06-StaticArtifact.md) |
-| [BIT-01](#-bit-01-符号なしオーバーフローによる範囲チェック) | 符号なしオーバーフロー範囲チェック | 範囲判定の分岐削減 | ✅ | [検証済](benchmarks/results/BIT-01-RangeCheck.md) |
-| [BIT-02](#-bit-02-ドメイン制約を活かした軽量ハッシュ生成) | ドメイン制約を活かした軽量ハッシュ | 既知キー集合の O(1) ハッシュ | ✅ | [実装](src/PerformancePatterns/Col/SampledNameTable.cs) |
-| [BIT-03](#-bit-03-2-の累乗サイズ--マスクによる剰余置換) | 2 の累乗サイズ + マスク | 剰余(除算)のビット AND 化 | ✅ | [検証済](benchmarks/results/BIT-03-PowerOfTwoMask.md) |
-| [BIT-04](#-bit-04-bitoperations-によるビット走査計数) | BitOperations | ビット走査・計数のハードウェア命令化 | ✅ | [検証済](benchmarks/results/BIT-04-BitOperations.md) |
-| [BIT-05](#-bit-05-xxhash3-による汎用ハッシュ) | XxHash3 | 非暗号ハッシュの高速化 | ✅ | [検証済](benchmarks/results/BIT-05-XxHash3.md) |
+| [BIT-01](#-bit-01-ドメイン制約を活かした軽量ハッシュ生成) | ドメイン制約を活かした軽量ハッシュ | 既知キー集合の O(1) ハッシュ | ✅ | [実装](src/PerformancePatterns/Col/SampledNameTable.cs) |
+| [BIT-02](#-bit-02-2-の累乗サイズ--マスクによる剰余置換) | 2 の累乗サイズ + マスク | 剰余(除算)のビット AND 化 | ✅ | [検証済](benchmarks/results/BIT-02-PowerOfTwoMask.md) |
+| [BIT-03](#-bit-03-bitoperations-によるビット走査計数) | BitOperations | ビット走査・計数のハードウェア命令化 | ✅ | [検証済](benchmarks/results/BIT-03-BitOperations.md) |
+| [BIT-04](#-bit-04-xxhash3-による汎用ハッシュ) | XxHash3 | 非暗号ハッシュの高速化 | ✅ | [検証済](benchmarks/results/BIT-04-XxHash3.md) |
 | [VEC-01](#-vec-01-明示的-simdvectort--vector256) | 明示的 SIMD | Vector\<T\> / Vector256 による一括処理 | ✅ | [検証済](benchmarks/results/VEC-01-VectorSum.md) |
 | [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-02](#-seq-02-stream-構造体-io) | Stream 構造体 I/O | 構造体の直接バイナリ読み書き | ✅ | [検証済](benchmarks/results/SEQ-02-StructStreamIo.md) |
@@ -130,96 +117,7 @@
 
 ## 💾 MEM: メモリアクセス最適化
 
-### 💾 MEM-01: MemoryMarshal.GetReference + Unsafe.Add
-
-**目的:** スパン要素への配列境界チェックを完全に排除する。
-
-**効果:**
-
-- 各アクセスから境界チェック命令を除去(JIT が自動で除去できない場合に有効)
-- ループ内で唯一のポインタ演算になるため CPU の最適化効率が上がる
-- 実測例: 標準インデクサーより約 10% 高速(要素 1024 個)
-
-**AOT:** ✅ 問題なし(純粋な IL レベルの操作)
-
-**実装例:**
-
-```csharp
-ref var head = ref MemoryMarshal.GetReference(span);
-for (var i = 0; i < span.Length; i++)
-{
-    Process(Unsafe.Add(ref head, i));
-}
-```
-
-**ユースケース:** 高頻度な内側ループ、パーサー、シリアライザ。
-
-**適用判断(実測に基づく指針):**
-
-| 状況 | 推奨 | 理由 |
-|---|---|---|
-| 複数の Span を同一ループで同時走査 | GetReference + Unsafe.Add | JIT は 2 本目以降の Span の境界チェックを除去できないことが多く、手動除去が効く(実測例: 0.82〜0.90 倍に短縮) |
-| 単一 Span の標準 for ループ | 通常のインデクサ | JIT の境界チェック除去が完全に効いており、手動 ref 化はセットアップコスト分だけ遅い(実測例: 1.07〜1.13 倍に悪化) |
-| 要素数が 1〜数個 | 通常のインデクサ | ref 準備コストが支配的になり逆転する |
-
-**注意:**
-
-- 境界チェックが消える分、範囲の正しさは呼び出し側の責任になる。終端 ref の計算ミスや複数カーソル走査での ref 進め忘れは静かに範囲外を読む(実際に混入しやすいバグ)
-- 手動 ref 走査はコードサイズを増やしがちで、速くならない場面では純粋な負債になる。必ずベンチマークとセットで採用する
-
-**実測結果(Ryzen 9 5900X / net10、2 本の Span の zip 合計 1024 要素):**
-
-| 方式 | 時間 | 比率 |
-|---|---:|---|
-| 索引形 `a[i] + b[i]` | 367.7 ns | 1.00 |
-| 事前スライス + 索引形 | 368.6 ns | 1.00 |
-| **手動 ref 走査(GetReference + Unsafe.Add)** | 537.7 ns | **1.46(❌ 逆効果)** |
-
-**net10 では複数 Span の単純な索引ループを JIT が自動ベクトル化する**(0.36 ns/要素)。手動 ref 走査はこれを阻害し、コードサイズ最小(88 B)でも 1.46 倍遅い。**要素ごとの単純処理では索引形で書く**こと。手動 ref 走査が残る適用先は、ベクトル化されない複雑な要素処理・サンプリングアクセス(SampledNameTable の 3 文字参照など)・ストライド走査に限られる。→ [測定結果](benchmarks/results/MEM-01-DualSpanWalk.md)
-
----
-
-### 💾 MEM-02: GetArrayDataReference
-
-**目的:** 配列の要素 0 への直接参照を取得する。`AsSpan()` を介さずに利用できる。
-
-**効果:**
-
-- `AsSpan` を介さず配列先頭の ref を得られる(ref を保持する型・API を書くときの入口)
-- コードサイズは小さくなる(実測 55 B vs 67〜72 B)
-
-⚠️ **速度目的では採用しない(実測):** net10 では逐次走査で **1.30 倍遅く**(索引形の自動ベクトル化を阻害 — MEM-01 / R-02 と同じ機序)、範囲が構造的に保証されたランダムアクセスでも索引形と**差なし**(境界チェックは実質無料)。
-
-**AOT:** ✅ 問題なし
-
-**実装例:**
-
-```csharp
-ref var head = ref MemoryMarshal.GetArrayDataReference(array);
-for (var i = 0; i < array.Length; i++)
-{
-    Unsafe.Add(ref head, i) = ComputeValue(i);
-}
-```
-
-**ユースケース:** ref を保持するカーソル型・データ構造の実装、Span を作れない文脈での先頭参照取得。**ループを速くする目的では使わない**。
-
-**実測結果(Ryzen 9 5900X / net10、int[1024]):**
-
-| 方式 | 時間 | 比率 |
-|---|---:|---|
-| 逐次: 索引 `for` | 457.4 ns | 1.00 |
-| 逐次: GetArrayDataReference + Unsafe.Add | 595.7 ns | **1.30(❌)** |
-| ランダム: 索引 | 466.2 ns | 1.00 |
-| ランダム: ref + Unsafe.Add | 461.4 ns | 1.01(➖誤差) |
-
-→ [測定結果](benchmarks/results/MEM-02-ArrayDataReference.md)
-
-**注意:** null チェック・長さ検証は一切行われない。配列が非 null かつ範囲内であることは呼び出し側で保証する。
-
----
-
-### 💾 MEM-03: SkipLocalsInit
+### 💾 MEM-01: SkipLocalsInit
 
 **目的:** ローカル変数のゼロ初期化(`.locals init`)をスキップする。
 
@@ -245,7 +143,7 @@ public bool MoveNext()
 
 **ユースケース:** `MoveNext()` のような非常に高頻度な呼び出しメソッド。
 
-**実測結果(Ryzen 9 5900X / net10、stackalloc byte[4096] を含むメソッド呼び出し):** ゼロ初期化あり 34.3 ns → `[SkipLocalsInit]` で **3.1 ns(0.09 倍 = 約 11 倍)**、コードサイズも 610 B → 177 B(memset 経路が消える)。コストは stackalloc のサイズに比例する(使用長ではなく確保長)。→ [測定結果](benchmarks/results/MEM-03-SkipLocalsInit.md)
+**実測結果(Ryzen 9 5900X / net10、stackalloc byte[4096] を含むメソッド呼び出し):** ゼロ初期化あり 34.3 ns → `[SkipLocalsInit]` で **3.1 ns(0.09 倍 = 約 11 倍)**、コードサイズも 610 B → 177 B(memset 経路が消える)。コストは stackalloc のサイズに比例する(使用長ではなく確保長)。→ [測定結果](benchmarks/results/MEM-01-SkipLocalsInit.md)
 
 **注意:**
 
@@ -254,7 +152,7 @@ public bool MoveNext()
 
 ---
 
-### 💾 MEM-04: struct 要素配列 + ref アクセス(データ指向レイアウト)
+### 💾 MEM-02: struct 要素配列 + ref アクセス(データ指向レイアウト)
 
 **目的:** エントリ列を class の配列ではなく struct の配列で持ち、`ref` で操作することで、要素ごとのヒープ確保とポインタ追跡を同時に排除する。
 
@@ -287,11 +185,11 @@ for (var i = 0; i < entries.Length; i++)
 
 **リポジトリ内実装:** [TypeMap.cs](src/PerformancePatterns/Typ/TypeMap.cs) の `Entry[]`(struct 要素配列 + copy-on-write)
 
-**実測結果(Ryzen 9 5900X / net10、16 バイト要素 × 1024 の走査):** struct + ref アクセス 483.0 ns ≒ class 配列 493.5 ns(信頼区間重複 — **連続確保直後の class は局所性が崩れていないため**)、struct のコピーアクセスは 595.7 ns(1.21 倍 = ref が消すコピーペナルティ)。この形の実測に出ない構造的差: 1024 要素で struct は 16 KB 連続、class は約 40 KB のオブジェクト群 + 8 KB の参照配列で、**ヒープが経年するほど class 側の局所性は劣化する**。→ [測定結果](benchmarks/results/MEM-04-StructArrayRef.md)
+**実測結果(Ryzen 9 5900X / net10、16 バイト要素 × 1024 の走査):** struct + ref アクセス 483.0 ns ≒ class 配列 493.5 ns(信頼区間重複 — **連続確保直後の class は局所性が崩れていないため**)、struct のコピーアクセスは 595.7 ns(1.21 倍 = ref が消すコピーペナルティ)。この形の実測に出ない構造的差: 1024 要素で struct は 16 KB 連続、class は約 40 KB のオブジェクト群 + 8 KB の参照配列で、**ヒープが経年するほど class 側の局所性は劣化する**。→ [測定結果](benchmarks/results/MEM-02-StructArrayRef.md)
 
 ---
 
-### 💾 MEM-05: Slice(offset, length) による明示的スライス
+### 💾 MEM-03: Slice(offset, length) による明示的スライス
 
 **目的:** Span の切り出しに範囲演算子 `span[offset..]` ではなく `span.Slice(offset, length)` を使い、スライス生成コストを削減する。
 
@@ -314,13 +212,13 @@ BinaryPrimitives.WriteInt32BigEndian(buffer.Slice(i * 4, 4), value);
 
 **ユースケース:** シリアライザ・エンコーダのホットループ内のスライス全般。
 
-**実測結果(Ryzen 9 5900X / net10、256 回のスライス + 端点読み):** `Slice(offset, 16)` 122.8 ns vs 範囲演算子 136.8 ns(**0.90 倍、信頼区間非重複の実差**)。コードサイズは 100 vs 103 B。**1 スライスあたり約 0.05 ns** の差なので、意識して使うのはホットループ内に限る。→ [測定結果](benchmarks/results/MEM-05-SliceStyle.md)
+**実測結果(Ryzen 9 5900X / net10、256 回のスライス + 端点読み):** `Slice(offset, 16)` 122.8 ns vs 範囲演算子 136.8 ns(**0.90 倍、信頼区間非重複の実差**)。コードサイズは 100 vs 103 B。**1 スライスあたり約 0.05 ns** の差なので、意識して使うのはホットループ内に限る。→ [測定結果](benchmarks/results/MEM-03-SliceStyle.md)
 
 **注意:** 可読性の差はごく小さいため、ホットパスでは `Slice(offset, length)` を既定にしてよい。1 回きりのスライスでは差は誤差レベル。
 
 ---
 
-### 💾 MEM-06: 構造体引数の in / ref 渡し戦略
+### 💾 MEM-04: 構造体引数の in / ref 渡し戦略
 
 **目的:** 大きな構造体を引数で渡すときの値コピーを避ける。
 
@@ -365,7 +263,7 @@ public void Draw(in MutableContext context) => context.Value.Use();
 | in + readonly メンバー | — | 1.60 ns | (基準) |
 | in + 非 readonly メンバー | — | 2.97 ns | **1.86(❌ 防御的コピー)** |
 
-サイズが大きいほど `in` の効果が拡大する。防御的コピーの罠も実測で確認: 非 readonly メンバーへの `in` 渡しは 1.86 倍遅く、コードサイズも 109 B → 219 B へ倍増する。→ [測定結果](benchmarks/results/MEM-06-StructPass.md)
+サイズが大きいほど `in` の効果が拡大する。防御的コピーの罠も実測で確認: 非 readonly メンバーへの `in` 渡しは 1.86 倍遅く、コードサイズも 109 B → 219 B へ倍増する。→ [測定結果](benchmarks/results/MEM-04-StructPass.md)
 
 **注意:** 効果はサイズ・呼び出し頻度・JIT のインライン化状況で変わる。インライン化されるとコピー自体が消えることもあるため、適用前後で計測する。
 
@@ -592,7 +490,7 @@ public static object Box(int value) => value switch
 | 可変サイズ 512 | 4.6 ns(約 3 倍) | **14.8 ns(約 9 倍)** |
 
 - 定数サイズならゼロ初期化コストもサイズ固定で予測可能。可変サイズは localloc 自体のコストに加え、ゼロ初期化も遅い形になる
-- MEM-03(SkipLocalsInit)の除去効果(6.6 → 1.6ns)も同時に実証
+- MEM-01(SkipLocalsInit)の除去効果(6.6 → 1.6ns)も同時に実証
 
 **AOT:** ✅ 問題なし
 
@@ -683,7 +581,7 @@ slots[0] = 1;
 Span<int> span = slots;
 ```
 
-**ユースケース:** 小さな固定長ワーク領域、ハッシュ表エントリのインライン格納(MEM-04 の発展)、状態機械の履歴バッファ。
+**ユースケース:** 小さな固定長ワーク領域、ハッシュ表エントリのインライン格納(MEM-02 の発展)、状態機械の履歴バッファ。
 
 **実測結果(Ryzen 9 5900X / net10、int×8 の書き込み+合計):** `new int[8]` 7.18 ns / 56 B に対し、stackalloc 4.71 ns(0.66)、InlineArray 4.93 ns(0.69)— いずれもゼロアロケーション。**stackalloc が僅かに速い(差 0.22 ns、信頼区間非重複の実差)**。InlineArray の価値は速度ではなく「構造体のフィールドとして持てる」ことにある。→ [測定結果](benchmarks/results/STK-08-InlineArray.md)
 
@@ -1268,7 +1166,7 @@ public sealed class BinaryFormatter : IFormatter { ... }
 
 **効果:**
 
-- 実測例: マルチキャストデリゲートは購読 2 個から急劣化し、購読 4 個では不変配列の foreach 実行が約 6.6 倍高速
+- マルチキャストデリゲートは購読者数にほぼ比例して劣化する。損益分岐は購読 2 個で、購読 4 個では不変配列の foreach が 2.75 倍高速(下記実測)
 - 発火側はロック不要(copy-on-write で購読変更時のみ配列を差し替える)
 
 **AOT:** ✅ 問題なし
@@ -1681,50 +1579,7 @@ var sql = SqlInsert<Order>.Sql;
 
 ## 🔢 BIT: ビット演算・ブランチレス最適化
 
-### 🔢 BIT-01: 符号なしオーバーフローによる範囲チェック
-
-**目的:** `min <= value && value <= max` の 2 比較・2 分岐を、符号なし整数の性質を利用した 1 比較に削減する。
-
-**効果:**
-
-- 比較・分岐が 2 回 → 1 回になり、分岐予測ミスの機会が減る
-- .NET ランタイム自身が配列境界チェック等で多用する定石で、JIT 最適化との親和性が高い
-- 単発の効果は小さい(実測例: 100 ns 規模の処理で 1〜2 ns)が、ホットループ内の頻出判定で積み上がる
-
-**AOT:** ✅ 問題なし
-
-**実装例:**
-
-```csharp
-// Before: 比較 2 回
-public static bool IsInRange(int value, int min, int max)
-    => (min <= value) && (value <= max);
-
-// After: 比較 1 回(min <= max が前提)
-public static bool IsInRange(int value, int min, int max)
-{
-    unchecked
-    {
-        return (uint)(value - min) <= (uint)(max - min);
-    }
-}
-```
-
-**仕組み:** `value < min` の場合、`value - min` は負になり `uint` として解釈すると巨大な値に折り返す(オーバーフロー)ため、`<= (uint)(max - min)` が必ず false になる。範囲内なら差分は `max - min` 以下に収まるため、単一比較で上下限を同時に判定できる。
-
-**ユースケース:** 連続値 enum の定義済み判定、インデックス検証、文字種判定(`(uint)(c - '0') <= 9` で数字判定等)。TYP-01 の実装例にある `(uint)index < (uint)array.Length` はこのパターンの特殊形。
-
-**注意:**
-
-- 可読性は明確に劣る。マイクロベンチマークで効果を確認できるホットパスに限定する
-- 意図的なオーバーフロー利用であることを `unchecked` で明示する(プロジェクト設定が checked でも壊れないようにする)
-- `min <= max` の成立が前提。破ると全入力が範囲外判定になる
-
-**実測結果(Ryzen 9 5900X / net10、1024 値の範囲判定):** 548.5 vs 553.7 ns で信頼区間重複。**Tier1 の生成コードを比較すると、JIT が 2 比較形を自動で符号なし 1 比較へ融合しており実質同一**(差は `sub r8d,100` vs `add r8d,-100` の符号化のみ、45 B)。**単純な min/max 判定では手書き変換は不要(差なし)** — 可読な 2 比較形で書いてよい。手書き形が意味を持つのは、JIT が範囲を証明できない複合条件・チェック網羅の分岐削減に限られる。→ [測定結果](benchmarks/results/BIT-01-RangeCheck.md)
-
----
-
-### 🔢 BIT-02: ドメイン制約を活かした軽量ハッシュ生成
+### 🔢 BIT-01: ドメイン制約を活かした軽量ハッシュ生成
 
 **目的:** 汎用ハッシュ(`string.GetHashCode` 等)が持つ「全文字反映・高い分散品質」をドメイン制約に基づいて捨て、O(1) の専用ハッシュに置き換える。
 
@@ -1785,7 +1640,7 @@ return (length << 16)
 
 ---
 
-### 🔢 BIT-03: 2 の累乗サイズ + マスクによる剰余置換
+### 🔢 BIT-02: 2 の累乗サイズ + マスクによる剰余置換
 
 **目的:** ハッシュ表などのインデックス計算で `% length` の整数除算を避け、サイズを 2 の累乗に揃えて `& (length - 1)` のマスクに置き換える。
 
@@ -1814,7 +1669,7 @@ var index = hash & mask;
 | **2 の累乗マスク `&`** | 310.3 ns | **0.23** |
 | 定数サイズの `%` | 253.0 ns | 0.19 |
 
-**手動マスク化が必要なのは「サイズが実行時に決まる」場合のみ**。定数の 2 の累乗に対する `%` は JIT が既に AND 形へ落とすため、そのまま書いてよい(マスク版との差は下限一致・分散由来)。→ [測定結果](benchmarks/results/BIT-03-PowerOfTwoMask.md)
+**手動マスク化が必要なのは「サイズが実行時に決まる」場合のみ**。定数の 2 の累乗に対する `%` は JIT が既に AND 形へ落とすため、そのまま書いてよい(マスク版との差は下限一致・分散由来)。→ [測定結果](benchmarks/results/BIT-02-PowerOfTwoMask.md)
 
 **注意:**
 
@@ -1823,7 +1678,7 @@ var index = hash & mask;
 
 ---
 
-### 🔢 BIT-04: BitOperations によるビット走査・計数
+### 🔢 BIT-03: BitOperations によるビット走査・計数
 
 **目的:** ビットマップの走査・ビット数計測を素朴なループからハードウェア命令(`TrailingZeroCount` / `PopCount` / `Log2` 等)へ置き換える。
 
@@ -1846,11 +1701,11 @@ while (mask != 0UL)
 }
 ```
 
-**ユースケース:** ビットマップアロケータ・プールの空きスロット検索、sparse set、フラグ集計、`RoundUpToPowerOf2`(BIT-03)や `Log2` によるサイズ計算。
+**ユースケース:** ビットマップアロケータ・プールの空きスロット検索、sparse set、フラグ集計、`RoundUpToPowerOf2`(BIT-02)や `Log2` によるサイズ計算。
 
 ---
 
-### 🔢 BIT-05: XxHash3 による汎用ハッシュ
+### 🔢 BIT-04: XxHash3 による汎用ハッシュ
 
 **目的:** 非暗号ハッシュ(キャッシュキー、チェックサム、重複検出)を、自前 FNV-1a や `string.GetHashCode` ではなく最適化済み実装に任せる(`System.IO.Hashing`)。
 
@@ -1875,7 +1730,7 @@ var hash = XxHash3.HashToUInt64(MemoryMarshal.AsBytes(value.AsSpan()));
 
 **使い分け:**
 
-- 少数の既知キー集合 → BIT-02(サンプリングハッシュ)。全文を読まないぶん更に速い
+- 少数の既知キー集合 → BIT-01(サンプリングハッシュ)。全文を読まないぶん更に速い
 - 短い ASCII トークン判定 → TXT-04(バイト列の直接比較)
 - 汎用・長い入力・安定値が必要 → 本パターン
 
@@ -1886,9 +1741,9 @@ var hash = XxHash3.HashToUInt64(MemoryMarshal.AsBytes(value.AsSpan()));
 | `string.GetHashCode`(基準) | 1.00 | 1.00 | 1.00 |
 | **XxHash3(Cast 経由)** | **0.34** | **0.25** | **0.11** |
 | XxHash3(fixed 経由) | 0.38 | 0.24 | 0.12 |
-| サンプリングハッシュ(BIT-02) | 0.19 | 0.03 | 0.003 |
+| サンプリングハッシュ(BIT-01) | 0.19 | 0.03 | 0.003 |
 
-XxHash3 は 8 文字時点で既に速く、長いほど差が開く。`MemoryMarshal.AsBytes` は `fixed` より遅くなることがなく、8 / 512 文字では信頼区間非重複で僅かに速い(pinning が不要なぶん)— ゼロコスト再解釈の確認としては十分。手書きのハッシュループはベクトル化された BCL に勝てないため、自作しない。→ [測定結果](benchmarks/results/BIT-05-XxHash3.md)
+XxHash3 は 8 文字時点で既に速く、長いほど差が開く。`MemoryMarshal.AsBytes` は `fixed` より遅くなることがなく、8 / 512 文字では信頼区間非重複で僅かに速い(pinning が不要なぶん)— ゼロコスト再解釈の確認としては十分。手書きのハッシュループはベクトル化された BCL に勝てないため、自作しない。→ [測定結果](benchmarks/results/BIT-04-XxHash3.md)
 
 **注意:** 非暗号ハッシュのため、改ざん検知や署名には使えない。
 
@@ -2222,7 +2077,7 @@ public bool TryResolve(ReadOnlySpan<char> name, out int value)
 **知見(実測例):**
 
 - 〜8 件程度: `string.Equals` の if 連鎖が最速級(enum 名解決で `Enum.TryParse` 比 0.17 倍)。小規模では配列の線形探索も辞書より速い
-- 十数件〜: サンプリングハッシュ switch(BIT-02)が安定して速い。Equals 連鎖は「宣言順どおりのアクセス」では速いが、逆順・部分アクセスでは 3〜5 倍劣化する — 平均ではなくアクセス形状への安定性で選ぶ
+- 十数件〜: サンプリングハッシュ switch(BIT-01)が安定して速い。Equals 連鎖は「宣言順どおりのアクセス」では速いが、逆順・部分アクセスでは 3〜5 倍劣化する — 平均ではなくアクセス形状への安定性で選ぶ
 - FrozenDictionary はこの規模(〜32 件)では最速になりにくい(実測でどのカラム数でも最速にならなかった)
 
 **AOT:** ✅ 問題なし
@@ -2231,7 +2086,7 @@ public bool TryResolve(ReadOnlySpan<char> name, out int value)
 
 **設計指針:** 生成コードなら要素数が生成時に分かるため、件数に応じて Equals 連鎖(小)/ ハッシュ switch(中〜)を出し分けるのが理想。
 
-**リポジトリ内実装:** [SampledNameTable.cs](src/PerformancePatterns/Col/SampledNameTable.cs)(BIT-02 のハッシュ + BIT-03 のマスク + バケット内 Ordinal 確定) / [テスト](tests/PerformancePatterns.Tests/Col/SampledNameTableTest.cs) / [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Col/SampledNameTableBenchmark.cs) / [測定結果](benchmarks/results/COL-04-SampledNameTable.md)
+**リポジトリ内実装:** [SampledNameTable.cs](src/PerformancePatterns/Col/SampledNameTable.cs)(BIT-01 のハッシュ + BIT-02 のマスク + バケット内 Ordinal 確定) / [テスト](tests/PerformancePatterns.Tests/Col/SampledNameTableTest.cs) / [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Col/SampledNameTableBenchmark.cs) / [測定結果](benchmarks/results/COL-04-SampledNameTable.md)
 
 **実測結果(Ryzen 9 5900X / net10、名前解決を要素数別に):**
 
@@ -2627,7 +2482,7 @@ SearchValues は**候補数に関係なく約 6 ns で一定**(配列版は候�
 
 - **数値の左詰めは `TryFormat` + `Fill`**: `TryFormat` は内部で桁数計算と 2 桁テーブル書き込みを最適化済み。書いた残りを `Fill` するだけで左詰め固定長になる
 - **トリムのベクトル化**: 固定長フィールドのフィラー除去は手ループでなく `IndexOfAnyExcept` / `LastIndexOfAnyExcept` を使い、切り出しは 1 回の `Slice` にする
-- **UTF-16 の無変換コピー**: .NET の内部表現が UTF-16 のため、UTF-16 固定長フィールドは `MemoryMarshal.Cast<byte, char>` で Encoding を通さず memcpy 相当にできる(Cast のゼロコスト性は BIT-05 で実測済み)。パディングも char 単位の `Fill` で一括
+- **UTF-16 の無変換コピー**: .NET の内部表現が UTF-16 のため、UTF-16 固定長フィールドは `MemoryMarshal.Cast<byte, char>` で Encoding を通さず memcpy 相当にできる(Cast のゼロコスト性は BIT-04 で実測済み)。パディングも char 単位の `Fill` で一括
 
 **AOT:** ✅ 問題なし
 
@@ -2848,7 +2703,7 @@ public void Notify()
 - **待機時間には上限を設ける**(例: 1 時間)。長時間待機はシステム時刻変更やドリフトの影響を受けやすい
 - 発火判定用の時刻取得は SYS-01(TickCount64 / GetTimestamp)に従い単調クロックを使う
 - 発火対象リストは毎周 `Clear()` して使い回す。継続は `ContinueWith(static (t, state) => ..., this, ...)` の static + state 形(DSP-04)にする
-- 期日情報がビット集合で表現できるなら BIT-04(TrailingZeroCount)で次候補を O(1) 取得できる(cron 実装の定石)
+- 期日情報がビット集合で表現できるなら BIT-03(TrailingZeroCount)で次候補を O(1) 取得できる(cron 実装の定石)
 
 **実測結果(Ryzen 9 5900X / net10、プリミティブ単位):** ジョブごとの `Timer` 生成 + 破棄 41.0 ns + 120 B(グローバルタイマーキューへの登録を含む)に対し、単一ループ方式の起床通知(TCS 差し替え + `TrySetResult`)は **11.2 ns + 88 B(0.27 倍)**。登録・通知プリミティブの比較であり、負荷時のスケジューラ全体挙動は対象外。→ [測定結果](benchmarks/results/ASY-06-SchedulerPrimitive.md)
 
@@ -3016,7 +2871,7 @@ private static partial ulong GetTickCount64();
 
 **効果:**
 
-- **序数の事前解決**: 列名から序数を引く処理を行ごとに行わず、リーダー 1 本につき 1 回だけ確定する。序数を保持する `readonly struct` を作って `in` で渡せば、行マッピングは構造体フィールドの読み出しになる(MEM-06)
+- **序数の事前解決**: 列名から序数を引く処理を行ごとに行わず、リーダー 1 本につき 1 回だけ確定する。序数を保持する `readonly struct` を作って `in` で渡せば、行マッピングは構造体フィールドの読み出しになる(MEM-04)
 - **1 パス列解決**: `GetOrdinal(name)` を列数ぶん呼ぶ代わりに、`GetName(i)` を昇順に 1 回走査して全序数を確定する。欠落列を -1 のまま扱えるので、部分列 SELECT でも例外にならない(`GetOrdinal` は例外を投げる)
 - **型別リーダーメソッド**: `GetValue` + アンボックスではなく `GetInt32` / `GetString` 等を直接呼ぶ。enum は基底型で読んでキャストする
 - **結果セット形状のキャッシュ**: 「列名 + 列型」の組み合わせをキーにマッパーをキャッシュする(同じ POCO でも SELECT 列が違えば別マッパー)
@@ -3061,7 +2916,7 @@ if (reader.Read())
 }
 ```
 
-**列名照合の戦略選択:** 列数に応じて `String.Equals(OrdinalIgnoreCase)` の連鎖(少数)と サンプリングハッシュ switch(中〜多数)を使い分ける(COL-04 / BIT-02)。生成コードなら列数が生成時に分かるため出し分けられる。
+**列名照合の戦略選択:** 列数に応じて `String.Equals(OrdinalIgnoreCase)` の連鎖(少数)と サンプリングハッシュ switch(中〜多数)を使い分ける(COL-04 / BIT-01)。生成コードなら列数が生成時に分かるため出し分けられる。
 
 **CommandBehavior の選択:**
 
@@ -3162,7 +3017,7 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | コレクション変換 | 容量確定 + `SetCount` + Span 直書きループ | COL-01 / COL-06 |
 | 変更通知・イベント | EventArgs の static readonly 焼き込み + 購読数に応じた形 | DSP-03 / DSP-04 |
 
-**❌ 生成してはいけないコード(アンチ生成):** typeof キャッシュ(R-01)、無条件 Frozen 化(R-08)、性能目的 readonly(R-10)、CopyBlock 置換(R-14)、手書き桁詰め(R-16)、Call 置換(R-17)、単一 Span の手動 ref 走査(R-02)、自前ハッシュループ(BIT-05)、実行時 Type キー辞書の主経路化(TYP-01)。一覧と理由は[生成コードパターン集](docs/generated-code-patterns.md)の第 9 節。
+**❌ 生成してはいけないコード(アンチ生成):** typeof キャッシュ(R-01)、無条件 Frozen 化(R-08)、性能目的 readonly(R-10)、CopyBlock 置換(R-14)、手書き桁詰め(R-16)、Call 置換(R-17)、単一 Span の手動 ref 走査(R-02)、自前ハッシュループ(BIT-04)、実行時 Type キー辞書の主経路化(TYP-01)。一覧と理由は[生成コードパターン集](docs/generated-code-patterns.md)の第 9 節。
 
 **GEN-01 との関係:** 直書き生成コードは Emit の最良形(Holder フィールド 6.55 ns ≒ クロージャ 6.23 ns)と同等の形を AOT 安全に出力できる。Emit 併設(AOTS-08 の二重パス)が要るのは「ビルド時に生成できない動的シナリオ」だけ。
 
@@ -3176,19 +3031,19 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 
 | 手書きしていた形 | ランタイムが自動でやること | 確認方法 | 記録 |
 |---|---|---|---|
-| `(uint)(v - min) <= max - min` の範囲チェック変換 | JIT が 2 比較形を符号なし 1 比較へ自動融合 | Tier1 生成コード一致 | [BIT-01](benchmarks/results/BIT-01-RangeCheck.md) |
-| 定数 2 の累乗サイズの `%` を `&` マスクへ書き換え | JIT が定数剰余を AND 形へ畳み込み | 実測でマスクと同水準 | [BIT-03](benchmarks/results/BIT-03-PowerOfTwoMask.md) |
+| `(uint)(v - min) <= max - min` の範囲チェック変換 | JIT が 2 比較形を符号なし 1 比較へ自動融合 | Tier1 生成コード一致 | [R-18](benchmarks/results/LAB-RangeCheck.md) |
+| 定数 2 の累乗サイズの `%` を `&` マスクへ書き換え | JIT が定数剰余を AND 形へ畳み込み | 実測でマスクと同水準 | [BIT-02](benchmarks/results/BIT-02-PowerOfTwoMask.md) |
 | 小さなヘルパーへの `AggressiveInlining` 付与 | 既定ポリシー(PGO)がループ持ちでもインライン化 | 呼び出し側 Tier1 コード一致(94 B) | [JIT-01](benchmarks/results/JIT-01-Inlining.md) |
 | `new T[0]` を `Array.Empty<T>()` へ置換 | 空配列を共有化し割り当てゼロに(コードサイズは `[]` が小) | BDN 割り当てゼロ実測 | [STK-07](benchmarks/results/STK-07-LazyAllocation.md) |
 | 単一 Span ループの `GetReference` + `Unsafe.Add` 化 | 標準 for で境界チェックを完全除去 | 手動化は 1.07〜1.13 倍遅 | [R-02](docs/rejected-patterns.md) |
-| **複数 Span** の単純ループの手動 ref 走査 | 索引形を自動ベクトル化(0.36 ns/要素) | 手動化はベクトル化を阻害し 1.46 倍遅 | [MEM-01](benchmarks/results/MEM-01-DualSpanWalk.md) |
-| 配列走査の `GetArrayDataReference` + `Unsafe.Add` 化 | 索引形で境界チェック除去 + 自動ベクトル化 | 逐次で 1.30 倍遅、ランダムでも差なし | [MEM-02](benchmarks/results/MEM-02-ArrayDataReference.md) |
+| **複数 Span** の単純ループの手動 ref 走査 | 索引形を自動ベクトル化(0.36 ns/要素) | 手動化はベクトル化を阻害し 1.46 倍遅 | [R-02](benchmarks/results/LAB-DualSpanWalk.md) |
+| 配列走査の `GetArrayDataReference` + `Unsafe.Add` 化 | 索引形で境界チェック除去 + 自動ベクトル化 | 逐次で 1.30 倍遅、ランダムでも差なし | [R-02](benchmarks/results/LAB-ArrayDataReference.md) |
 | 速度目的の関数ポインタ `delegate*` 化 | デリゲートは PGO が推測脱仮想化 + インライン化 | 関数ポインタは calli で投機不可、6.04 倍遅 | [DSP-02](benchmarks/results/DSP-02-CallAbstraction.md) |
 | `typeof(X)` の static readonly キャッシュ | Tier1 で凍結 RuntimeType ポインタの即値へ定数化 | 生成コード完全一致(11 B) | [R-01](docs/rejected-patterns.md) |
 | ループ構文の書き分け(for / while) | 同一の命令列へ正規化 | 生成コード一致(28 B) | [R-04](docs/rejected-patterns.md) |
 | デリゲート Invoke の `call` 置換(null チェック回避) | ターゲットフィールド読みが null チェックを兼務 | 生成コード完全一致(229 B) | [R-17](docs/rejected-patterns.md) |
 | 手書きの桁整形ループ(右詰めシフト・逆順書き) | `TryFormat` 内部が桁数計算・2 桁テーブル・アンロール済み | TryFormat の 2.5〜4.8 倍遅 | [R-16](docs/rejected-patterns.md) |
-| 自前ハッシュループ(FNV-1a 等) | `string.GetHashCode` / XxHash3 がベクトル化済み | 64 文字以降で自前が逆転負け | [BIT-05](benchmarks/results/BIT-05-XxHash3.md) |
+| 自前ハッシュループ(FNV-1a 等) | `string.GetHashCode` / XxHash3 がベクトル化済み | 64 文字以降で自前が逆転負け | [BIT-04](benchmarks/results/BIT-04-XxHash3.md) |
 | エスケープしないボックスの回避 | エスケープ解析がスタック化(0.004 ns) | STK-05 実測例 | [STK-05](#-stk-05-ボックス化回避と頻出値キャッシュ) |
 | 末尾要素の事前タッチによる境界チェック誘導 | ヒントなしで同一(全バリアント差なし) | net10 / net8 実測 | [R-15](docs/rejected-patterns.md) |
 
@@ -3221,7 +3076,7 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | ID | 手法 | 不採用の理由(一言) |
 |---|---|---|
 | R-01 | `typeof(X)` の static readonly キャッシュ | JIT が typeof を定数化するため完全に同速 |
-| R-02 | 単一 Span ループの GetReference + Unsafe.Add 化 | インデクサより 7〜13% 遅い(BCE 済み) |
+| R-02 | 手動 ref 走査(GetReference / GetArrayDataReference) | どの形状でも速くならない(複数 Span 1.46 倍・配列 1.30 倍遅い) |
 | R-03 | `CollectionsMarshal.AsSpan` 後の手動 ref ウォーク | 差なし、コードサイズ増のみ |
 | R-04 | ループ構文の選択(for / while / do-while / 昇降順) | 差なし |
 | R-05 | class 要素配列への ArrayPool 適用 | 要素個別の確保が残り効果なし〜逆効果 |
@@ -3237,6 +3092,7 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | R-15 | 末尾要素の事前タッチによる境界チェック誘導 | net10 / net8 とも全バリアント差なし |
 | R-16 | 手書きの桁順整形トリック(右詰め→シフト・逆順書き込み) | TryFormat + Fill の 2.5〜4.8 倍遅い |
 | R-17 | デリゲート Invoke の Call 置換(Callvirt 回避) | 生成コード完全一致を JIT 確認(net10) |
+| R-18 | 符号なしオーバーフローによる範囲チェックの手書き | JIT が 2 比較を自動融合、生成コード実質同一 |
 
 ---
 
@@ -3248,15 +3104,15 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 |---|---|---|---|
 | `typeof(X)` の static readonly キャッシュ | Tier1 で生成コード完全一致。昇格前はキャッシュ側が不利 | `typeof(X)` を直書き | R-01 |
 | 単一 Span ループの `GetReference` + `Unsafe.Add` 化 | 標準 for で境界チェック除去済み。1.07〜1.13 倍遅 | 索引形の `for` | R-02 |
-| **複数 Span** ループの手動 ref 走査 | 索引形は自動ベクトル化され、手動化は阻害して 1.46 倍遅 | 索引形の `for` | [MEM-01](#-mem-01-memorymarshalgetreference--unsafeadd) |
-| 配列走査の `GetArrayDataReference` 化 | 逐次で 1.30 倍遅、ランダムでも差なし | 索引形の `for` | [MEM-02](#-mem-02-getarraydatareference) |
+| **複数 Span** ループの手動 ref 走査 | 索引形は自動ベクトル化され、手動化は阻害して 1.46 倍遅 | 索引形の `for` | [MEM-01](#-mem-01-skiplocalsinit) |
+| 配列走査の `GetArrayDataReference` 化 | 逐次で 1.30 倍遅、ランダムでも差なし | 索引形の `for` | [MEM-02](#-mem-02-struct-要素配列--ref-アクセスデータ指向レイアウト) |
 | 読み取り専用辞書の無条件 `FrozenDictionary` 化 | 構築 7.4〜10.2 倍、検索利得なし(string キー) | `Dictionary` か名前スイッチ(COL-04) | R-08 |
 | インスタンスフィールドへの性能目的 `readonly` | 生成コード同一(オフセット以外) | 設計意図としてのみ付与 | R-10 |
 | `Span.CopyTo` の `Unsafe.CopyBlockUnaligned` 置換 | 可変長は同じ Memmove へ到達(誤差) | `CopyTo` | R-14 |
 | 手書きの桁詰め整形ループ(右詰めシフト・逆順書き) | `TryFormat` + `Fill` の 2.5〜4.8 倍遅 | `TryFormat` + `Fill` | R-16 |
 | デリゲート Invoke の `call` 置換(`callvirt` 回避) | 生成コード 68 命令・229 B 完全一致 | `callvirt` のまま | R-17 |
 | 速度目的の関数ポインタ `delegate*` 化 | calli は PGO 投機不可・インライン不可で 6.04 倍遅 | 具象 sealed 型 or デリゲート | [DSP-02](#-dsp-02-呼び出し抽象化の選択指針) |
-| 自前ハッシュループ(FNV-1a 等) | 64 文字以降 `string.GetHashCode` より遅い | XxHash3(BIT-05)かサンプリング(BIT-02) | [BIT-05](#-bit-05-xxhash3-による汎用ハッシュ) |
+| 自前ハッシュループ(FNV-1a 等) | 64 文字以降 `string.GetHashCode` より遅い | XxHash3(BIT-04)かサンプリング(BIT-01) | [BIT-04](#-bit-04-xxhash3-による汎用ハッシュ) |
 | 実行時 `Type` キー辞書を主経路にする生成 | 実行時 Type 経路は素の Dictionary より 1.93 倍遅 | ジェネリック API で受けて静的解決(TYP-01) | [TYP-01](#️-typ-01-静的型スロットtypemap--typeslot) |
 | `(T)Enum.Parse(typeof(T), name)` 形 | 非ジェネリック版はボックス化 + 常に確保 | `Enum.TryParse<T>` か名前スイッチ | [STK-05](#-stk-05-ボックス化回避と頻出値キャッシュ) |
 
@@ -3269,11 +3125,11 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | 目的 | 推奨パターン |
 |---|---|
 | ループ内の境界チェック除去 | MEM-01 / MEM-02 |
-| スタックフレーム初期化コスト削減 | MEM-03 |
+| スタックフレーム初期化コスト削減 | MEM-01 |
 | 関数呼び出しコスト削減 | JIT-01 |
 | 比較・検索の仮想呼び出し除去 | JIT-02 |
 | 範囲チェックの分岐削減 | BIT-01 |
-| 既知キー集合(列挙型名等)の高速ハッシュ | BIT-02 |
+| 既知キー集合(列挙型名等)の高速ハッシュ | BIT-01 |
 | 一時オブジェクトのヒープ確保禁止 | STK-01 |
 | コピーなしのデータ参照 | STK-02 |
 | foreach のアロケーション除去 | STK-03 / STK-04 |
@@ -3287,11 +3143,11 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | 型ベースマップの高速読み取り | TYP-01 |
 | 値型の辞書キー比較 | TYP-02 |
 | 非公開メンバーへのリフレクションなしアクセス | TYP-03 |
-| 内部データ構造のアロケーション排除 | MEM-04 |
-| ホットループ内のスライス | MEM-05 |
+| 内部データ構造のアロケーション排除 | MEM-02 |
+| ホットループ内のスライス | MEM-03 |
 | ジェネリック変換の型別特殊化 | JIT-03 / TYP-04 |
 | ホットパスのインライン化促進 | JIT-04 |
-| ハッシュ表のインデックス計算 | BIT-03 |
+| ハッシュ表のインデックス計算 | BIT-02 |
 | コールバック・ファクトリの保持形態選択 | DSP-01 / DSP-02 |
 | 複数購読イベントの高速発火 | DSP-03 |
 | object 境界のボックス化回避 | STK-05 |
@@ -3299,18 +3155,18 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | List/Dictionary の内部直接アクセス | COL-01 |
 | 不変辞書の検索高速化 | COL-02 |
 | Span キーでの辞書検索 | COL-03 |
-| 名前→値解決の実装選択 | COL-04 / BIT-02 |
+| 名前→値解決の実装選択 | COL-04 / BIT-01 |
 | 固定書式の整形・進数変換 | TXT-01 |
 | 短命文字列の組み立て | TXT-02 |
 | パース・変換の失敗ハンドリング | TXT-03 |
 | 型保証済みキャストの高速化 | TYP-05 |
-| ビットマップ走査・ビット計数 | BIT-04 |
+| ビットマップ走査・ビット計数 | BIT-03 |
 | 単純フォワードの async 排除 | ASY-01 |
 | TTL・タイムアウト用の時刻取得 | SYS-01 |
 | ラムダのキャプチャ排除 | DSP-04 |
 | 使用時まで確保しない設計 | STK-07 |
 | Dispose・初期化の多重実行防止 | CON-01 |
-| 大きな構造体の引数渡し | MEM-06 |
+| 大きな構造体の引数渡し | MEM-04 |
 | 構造体内に固定長領域を持つ | STK-08 |
 | 可変長引数の配列確保除去 | STK-09 |
 | 参照型インスタンスの再利用 | BUF-07 |
@@ -3319,7 +3175,7 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | 文字列生成のゼロアロケーション化 | TXT-07 |
 | 多数候補の文字検索 | TXT-08(候補 2〜3 個は専用オーバーロード) |
 | 固定長フィールドの整形・トリム | TXT-09 |
-| 汎用ハッシュ(長い入力・安定値) | BIT-05 |
+| 汎用ハッシュ(長い入力・安定値) | BIT-04 |
 | 型ごとの文字列・SQL の事前確定 | TYP-06 |
 | パイプライン・コールバックの合成コスト削減 | DSP-05 |
 | 同期完了が多い非同期 API | ASY-05 |
@@ -3341,7 +3197,7 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | `Unsafe.As<T>(object)` | 型チェック省略キャスト(参照型) | TYP-05 |
 | `Unsafe.As<TFrom, TTo>(ref v)` | ref の再解釈(ジェネリック特殊化・ビット再解釈) | JIT-03 / SEQ-02 |
 | `Unsafe.ReadUnaligned / WriteUnaligned` | アラインメント非保証位置の unmanaged 読み書き | SEQ-01 / SEQ-02 / BUF-02 |
-| `Unsafe.SkipInit(out v)` | out 変数の初期化スキップ | MEM-03 / SEQ-02 |
+| `Unsafe.SkipInit(out v)` | out 変数の初期化スキップ | MEM-01 / SEQ-02 |
 | `Unsafe.SizeOf<T>()` | unmanaged 型のサイズ(JIT 定数) | SEQ-01 / SEQ-02 |
 | `Unsafe.IsAddressLessThan` | ref 同士の位置比較(終端判定) | MEM-01 |
 | `Unsafe.BitCast<TFrom, TTo>`(.NET 8+) | 同サイズ値型の安全なビット再解釈(As の安全版) | SEQ-02 / TYP-02 |
@@ -3357,6 +3213,16 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 **共通の注意:** これらは境界チェック・型安全性を自分で保証する API 群。公開 API の入力検証を通過した後の内部実装に閉じて使い、Debug ビルドでの `Debug.Assert` 併用を推奨する。
 
 ---
+
+## 📖 ドキュメント構成
+
+| ドキュメント | 内容 |
+|---|---|
+| README.md(本書) | パフォーマンス実装パターンの分類・一覧・解説(主知識) |
+| [docs/rejected-patterns.md](docs/rejected-patterns.md) | 採用しない手法の詳細(なぜ効果がない・逆効果か) |
+| [docs/aot-compatibility.md](docs/aot-compatibility.md) | AOT / トリミング対応パターン一覧(非互換パターンと対策) |
+| [docs/benchmark-methodology.md](docs/benchmark-methodology.md) | ベンチマーク実施ガイドライン(BenchmarkDotNet 構成と測定の落とし穴) |
+| [docs/generated-code-patterns.md](docs/generated-code-patterns.md) | Source Generator 生成コードパターン集(何を生成すれば速いか・アンチ生成リスト) |
 
 ## 🏗️ リポジトリ構成
 

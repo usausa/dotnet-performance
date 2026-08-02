@@ -8,8 +8,8 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Seq;
 
-// 検証キュー⑤: ref フィールドによる ref struct 設計(C# 11)
-// 問い: カーソルを「Span + インデックス」でなく「ref T + 終端 ref」で保持すると速くなるか。
+// Study queue 5: ref struct design based on ref fields (C# 11)
+// Question: is a cursor faster when held as "ref T + end ref" instead of "Span + index"?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class RefFieldCursorBenchmark
@@ -66,7 +66,7 @@ public class RefFieldCursorBenchmark
     }
 }
 
-// ref フィールド(C# 11)によるカーソル: 位置を ref そのもので保持する
+// Cursor built on ref fields (C# 11): the position is held as the ref itself
 internal ref struct RefFieldCursor<T>
 {
     private readonly ref T end;

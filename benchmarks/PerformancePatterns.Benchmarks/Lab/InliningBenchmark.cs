@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// JIT-01 検証: ループを含むヘルパー(既定ではインライン化されない)への AggressiveInlining
+// JIT-01 study: AggressiveInlining on a helper containing a loop (not inlined by default)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class InliningBenchmark
@@ -58,7 +58,7 @@ public class InliningBenchmark
         return total;
     }
 
-    // ループを含むため、既定ポリシーではインライン化されない
+    // Contains a loop, so the default policy will not inline it
     private static uint MixDefault(uint value)
     {
         for (var i = 0; i < 4; i++)

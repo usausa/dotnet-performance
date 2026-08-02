@@ -18,13 +18,22 @@
 
 ---
 
-### R-02: 単一 Span ループの GetReference + Unsafe.Add 化
+### R-02: 手動 ref 走査(GetReference / GetArrayDataReference + Unsafe.Add)
 
-🎯 **狙い:** ループ内の境界チェックを `MemoryMarshal.GetReference` + `Unsafe.Add` の手動 ref 走査で排除する。
+🎯 **狙い:** ループ内の境界チェックを `MemoryMarshal.GetReference` / `MemoryMarshal.GetArrayDataReference` + `Unsafe.Add` の手動 ref 走査で排除する。
 
-📉 **実測・不採用の理由:** 単一 Span の標準 for ループでは JIT の境界チェック除去が完全に効いており、手動 ref 化はセットアップコスト分だけ遅い(1.07〜1.13 倍)。手動走査は終端計算ミス等のバグ混入率も高い(検証中に実バグを複数検出)。
+📉 **実測・不採用の理由:** net10 では**どの形状でも速くならない**。
 
-✅ **代わりにやること:** 単一 Span は `for (var i = 0; i < span.Length; i++)` の標準形で書く。手動 ref 走査が効くのは「複数 Span の同時走査」のみ(MEM-01 の適用判断表)。
+- 単一 Span: 標準 for ループで境界チェック除去が完全に効いており、手動 ref 化はセットアップ分だけ遅い(1.07〜1.13 倍)
+- **複数 Span の同時走査**(この手法の本命とされていた形): JIT が索引形を自動ベクトル化(0.36 ns/要素)するため、手動 ref 走査はそれを阻害して **1.46 倍遅い**
+- **配列の逐次走査**(`GetArrayDataReference`): 同じ機序で **1.30 倍遅い**
+- **範囲が構造的に保証されたランダムアクセス**(サンプリング等): 索引形と**差なし**(境界チェックは実質無料)
+
+手動走査は終端計算ミス等のバグ混入率も高い(検証中に実バグを複数検出)。
+
+✅ **代わりにやること:** `for (var i = 0; i < span.Length; i++)` の索引形で書く。`GetArrayDataReference` は「Span を作れない文脈で先頭 ref が必要」「ref を保持する型を実装する」といった**構造上の理由がある場合のみ**使い、速度目的では使わない。
+
+🔗 **測定記録:** [LAB-DualSpanWalk.md](../benchmarks/results/LAB-DualSpanWalk.md) / [LAB-ArrayDataReference.md](../benchmarks/results/LAB-ArrayDataReference.md)
 
 ---
 
@@ -48,7 +57,7 @@
 - do-while(ガード + do 形): ループ内に境界チェックが**残存**(63 バイト)— 生成コードは異なるが時間は分解不能(➖誤差)
 - 降順 for: ループクローンが発生(85 バイト、ホットパスはチェックなし)— 同じく生成コードは異なるが時間は分解不能(➖誤差)
 
-✅ **代わりにやること:** 可読性で選ぶ(既定は for / while)。do-while・降順は生成コードが別物になるため、境界チェック除去を期待する場面では for の昇順を使う。効くのは構文でなくデータアクセス形(MEM-01 / COL-01 / MEM-04)。
+✅ **代わりにやること:** 可読性で選ぶ(既定は for / while)。do-while・降順は生成コードが別物になるため、境界チェック除去を期待する場面では for の昇順を使う。効くのは構文でなくデータアクセス形(MEM-01 / COL-01 / MEM-02)。
 
 ---
 
@@ -58,7 +67,7 @@
 
 📉 **実測・不採用の理由:** 配列本体はプールできても要素オブジェクトの個別確保が残るため、効果なし〜逆効果(プール管理コストだけ載る)。
 
-✅ **代わりにやること:** 要素を struct 化してから配列をプールする(MEM-04 + BUF-01)。struct + プールなら約 6 倍・0B を実測済み。
+✅ **代わりにやること:** 要素を struct 化してから配列をプールする(MEM-02 + BUF-01)。struct + プールなら約 6 倍・0B を実測済み。
 
 ---
 
@@ -98,9 +107,9 @@
 
 📉 **実測・不採用の理由:** `MemoryMarshal.Cast` / `Unsafe.As` による再解釈と同速か、fixed の固定コスト分だけ遅い。unsafe コンテキストの導入コスト(監査・安全性)に見合う利得がない。
 
-✅ **代わりにやること:** Span / ref ベースで書く。再解釈は `MemoryMarshal.Cast`(ゼロコスト実測済み。BIT-05 の再測定では 8 / 512 文字で fixed より Cast が信頼区間非重複で速い — pinning が不要なぶん)、unmanaged 読み書きは SEQ-02(Stream 構造体 I/O)。
+✅ **代わりにやること:** Span / ref ベースで書く。再解釈は `MemoryMarshal.Cast`(ゼロコスト実測済み。BIT-04 の再測定では 8 / 512 文字で fixed より Cast が信頼区間非重複で速い — pinning が不要なぶん)、unmanaged 読み書きは SEQ-02(Stream 構造体 I/O)。
 
-🔗 **測定記録:** [BIT-05-XxHash3.md](../benchmarks/results/BIT-05-XxHash3.md)(Cast vs fixed の比較を含む)
+🔗 **測定記録:** [BIT-04-XxHash3.md](../benchmarks/results/BIT-04-XxHash3.md)(Cast vs fixed の比較を含む)
 
 ---
 
@@ -154,7 +163,7 @@
 
 📉 **実測・不採用の理由:** 可変長では 0.98〜1.03 倍で信頼区間が重なる(➖誤差 — 呼び出し側の生成コードは異なるが、両者とも同じ Memmove に到達するため差が出ない)。JIT が展開できる定数長 16B では 0.83 倍・コードサイズ 45B 減の**実差**があるが、安全性(境界チェックなし・型情報なし)を捨てる対価に見合わない。`Array.Copy` はコードサイズ肥大(1.7KB)で最遅。
 
-✅ **代わりにやること:** `Span.CopyTo` を既定にする(MEM-05 の明示スライスと併用)。
+✅ **代わりにやること:** `Span.CopyTo` を既定にする(MEM-03 の明示スライスと併用)。
 
 🔗 **測定記録:** [LAB-CopyBlockUnaligned.md](../benchmarks/results/LAB-CopyBlockUnaligned.md)
 
@@ -193,6 +202,16 @@
 ✅ **代わりにやること:** `callvirt` のまま emit する(Roslyn と同じ)。Emit 生成コードで効くのは子デリゲート連鎖の排除(2.3 倍)と Holder フィールドターゲット化(closure 配列比 1.5 倍)— GEN-01 を参照。
 
 🔗 **測定記録:** [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md)
+
+### R-18: 符号なしオーバーフローによる範囲チェックの手書き
+
+🎯 **狙い:** `min <= value && value <= max` の 2 比較を `(uint)(value - min) <= (uint)(max - min)` の 1 比較へ手で書き換えて分岐を減らす。
+
+📉 **実測・不採用の理由:** 548.5 vs 553.7 ns で信頼区間重複。**Tier1 の生成コードを比較すると両者は実質同一**(差は `sub r8d,100` vs `add r8d,-100` の符号化のみ、どちらも 45 バイト)。net10 の JIT が 2 比較形を自動で符号なし 1 比較へ融合するため、手で書き換える意味がない。
+
+✅ **代わりにやること:** 可読な `(value >= min) && (value <= max)` で書く。JIT が範囲を証明できない複合条件では依然として手書きが意味を持ちうるが、その場合も計測してから採用する。
+
+🔗 **測定記録:** [LAB-RangeCheck.md](../benchmarks/results/LAB-RangeCheck.md)
 
 ---
 

@@ -6,9 +6,9 @@ using System.Text.Unicode;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー③: Utf8.TryWrite(.NET 8+)
-// 問い: UTF-8 補間ハンドラで Span<byte> へ直接整形すると、
-// string 補間 + Encode / char 補間 TryWrite + Encode に対してどれだけ速いか。
+// Study queue 3: Utf8.TryWrite (.NET 8+)
+// Question: how much faster is formatting directly into a Span<byte> with the UTF-8 interpolation handler
+// than string interpolation + Encode or char interpolation TryWrite + Encode?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class Utf8WriteBenchmark
@@ -23,7 +23,7 @@ public class Utf8WriteBenchmark
 
     private char[] charBuffer = default!;
 
-    // Verify 用(測定対象外)
+    // For Verify (not part of the measurement)
     public byte[] CopyBuffer(int length)
     {
         var copy = new byte[length];

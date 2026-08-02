@@ -29,7 +29,7 @@ public sealed class BitwiseComparerTest
     [Fact]
     public void IgnoresLyingCustomEquals()
     {
-        // Equals が常に true を返す型でも、ビットパターンの違いを検出する
+        // Detects a difference in bit pattern even for a type whose Equals always returns true
         var comparer = BitwiseComparer<AlwaysEqualValue>.Instance;
         var x = new AlwaysEqualValue(1);
         var y = new AlwaysEqualValue(2);
@@ -70,7 +70,7 @@ public sealed class BitwiseComparerTest
         Assert.False(comparer.Equals(1L, 2L));
     }
 
-    // パディングなし 16 バイト
+    // 16 bytes with no padding
     private readonly record struct PackedValue(long A, long B);
 
     private readonly struct AlwaysEqualValue(int value) : IEquatable<AlwaysEqualValue>
@@ -79,7 +79,7 @@ public sealed class BitwiseComparerTest
 
         public override bool Equals(object? obj) => obj is AlwaysEqualValue;
 
-        // 意図的に常に等しいと嘘をつく(ビット比較がこれを無視することの検証用)
+        // Deliberately lies that values are always equal (used to verify the bitwise comparison ignores it)
         public bool Equals(AlwaysEqualValue other) => (Value & 0) == (other.Value & 0);
 
         public override int GetHashCode() => 0;

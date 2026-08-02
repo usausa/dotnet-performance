@@ -6,10 +6,10 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 /// <summary>
-/// BIT-02 / COL-04: 既知の名前集合に特化した読み取り専用ルックアップ。
-/// 長さ + 先頭 / 中央 / 末尾の 3 文字だけから O(1) のサンプリングハッシュを求め(BIT-02)、
-/// 2 の累乗サイズ + マスク(BIT-03)でバケットを引き、バケット内は Ordinal 比較で確定する。
-/// キーは <see cref="ReadOnlySpan{T}"/> のまま照合できるため string 化が不要(COL-03 と同じ狙い)。
+/// BIT-01 / COL-04: Read-only lookup specialized for a known set of names.
+/// Computes an O(1) sampling hash from the length plus only the first / middle / last characters (BIT-01),
+/// selects a bucket with a power-of-two size and mask (BIT-02), then confirms the match with an Ordinal comparison inside the bucket.
+/// Keys can be matched as <see cref="ReadOnlySpan{T}"/> without materializing a string (the same goal as COL-03).
 /// </summary>
 public sealed class SampledNameTable<TValue>
 {
@@ -24,7 +24,7 @@ public sealed class SampledNameTable<TValue>
         var source = entries.ToArray();
         Count = source.Length;
 
-        // 意図的に疎(要素数の 2 倍以上)にしてバケット内の線形探索を 1 件に近づける
+        // Deliberately sparse (at least twice the entry count) so the linear scan inside a bucket is close to a single item
         var size = (int)BitOperations.RoundUpToPowerOf2((uint)Math.Max(source.Length * 2, 4));
         mask = size - 1;
 
@@ -59,7 +59,7 @@ public sealed class SampledNameTable<TValue>
 
     public int Count { get; }
 
-    /// <summary>長さと 3 文字だけを見る O(1) ハッシュ。衝突は呼び出し側の完全一致比較で解決する。</summary>
+    /// <summary>O(1) hash that looks only at the length and three characters. Collisions are resolved by the caller's exact-match comparison.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int CalculateHash(ReadOnlySpan<char> value)
     {
@@ -83,7 +83,7 @@ public sealed class SampledNameTable<TValue>
         var keys = bucket.Keys;
         for (var i = 0; i < keys.Length; i++)
         {
-            // ハッシュ一致後は必ず完全一致で確定させる(サンプリングハッシュは衝突しうる)
+            // Always confirm with an exact match after the hash matches (the sampling hash can collide)
             if (key.SequenceEqual(keys[i]))
             {
                 value = bucket.Values[i];

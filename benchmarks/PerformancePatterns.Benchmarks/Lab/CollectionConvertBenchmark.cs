@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// COL-06 検証: ImmutableArray の構築方式(MoveToImmutable vs ToImmutable vs ToImmutableArray)
+// COL-06 study: ways to build an ImmutableArray (MoveToImmutable vs ToImmutable vs ToImmutableArray)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ImmutableBuildBenchmark
@@ -50,12 +50,12 @@ public class ImmutableBuildBenchmark
             builder.Add(source[i]);
         }
 
-        // 容量と件数が一致していればコピーなしで確定できる
+        // When capacity and count match, the array can be finalized without a copy
         return builder.MoveToImmutable().Length;
     }
 }
 
-// COL-06 検証: 変換先 List の確保方式(毎回 new vs 容量指定 vs Clear + EnsureCapacity で再利用)
+// COL-06 study: ways to allocate the destination List (new every time vs a preset capacity vs reuse with Clear + EnsureCapacity)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ListReuseBenchmark

@@ -4,7 +4,7 @@
 - Constant 512 + SkipLocalsInit: 1.6 ns
 - Variable size + SkipLocalsInit: 4.3-4.6 ns (localloc, ~3x)
 - Variable 512 zero-initialized: 14.8 ns (~9x)
-- Also demonstrates MEM-03 (SkipLocalsInit): 6.6 -> 1.6 ns
+- Also demonstrates MEM-01 (SkipLocalsInit): 6.6 -> 1.6 ns
 
 ```
 

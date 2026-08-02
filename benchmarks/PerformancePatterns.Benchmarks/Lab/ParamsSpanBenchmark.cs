@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// STK-09 検証: params T[] と params ReadOnlySpan<T> の呼び出しコスト
+// STK-09 study: call cost of params T[] versus params ReadOnlySpan<T>
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ParamsSpanBenchmark

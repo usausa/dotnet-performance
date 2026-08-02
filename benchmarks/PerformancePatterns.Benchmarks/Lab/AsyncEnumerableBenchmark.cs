@@ -3,9 +3,9 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー⑤: IAsyncEnumerable のコスト
-// 問い: 同期完了で列挙できるデータを await foreach で流す場合の
-// 要素あたりオーバーヘッドは IEnumerable の foreach 比でどれくらいか。
+// Study queue 5: the cost of IAsyncEnumerable
+// Question: for data that can be enumerated with synchronous completion, how large is the
+// per-element overhead of await foreach compared with a plain IEnumerable foreach?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class AsyncEnumerableBenchmark

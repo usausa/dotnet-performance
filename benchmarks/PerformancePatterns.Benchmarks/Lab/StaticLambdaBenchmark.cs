@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// DSP-04 検証: ローカルをキャプチャするラムダ vs static ラムダ + TState
+// DSP-04 study: a lambda capturing locals vs a static lambda with TState
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class StaticLambdaBenchmark
@@ -31,7 +31,7 @@ public class StaticLambdaBenchmark
         for (var i = 0; i < N; i++)
         {
             var target = i & 15;
-            // ループ変数由来のローカルをキャプチャ → 呼び出しごとにクロージャ + デリゲート確保
+            // Captures a local derived from the loop variable, allocating a closure and a delegate on every call
             total += FindIndex(values, x => x == target);
         }
 
@@ -45,7 +45,7 @@ public class StaticLambdaBenchmark
         for (var i = 0; i < N; i++)
         {
             var target = i & 15;
-            // static ラムダはコンパイラがキャッシュ、状態は TState 引数で渡す
+            // The compiler caches a static lambda, and the state is passed through the TState argument
             total += FindIndex(values, target, static (x, t) => x == t);
         }
 

@@ -6,9 +6,9 @@ using System.Text;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー③: ASCII 特化処理(.NET 8 の Ascii クラス)
-// 問い: ASCII 前提が保証できる場面(HTTP ヘッダ名等)で、
-// string.Equals(OrdinalIgnoreCase) / Ascii.EqualsIgnoreCase / 手書き | 0x20 比較はどう使い分けるか。
+// Study queue 3: ASCII-specialized processing (the Ascii class in .NET 8)
+// Question: where ASCII input is guaranteed (HTTP header names and the like),
+// how should string.Equals(OrdinalIgnoreCase) / Ascii.EqualsIgnoreCase / a handwritten | 0x20 comparison be chosen between?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class AsciiBenchmark
@@ -96,7 +96,7 @@ public class AsciiBenchmark
         return count;
     }
 
-    // 英字のみ大小が異なる前提の | 0x20 正規化('@' と '`' 等の衝突があるため閉じた用途限定)
+    // | 0x20 normalization, assuming only letters differ in case (limited to closed use cases because '@' and '`' collide)
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool EqualsIgnoreCaseManual(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
     {

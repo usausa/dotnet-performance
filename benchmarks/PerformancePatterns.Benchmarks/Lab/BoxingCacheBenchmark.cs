@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// STK-05 検証: object 境界のボックス化 vs 頻出値の事前ボックスキャッシュ
+// STK-05 study: boxing at an object boundary vs a pre-boxed cache of frequent values
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class BoxingCacheBenchmark
@@ -23,7 +23,7 @@ public class BoxingCacheBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // フラグ・戻り値コードに典型的な -1 / 0 / 1 の列
+        // A sequence of -1 / 0 / 1, typical of flags and return codes
         values = new int[N];
         for (var i = 0; i < N; i++)
         {
@@ -38,7 +38,7 @@ public class BoxingCacheBenchmark
     {
         for (var i = 0; i < N; i++)
         {
-            // 格納先が object[] のためエスケープし、毎回ヒープへボックス化される
+            // The destination is object[], so the value escapes and is boxed on the heap every time
             sink[i] = values[i];
         }
 
@@ -55,7 +55,7 @@ public class BoxingCacheBenchmark
                 -1 => BoxedMinusOne,
                 0 => BoxedZero,
                 1 => BoxedOne,
-                var other => other,   // キャッシュ外のみボックス化
+                var other => other,   // Only values outside the cache are boxed
             };
         }
 

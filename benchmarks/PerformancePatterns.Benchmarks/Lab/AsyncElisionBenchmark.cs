@@ -3,16 +3,16 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー④: async ステートマシンの省略
-// 問い: 同期完了する内側呼び出しを単純フォワードする場合、async/await を書かず
-// Task/ValueTask をそのまま返すとどれだけ差が出るか(キャッシュ済み Task の再ラップ問題を含む)。
+// Study queue 4: eliding the async state machine
+// Question: when simply forwarding an inner call that completes synchronously, how much is gained by returning
+// the Task/ValueTask directly instead of writing async/await (including the re-wrapping of an already cached Task)?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class AsyncElisionBenchmark
 {
     private const int N = 100;
 
-    // 42 はランタイムの Task キャッシュ(-1〜8)の範囲外 → async ラッパーは再ラップで毎回 Task を確保する
+    // 42 is outside the runtime's Task cache (-1 to 8), so the async wrapper re-wraps and allocates a Task on every call
     private static readonly Task<int> CompletedTask = Task.FromResult(42);
 
     [Benchmark(Baseline = true, OperationsPerInvoke = N)]
@@ -67,10 +67,10 @@ public class AsyncElisionBenchmark
 
     private static ValueTask<int> InnerValueTask() => new(42);
 
-    // ❌ 単純フォワードに async/await(ステートマシン + 結果の再ラップ)
+    // ❌ async/await on a simple forward (state machine + re-wrapping the result)
     private static async Task<int> AwaitForwardTaskAsync() => await InnerTask().ConfigureAwait(false);
 
-    // ✅ Task をそのまま返す(async 消去)
+    // ✅ Return the Task directly (async elision)
     private static Task<int> DirectForwardTask() => InnerTask();
 
     private static async ValueTask<int> AwaitForwardValueTaskAsync() => await InnerValueTask().ConfigureAwait(false);

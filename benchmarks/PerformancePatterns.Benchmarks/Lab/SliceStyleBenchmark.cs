@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// MEM-05 検証: Slice(offset, length) vs 範囲演算子 [a..b]
+// MEM-03 study: Slice(offset, length) vs the range operator [a..b]
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class SliceStyleBenchmark

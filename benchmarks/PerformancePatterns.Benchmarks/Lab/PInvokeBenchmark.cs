@@ -5,9 +5,9 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー⑤: P/Invoke 高速化(Windows 専用ベンチマーク)
-// 問い: [LibraryImport](ソース生成マーシャリング)と [SuppressGCTransition]
-// (短時間ネイティブ呼び出しの GC 遷移省略)はどれだけ効くか。
+// Study queue 5: speeding up P/Invoke (Windows-only benchmark)
+// Question: how much do [LibraryImport] (source-generated marshalling) and [SuppressGCTransition]
+// (skipping the GC transition for short native calls) actually help?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public partial class PInvokeBenchmark
@@ -62,7 +62,7 @@ public partial class PInvokeBenchmark
         return total;
     }
 
-#pragma warning disable SYSLIB1054 // DllImport と LibraryImport の比較測定のため意図的に旧 API を使用
+#pragma warning disable SYSLIB1054 // The old API is used deliberately in order to measure DllImport against LibraryImport
     [DllImport("kernel32.dll", EntryPoint = "GetTickCount64", ExactSpelling = true)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     private static extern ulong GetTickCount64Dll();
@@ -72,7 +72,7 @@ public partial class PInvokeBenchmark
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     private static partial ulong GetTickCount64Lib();
 
-    // 極短時間(数百 ns 未満)・ブロックしない・コールバックしない呼び出し専用
+    // Only for calls that are extremely short (under a few hundred ns), never block and never call back
     [LibraryImport("kernel32.dll", EntryPoint = "GetTickCount64")]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [SuppressGCTransition]

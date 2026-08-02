@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// DSP-02 検証: 呼び出し抽象化 5 方式のオーバーヘッド(加算 × 1024)
+// DSP-02 study: overhead of five call abstraction approaches (1024 additions)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public unsafe class CallAbstractionBenchmark
@@ -28,7 +28,7 @@ public unsafe class CallAbstractionBenchmark
         functionPointer = &AddStatic;
     }
 
-    // 実行時分岐で生成し、単相 devirt を過度に助けない(実利用の形に寄せる)
+    // Created through a runtime branch so monomorphic devirtualization is not over-helped (closer to real usage)
     private static IAdder CreateInterface()
         => Environment.TickCount >= int.MinValue ? new SealedAdder() : new AltAdder();
 

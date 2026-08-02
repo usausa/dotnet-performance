@@ -4,8 +4,8 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// BUF-05: 一時バッファの段階戦略。小さければ stackalloc、大きければ ArrayPool を
-/// 1 つの ref struct + using スコープに統合する。
+/// BUF-05: Tiered strategy for temporary buffers. Combines stackalloc for small sizes and
+/// ArrayPool for large ones into a single ref struct with a using scope.
 /// <code>
 /// using var buffer = size &lt;= 512
 ///     ? new TemporaryBuffer&lt;byte&gt;(stackalloc byte[512], size)

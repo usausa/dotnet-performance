@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// DSP-01 検証: sealed による脱仮想化(インターフェース経由呼び出し、単一実装)
+// DSP-01 study: devirtualization through sealed (call via an interface, single implementation)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class SealedDevirtBenchmark
@@ -22,8 +22,8 @@ public class SealedDevirtBenchmark
         sealedConcrete = new SealedAccumulator();
     }
 
-    // 実行時分岐で生成し、静的解析にも「複数実装がありうる」ことを見せる
-    // (非 sealed が devirt できない実際の条件 = 派生の可能性、をそのまま表現)
+    // Created through a runtime branch so that static analysis also sees that multiple implementations are possible
+    // (this reproduces the actual reason a non-sealed type cannot be devirtualized: it may be derived from)
     private static IAccumulator CreateOpen()
         => Environment.TickCount >= int.MinValue ? new OpenAccumulator() : new DerivedAccumulator();
 
@@ -82,5 +82,5 @@ internal sealed class SealedAccumulator : IAccumulator
     public long Add(long total, int value) => total + value;
 }
 
-// OpenAccumulator に派生が実在することを示す型(非 sealed を意図的に維持するための実体)
+// Type proving that a derivative of OpenAccumulator really exists (the concrete reason to keep it non-sealed)
 internal sealed class DerivedAccumulator : OpenAccumulator;

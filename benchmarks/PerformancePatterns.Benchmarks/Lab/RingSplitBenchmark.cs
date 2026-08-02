@@ -3,9 +3,9 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// SEQ-05 検証: ストリーミング受信の行分割
-// 素朴な「毎回全域再走査 + 行ごとに前方詰め」と、「増分探索 + 遅延コンパクション」を比較する。
-// (リングの折り返し 2 セグメント処理は未測定 — フラットバッファ形で増分探索の効果のみを測る)
+// SEQ-05 study: line splitting for streamed input
+// Compares the naive "rescan everything and compact after every line" approach with "incremental search plus lazy compaction".
+// (the two-segment wraparound of a ring buffer is not measured — a flat buffer isolates the effect of the incremental search)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class RingSplitBenchmark
@@ -25,7 +25,7 @@ public class RingSplitBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // 2 KB 行 × 16 行(行が多数チャンクにまたがる = 再走査コストが顕在化する形)
+        // 16 lines of 2 KB each (a line spans many chunks, which is where the rescan cost shows up)
         source = new byte[LineLength * LineCount];
         for (var i = 0; i < LineCount; i++)
         {
@@ -50,13 +50,13 @@ public class RingSplitBenchmark
             count += chunkLength;
             offset += chunkLength;
 
-            // 毎回先頭から全域を再走査する
+            // Rescan the whole buffer from the start every time
             int index;
             while ((index = buffer.AsSpan(0, count).IndexOf(Delimiter)) >= 0)
             {
                 total += buffer[0] + (long)index;
 
-                // 行ごとに残りを前方へ詰める
+                // Compact the remainder to the front after every line
                 buffer.AsSpan(index + 1, count - index - 1).CopyTo(buffer);
                 count -= index + 1;
             }
@@ -77,7 +77,7 @@ public class RingSplitBenchmark
         {
             var chunkLength = Math.Min(ChunkSize, source.Length - offset);
 
-            // 空きが足りないときだけ前方へ詰める(遅延コンパクション)
+            // Compact to the front only when there is not enough free space (lazy compaction)
             if (count + chunkLength > buffer.Length)
             {
                 buffer.AsSpan(start, count - start).CopyTo(buffer);
@@ -90,7 +90,7 @@ public class RingSplitBenchmark
             count += chunkLength;
             offset += chunkLength;
 
-            // 前回走査済みの位置から先だけを見る(増分探索)
+            // Look only past the position already scanned (incremental search)
             while (true)
             {
                 var span = buffer.AsSpan(search, count - search);

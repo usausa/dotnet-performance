@@ -5,8 +5,8 @@ using System.Buffers;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// TXT-08 検証: 候補数別に IndexOfAny(配列) と SearchValues を比較
-// (候補 2〜3 個での専用オーバーロード優位は R-07 で測定済み)
+// TXT-08 study: comparing IndexOfAny(array) with SearchValues by number of candidates
+// (the advantage of the dedicated overloads for 2-3 candidates was already measured in R-07)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class SearchValuesBenchmark
@@ -23,7 +23,7 @@ public class SearchValuesBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // 区切りは末尾付近にのみ存在させ、走査量を確保する
+        // Place separators only near the end so there is enough to scan
         var chars = new char[256];
         for (var i = 0; i < chars.Length; i++)
         {

@@ -29,7 +29,7 @@ public sealed class ValueStringBuilderTest
     [Fact]
     public void GrowFromStackToPool()
     {
-        // 初期バッファ 8 文字に対して大量に追記して Grow パスを通す
+        // Append far more than the 8-character initial buffer to exercise the Grow path
         var expected = new StringBuilder();
         using var builder = new ValueStringBuilder(stackalloc char[8]);
 

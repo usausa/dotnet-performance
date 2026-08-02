@@ -31,12 +31,12 @@ A pattern catalog for building libraries that work under Native AOT and trimming
 | [AOTP-02](#aotp-02-expressiontcompile) | Expression\<T\>.Compile() | Critical | Exception, or crippling slowdown under the interpreter | Source Generator / direct API |
 | [AOTP-03](#aotp-03-activatorcreateinstancetype) | Activator.CreateInstance(Type) | High | `MissingMethodException` after trimming | Generic API + attributes |
 | [AOTP-04](#aotp-04-makegenerictype--makegenericmethod) | MakeGenericType / MakeGenericMethod | High | Runtime failure for value type combinations (IL3050) | Source Generator / static dispatch |
-| [AOTP-05](#aotp-05-メタデータ走査) | GetProperties / GetMethods / GetCustomAttribute | High–Medium | Members missing after trimming | Attributes / Source Generator |
+| [AOTP-05](#aotp-05-metadata-scanning) | GetProperties / GetMethods / GetCustomAttribute | High–Medium | Members missing after trimming | Attributes / Source Generator |
 | [AOTP-06](#aotp-06-propertyinfosetvalue--methodinfoinvoke) | PropertyInfo.SetValue / MethodInfo.Invoke | High–Medium | Runtime failure after trimming (IL2026) | Generated accessors / delegate registration |
-| [AOTP-07](#aotp-07-文字列ベース型解決動的アセンブリロード) | Assembly.GetType(string) / Assembly.LoadFrom | High | Untrackable by the trimmer; unsupported on AOT | Static registration (ModuleInitializer) |
-| [AOTP-08](#aotp-08-リフレクションベースのシリアライズ) | System.Text.Json reflection mode, etc. | High | `NotSupportedException` | JsonSerializerContext (SG) |
-| [AOTP-09](#aotp-09-リフレクションベースの設定バインドdi) | ConfigurationBinder / reflection-based DI | Medium | Binding and resolution failures | Binder SG / generic registration |
-| [AOTP-10](#aotp-10-regexoptionscompiled--動的パターン) | RegexOptions.Compiled / dynamic patterns | Low–Medium | Exception or slowdown | \[GeneratedRegex\] |
+| [AOTP-07](#aotp-07-string-based-type-resolution-and-dynamic-assembly-loading) | Assembly.GetType(string) / Assembly.LoadFrom | High | Untrackable by the trimmer; unsupported on AOT | Static registration (ModuleInitializer) |
+| [AOTP-08](#aotp-08-reflection-based-serialization) | System.Text.Json reflection mode, etc. | High | `NotSupportedException` | JsonSerializerContext (SG) |
+| [AOTP-09](#aotp-09-reflection-based-configuration-binding-and-di) | ConfigurationBinder / reflection-based DI | Medium | Binding and resolution failures | Binder SG / generic registration |
+| [AOTP-10](#aotp-10-regexoptionscompiled--dynamic-patterns) | RegexOptions.Compiled / dynamic patterns | Low–Medium | Exception or slowdown | \[GeneratedRegex\] |
 
 ### AOTP-01: Reflection.Emit
 
@@ -48,9 +48,9 @@ A pattern catalog for building libraries that work under Native AOT and trimming
 
 | Approach | Details |
 |---|---|
-| Source Generator (recommended) | Generate the code at compile time with a Roslyn incremental source generator ([AOTS-01](#aots-01-source-generator根本対策)) |
+| Source Generator (recommended) | Generate the code at compile time with a Roslyn incremental source generator ([AOTS-01](#aots-01-source-generator-root-fix)) |
 | Reflection fallback | Ship a slower `PropertyInfo.GetValue/SetValue` based path for AOT |
-| Branch on the runtime environment | Use `RuntimeFeature.IsDynamicCodeSupported` to bypass the Emit path ([AOTS-08](#aots-08-runtimefeature-による二重パス)) |
+| Branch on the runtime environment | Use `RuntimeFeature.IsDynamicCodeSupported` to bypass the Emit path ([AOTS-08](#aots-08-dual-paths-via-runtimefeature)) |
 | Apply `[RequiresDynamicCode]` | Declare the API AOT-incompatible so consumers get a compile-time warning ([AOTS-06](#aots-06-requiresunreferencedcode--requiresdynamiccode)) |
 
 ### AOTP-02: Expression\<T\>.Compile()
@@ -69,8 +69,8 @@ A pattern catalog for building libraries that work under Native AOT and trimming
 
 | Approach | Details |
 |---|---|
-| Standardize on generic APIs | Pin the type at compile time with `Create<T>()` ([AOTS-02](#aots-02-ジェネリック-api-への統一)) |
-| Factory delegate registration | The `Register<T>(Func<T> factory)` pattern ([AOTS-03](#aots-03-ファクトリデリゲート登録)) |
+| Standardize on generic APIs | Pin the type at compile time with `Create<T>()` ([AOTS-02](#aots-02-standardize-on-generic-apis)) |
+| Factory delegate registration | The `Register<T>(Func<T> factory)` pattern ([AOTS-03](#aots-03-factory-delegate-registration)) |
 | `[DynamicallyAccessedMembers(PublicConstructors)]` | Apply it to the type parameter or argument to hint the trimmer ([AOTS-04](#aots-04-dynamicallyaccessedmembers)) |
 
 ### AOTP-04: MakeGenericType / MakeGenericMethod
@@ -85,13 +85,13 @@ A pattern catalog for building libraries that work under Native AOT and trimming
 
 **Problem:** Metadata scanning through `Type.GetProperties()` / `GetMethods()` / `GetCustomAttribute<T>()` silently comes up empty when trimming removes the target members or attributes.
 
-**Mitigation:** instruct the trimmer to keep the metadata with `[DynamicallyAccessedMembers]` / bake attribute and property information into static code at build time with a Source Generator / `rd.xml` (a stopgap, [AOTS-09](#aots-09-rdxml--trimmerrootdescriptor暫定対応)).
+**Mitigation:** instruct the trimmer to keep the metadata with `[DynamicallyAccessedMembers]` / bake attribute and property information into static code at build time with a Source Generator / `rd.xml` (a stopgap, [AOTS-09](#aots-09-rdxml--trimmerrootdescriptor-stopgap)).
 
 ### AOTP-06: PropertyInfo.SetValue / MethodInfo.Invoke
 
 **Problem:** Runtime failure once trimming removes the member. Flagged by warning IL2026.
 
-**Mitigation:** generate static accessors with a Source Generator / register delegates up front in `Action<T, TValue>` form / move to an interface contract. When the target is a known non-public member, `[UnsafeAccessor]` (TYP-03 in the [README](../README.md#typ-03-unsafeaccessor非公開メンバーへの直接アクセス)) is a reflection-free, AOT-compatible alternative.
+**Mitigation:** generate static accessors with a Source Generator / register delegates up front in `Action<T, TValue>` form / move to an interface contract. When the target is a known non-public member, `[UnsafeAccessor]` (TYP-03 in the [README](../README.md#️-typ-03-unsafeaccessor非公開メンバーへの直接アクセス)) is a reflection-free, AOT-compatible alternative.
 
 ### AOTP-07: String-based type resolution and dynamic assembly loading
 
@@ -155,17 +155,17 @@ For dynamic patterns, consider replacing the regex with `string.StartsWith` / `c
 
 | ID | Pattern | Role | Primary use |
 |---|---|---|---|
-| [AOTS-01](#aots-01-source-generator根本対策) | Source Generator | Root fix | Eliminating reflection and Emit |
-| [AOTS-02](#aots-02-ジェネリック-api-への統一) | Standardize on generic APIs | Root fix | Pinning types at compile time |
-| [AOTS-03](#aots-03-ファクトリデリゲート登録) | Factory delegate registration | Root fix | Turning dynamic creation into up-front registration |
+| [AOTS-01](#aots-01-source-generator-root-fix) | Source Generator | Root fix | Eliminating reflection and Emit |
+| [AOTS-02](#aots-02-standardize-on-generic-apis) | Standardize on generic APIs | Root fix | Pinning types at compile time |
+| [AOTS-03](#aots-03-factory-delegate-registration) | Factory delegate registration | Root fix | Turning dynamic creation into up-front registration |
 | [AOTS-04](#aots-04-dynamicallyaccessedmembers) | \[DynamicallyAccessedMembers\] | Legitimate annotation | Telling the trimmer to keep reflection targets |
 | [AOTS-05](#aots-05-dynamicdependency) | \[DynamicDependency\] | Supplementary | Keeping fixed dependency members |
 | [AOTS-06](#aots-06-requiresunreferencedcode--requiresdynamiccode) | \[RequiresUnreferencedCode\] / \[RequiresDynamicCode\] | Declaring incompatibility | Propagating warnings to callers |
-| [AOTS-07](#aots-07-unconditionalsuppressmessage最終手段) | \[UnconditionalSuppressMessage\] | Last resort | Suppressing warnings already proven safe |
-| [AOTS-08](#aots-08-runtimefeature-による二重パス) | Dual paths via RuntimeFeature | Compatibility strategy | Emit on JIT, fallback on AOT |
-| [AOTS-09](#aots-09-rdxml--trimmerrootdescriptor暫定対応) | rd.xml / TrimmerRootDescriptor | Stopgap | Keeping types, mainly on the app side |
+| [AOTS-07](#aots-07-unconditionalsuppressmessage-last-resort) | \[UnconditionalSuppressMessage\] | Last resort | Suppressing warnings already proven safe |
+| [AOTS-08](#aots-08-dual-paths-via-runtimefeature) | Dual paths via RuntimeFeature | Compatibility strategy | Emit on JIT, fallback on AOT |
+| [AOTS-09](#aots-09-rdxml--trimmerrootdescriptor-stopgap) | rd.xml / TrimmerRootDescriptor | Stopgap | Keeping types, mainly on the app side |
 | [AOTS-10](#aots-10-illinksubstitutionsxml) | ILLink.Substitutions.xml | Supplementary | Freezing branches at trim time |
-| [AOTS-11](#aots-11-プロジェクト設定と-ci-検証) | Project settings and CI verification | Quality gate | Surfacing warnings and keeping them at zero |
+| [AOTS-11](#aots-11-project-settings-and-ci-verification) | Project settings and CI verification | Quality gate | Surfacing warnings and keeping them at zero |
 
 ### AOTS-01: Source Generator (root fix)
 
@@ -399,14 +399,16 @@ A trimmer/AOT warning appeared
 
 ## 🤝 Division of responsibility: library authors and application developers
 
-| Task | Library author | App developer |
+| Task | Library author | Application developer |
 |---|:---:|:---:|
-| Applying `[DynamicallyAccessedMembers]` | ◎ Primary | − |
-| Applying `[RequiresUnreferencedCode]` / `[RequiresDynamicCode]` | ◎ Primary | − |
-| Applying `[DynamicDependency]` | ○ (fixed internal dependencies) | ○ (protecting types referenced from XAML/config) |
-| `<IsAotCompatible>true</IsAotCompatible>` | ◎ Primary | − |
-| `rd.xml` / `TrimmerRootDescriptor` | △ (avoid as a rule) | ◎ (dealing with third-party code) |
-| Verifying with `PublishAot=true` | ○ (via the sample app in CI) | ◎ Final check |
+| Applying `[DynamicallyAccessedMembers]` | ✅ | ➖ |
+| Applying `[RequiresUnreferencedCode]` / `[RequiresDynamicCode]` | ✅ | ➖ |
+| Applying `[DynamicDependency]` | ☑️ (fixed internal dependencies) | ☑️ (protecting types referenced from XAML/config) |
+| `<IsAotCompatible>true</IsAotCompatible>` | ✅ | ➖ |
+| `rd.xml` / `TrimmerRootDescriptor` | ⚠️ (avoid as a rule) | ✅ (dealing with third-party code) |
+| Verifying with `PublishAot=true` | ☑️ (via the sample app in CI) | ✅ |
+
+Legend: ✅ owns it / ☑️ assists / ⚠️ avoid as a rule / ➖ not applicable
 
 ## 🪜 Incremental adoption roadmap
 
@@ -446,15 +448,13 @@ A trimmer/AOT warning appeared
 
 ## ☑️ Checklist (when a library counts as AOT-ready)
 
-```
-□ IsAotCompatible is set
-□ Built the verification app with PublishTrimmed=true / PublishAot=true
-□ Reviewed every IL2xxx / IL3xxx warning
-□ Addressed each warning in this order of preference:
-  1. Fix at the root through a design change (generic API / Source Generator)
-  2. Preserve with [DynamicallyAccessedMembers] / [DynamicDependency]
-  3. Propagate with [RequiresUnreferencedCode] / [RequiresDynamicCode]
-  4. Suppress with [UnconditionalSuppressMessage] (state the justification)
-□ Confirmed the final build has zero warnings
-□ Ran execution tests in an AOT environment (a PublishAot executable)
-```
+- [ ] IsAotCompatible is set
+- [ ] Built the verification app with PublishTrimmed=true / PublishAot=true
+- [ ] Reviewed every IL2xxx / IL3xxx warning
+- [ ] Addressed each warning in this order of preference:
+      1. Fix at the root through a design change (generic API / Source Generator)
+      2. Preserve with [DynamicallyAccessedMembers] / [DynamicDependency]
+      3. Propagate with [RequiresUnreferencedCode] / [RequiresDynamicCode]
+      4. Suppress with [UnconditionalSuppressMessage] (state the justification)
+- [ ] Confirmed the final build has zero warnings
+- [ ] Ran execution tests in an AOT environment (a PublishAot executable)

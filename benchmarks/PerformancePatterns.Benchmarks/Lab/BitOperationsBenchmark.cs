@@ -6,9 +6,9 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー④: BitOperations 活用
-// 問い: ビットマップ走査・ビット数計測を素朴なループから
-// TrailingZeroCount / PopCount(ハードウェア命令)へ置き換える効果。
+// Study queue 4: making use of BitOperations
+// Question: what is gained by replacing naive loops for bitmap scanning and bit counting with
+// TrailingZeroCount / PopCount (hardware instructions)?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class BitOperationsBenchmark
@@ -18,7 +18,7 @@ public class BitOperationsBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // 各 7 ビット立った疎なビットマップ(決定的パターン)
+        // Sparse bitmaps with 7 bits set each (a deterministic pattern)
         masks = new ulong[64];
         for (var i = 0; i < masks.Length; i++)
         {
@@ -89,7 +89,7 @@ public class BitOperationsBenchmark
         return total;
     }
 
-    // 立っているビットだけを辿る: 最下位ビット位置を取得し、mask &= mask - 1 で消す
+    // Walk only the set bits: take the lowest set bit position, then clear it with mask &= mask - 1
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int ScanTzcnt(ulong mask)
     {

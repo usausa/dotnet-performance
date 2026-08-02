@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// MEM-03 検証: stackalloc のゼロ初期化コストと SkipLocalsInit によるスキップ
+// MEM-01 study: the zero-initialization cost of stackalloc and skipping it with SkipLocalsInit
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class SkipLocalsInitBenchmark
@@ -39,7 +39,7 @@ public class SkipLocalsInitBenchmark
         return total;
     }
 
-    // 既定: stackalloc はゼロ初期化される
+    // Default: stackalloc is zero-initialized
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int ZeroInitCore(int size)
     {
@@ -50,7 +50,7 @@ public class SkipLocalsInitBenchmark
         return span[0] + span[^1];
     }
 
-    // SkipLocalsInit: ゼロ初期化を省く(書き込んだ位置しか読まないことが前提)
+    // SkipLocalsInit: skips zero-initialization (assumes only written positions are read)
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int SkipInitCore(int size)

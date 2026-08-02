@@ -4,11 +4,11 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 /// <summary>
-/// TYP-02: unmanaged 値型の等値・順序・ハッシュを生バイト列で行う比較子。
-/// カスタム Equals を無視してビットパターンで判定でき、SIMD 最適化された
-/// SequenceEqual / SequenceCompareTo に処理を委譲する。
-/// パディングを含む構造体は未初期化パディングにより「論理的に等しいのに不一致」と
-/// なりうるため、パディングのないレイアウトの型に限定して使用する。
+/// TYP-02: Comparer that decides equality, ordering and hash codes for unmanaged value types over the raw bytes.
+/// It ignores any custom Equals and decides on the bit pattern, delegating to the SIMD-optimized
+/// SequenceEqual / SequenceCompareTo.
+/// A struct containing padding can be reported as unequal even when logically equal, because the padding is
+/// uninitialized, so use this only with types whose layout has no padding.
 /// </summary>
 public sealed class BitwiseComparer<T> : IEqualityComparer<T>, IComparer<T>
     where T : unmanaged

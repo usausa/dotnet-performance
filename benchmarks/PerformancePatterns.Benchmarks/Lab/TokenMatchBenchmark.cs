@@ -7,14 +7,14 @@ using System.Text;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー③: byte 列の int 化定数比較
-// 問い: 4 バイトの ASCII トークン(HTTP メソッド等)の判定は、
-// string 化 / SequenceEqual("..."u8) / uint 定数 1 比較のどれが速いか。
+// Study queue 3: comparing a byte sequence as an integer constant
+// Question: for matching a 4-byte ASCII token (an HTTP method and the like), which is fastest:
+// converting to string, SequenceEqual("..."u8), or a single uint constant comparison?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class TokenMatchBenchmark
 {
-    // static readonly は Tier1 で JIT 定数扱いになる(手書き 16 進定数のミスも防げる)
+    // static readonly is treated as a JIT constant at Tier1 (and it also avoids mistakes in handwritten hex constants)
     private static readonly uint GetToken = BinaryPrimitives.ReadUInt32LittleEndian("GET "u8);
 
     private static readonly uint PostToken = BinaryPrimitives.ReadUInt32LittleEndian("POST"u8);
@@ -28,7 +28,7 @@ public class TokenMatchBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // 実行時生成(データセクションの u8 リテラル参照をそのまま渡さない)
+        // Built at run time (does not pass the u8 literal reference from the data section directly)
         var methods = new[] { "GET ", "POST", "PUT ", "HEAD" };
         probes = new byte[64][];
         for (var i = 0; i < probes.Length; i++)

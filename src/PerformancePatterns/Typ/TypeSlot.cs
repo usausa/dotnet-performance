@@ -1,7 +1,7 @@
 namespace PerformancePatterns.Typ;
 
 /// <summary>
-/// TYP-01: 型ごとに一意な連番(スロット番号)を採番する。
+/// TYP-01: Assigns a unique sequential number (a slot number) to each type.
 /// </summary>
 public static class TypeSlot
 {
@@ -13,7 +13,7 @@ public static class TypeSlot
 }
 
 /// <summary>
-/// TYP-01: 型 <typeparamref name="T"/> のスロット番号。static 初期化で型ごとに一度だけ採番される。
+/// TYP-01: Slot number for type <typeparamref name="T"/>. Assigned exactly once per type by the static initializer.
 /// </summary>
 public static class TypeSlot<T>
 {

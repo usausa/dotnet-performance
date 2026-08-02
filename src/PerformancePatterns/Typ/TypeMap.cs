@@ -4,9 +4,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// TYP-01: 型ごとに採番した静的スロットで、Type キーの辞書を配列インデクスアクセスに置き換える。
-/// 型引数が既知のパス(<see cref="TryGetValue{T}"/>)はハッシュ計算・衝突解決なしの添字アクセスになる。
-/// エントリは struct 配列 + ref アクセス(MEM-04)、成長は copy-on-write。
+/// TYP-01: Replaces a Type-keyed dictionary with array index access through a static slot assigned per type.
+/// The path where the type argument is known (<see cref="TryGetValue{T}"/>) becomes a plain index access with no hashing and no collision resolution.
+/// Entries are a struct array accessed by ref (MEM-02), and growth is copy-on-write.
 /// </summary>
 public sealed class TypeMap<TValue>
 {
@@ -16,19 +16,19 @@ public sealed class TypeMap<TValue>
     private readonly object sync = new();
 #endif
 
-    // 実行時 Type からスロットを引くフォールバック(AOT 非互換な MakeGenericType を使わない)
+    // Fallback that resolves a slot from a runtime Type (without the AOT-incompatible MakeGenericType)
     private readonly Dictionary<Type, int> slotOfType = [];
 
     private Entry[] entries = [];
 
     public int Count { get; private set; }
 
-    /// <summary>型引数が既知の高速パス。JIT はスロット番号を定数として扱える。</summary>
+    /// <summary>Fast path where the type argument is known. The JIT can treat the slot number as a constant.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetValue<T>([MaybeNullWhen(false)] out TValue value)
         => TryGetBySlot(TypeSlot<T>.Index, out value);
 
-    /// <summary>実行時に型が決まる場合のフォールバックパス。</summary>
+    /// <summary>Fallback path for when the type is only known at run time.</summary>
     public bool TryGetValue(Type type, [MaybeNullWhen(false)] out TValue value)
     {
         int slot;
@@ -54,7 +54,7 @@ public sealed class TypeMap<TValue>
             var current = entries;
             if (slot >= current.Length)
             {
-                // copy-on-write: 読み取り側は差し替え前の配列を見続けても安全
+                // copy-on-write: readers can safely keep observing the pre-swap array
                 var next = new Entry[CalculateSize(slot)];
                 current.AsSpan().CopyTo(next);
                 current = next;
@@ -79,7 +79,7 @@ public sealed class TypeMap<TValue>
         var current = Volatile.Read(ref entries);
         if ((uint)slot < (uint)current.Length)
         {
-            // MEM-04: struct 要素を ref で受けてコピーを避ける
+            // MEM-02: Take the struct element by ref to avoid a copy
             ref var entry = ref current[slot];
             if (entry.HasValue)
             {
@@ -92,7 +92,7 @@ public sealed class TypeMap<TValue>
         return false;
     }
 
-    // 8 刻みで確保する(スロットは密に採番されるため 2 倍成長よりメモリ効率が良い)
+    // Grow in steps of 8 (slots are numbered densely, so this is more memory efficient than doubling)
     private static int CalculateSize(int slot) => ((slot >> 3) << 3) + 8;
 
     private struct Entry

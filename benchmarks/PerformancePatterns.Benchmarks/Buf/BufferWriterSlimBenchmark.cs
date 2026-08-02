@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Buf;
 
-// BUF-03 実装例: 逐次書き込みのライフサイクル(生成 → 16 バイト × N 書き込み → 読み出し → 破棄)を比較
+// BUF-03 example: comparing the sequential write lifecycle (create -> write 16 bytes x N -> read -> dispose)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class BufferWriterSlimBenchmark

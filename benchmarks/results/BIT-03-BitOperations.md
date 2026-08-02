@@ -1,4 +1,4 @@
-# BIT-04: BitOperations scan / popcount
+# BIT-03: BitOperations scan / popcount
 
 - Verdict: adopted
 - Set-bit scan via TrailingZeroCount + (mask &= mask - 1): 0.13x

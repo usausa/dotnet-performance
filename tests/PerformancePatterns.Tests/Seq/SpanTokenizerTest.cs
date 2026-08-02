@@ -23,7 +23,7 @@ public sealed class SpanTokenizerTest
     [Fact]
     public void ParityWithStringSplitExhaustive()
     {
-        // 長さ 0〜10 の {'a', ','} 全組み合わせで string.Split と一致することを検証する
+        // Verify agreement with string.Split for every {'a', ','} combination of length 0 to 10
         Span<char> buffer = stackalloc char[10];
         for (var length = 0; length <= buffer.Length; length++)
         {

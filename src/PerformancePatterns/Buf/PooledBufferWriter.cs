@@ -4,9 +4,9 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// BUF-02: ArrayPool を後背とする IBufferWriter&lt;T&gt; 実装。
-/// GetSpan / Advance でゼロコピー書き込みを受け、Dispose でプールへ返却する。
-/// Grow はコールドパス分離(JIT-04)、返却時クリアは参照有無で分岐(JIT-05)。
+/// BUF-02: IBufferWriter&lt;T&gt; implementation backed by ArrayPool.
+/// Accepts zero-copy writes through GetSpan / Advance and returns the buffer to the pool on Dispose.
+/// Grow is split into a cold path (JIT-04), and the clear on return branches on whether T holds references (JIT-05).
 /// </summary>
 public sealed class PooledBufferWriter<T> : IBufferWriter<T>, IDisposable
 {
@@ -42,7 +42,7 @@ public sealed class PooledBufferWriter<T> : IBufferWriter<T>, IDisposable
 
     public void Clear()
     {
-        // 参照を含まない型ではクリア不要(JIT-05)
+        // No clearing needed for types that hold no references (JIT-05)
         if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             Array.Clear(buffer, 0, WrittenCount);
@@ -76,7 +76,7 @@ public sealed class PooledBufferWriter<T> : IBufferWriter<T>, IDisposable
         }
     }
 
-    // コールドパス: 分離してホット側のインライン化を保つ(JIT-04)
+    // Cold path: kept separate so the hot path stays inlineable (JIT-04)
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void Grow(int sizeHint)
     {

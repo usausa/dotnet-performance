@@ -283,7 +283,7 @@ public string Name
 | 手書きの桁詰め整形ループ(右詰めシフト・逆順書き) | `TryFormat` + `Fill` の 2.5〜4.8 倍遅い | R-16 |
 | デリゲート Invoke の `call` 置換(`callvirt` 回避) | 生成コード 68 命令・229 B 完全一致を JIT 確認 | R-17 |
 | 単一 Span ループの `GetReference` + `Unsafe.Add` 化 | 標準 for で境界チェック除去済み。手動化は 1.07〜1.13 倍遅 + バグ源 | R-02 |
-| 自前ハッシュループ(FNV-1a 等)の生成 | 64 文字以降 `string.GetHashCode` より遅い。XxHash3 かサンプリング(シナリオ 1)を使う | [BIT-05](../benchmarks/results/BIT-05-XxHash3.md) |
+| 自前ハッシュループ(FNV-1a 等)の生成 | 64 文字以降 `string.GetHashCode` より遅い。XxHash3 かサンプリング(シナリオ 1)を使う | [BIT-04](../benchmarks/results/BIT-04-XxHash3.md) |
 | 実行時 `Type` キー辞書を主経路にする生成 | 実行時 Type 経路は素の Dictionary より遅い(1.93 倍)。ジェネリック API で受けて static 解決する | [TYP-01](../benchmarks/results/TYP-01-TypeMap.md) |
 
 詳細は [rejected-patterns.md](rejected-patterns.md)。

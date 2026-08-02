@@ -91,7 +91,7 @@ Native AOT・トリミング対応ライブラリを実装するためのパタ�
 
 **問題:** トリミングでメンバーが除去されると実行時エラー。IL2026 警告の対象。
 
-**対策:** Source Generator による静的アクセサ生成 / `Action<T, TValue>` 形式の事前デリゲート登録 / インターフェース契約への移行。対象が既知の非公開メンバーであれば `[UnsafeAccessor]`([README](../README.md#typ-03-unsafeaccessor非公開メンバーへの直接アクセス) の TYP-03)がリフレクション不要かつ AOT 互換の代替になる。
+**対策:** Source Generator による静的アクセサ生成 / `Action<T, TValue>` 形式の事前デリゲート登録 / インターフェース契約への移行。対象が既知の非公開メンバーであれば `[UnsafeAccessor]`([README](../README.md#️-typ-03-unsafeaccessor非公開メンバーへの直接アクセス) の TYP-03)がリフレクション不要かつ AOT 互換の代替になる。
 
 ### AOTP-07: 文字列ベース型解決・動的アセンブリロード
 
@@ -401,12 +401,14 @@ dotnet publish -r win-x64 -c Release -p:PublishAot=true
 
 | 対応 | ライブラリ作者 | アプリ開発者 |
 |---|:---:|:---:|
-| `[DynamicallyAccessedMembers]` の付与 | ◎ 主担当 | − |
-| `[RequiresUnreferencedCode]` / `[RequiresDynamicCode]` の付与 | ◎ 主担当 | − |
-| `[DynamicDependency]` の付与 | ○(内部の固定依存) | ○(XAML/設定参照型の保護) |
-| `<IsAotCompatible>true</IsAotCompatible>` | ◎ 主担当 | − |
-| `rd.xml` / `TrimmerRootDescriptor` | △(原則使わない) | ◎(サードパーティ対応) |
-| `PublishAot=true` での検証 | ○(CI のサンプルアプリで) | ◎ 最終確認 |
+| `[DynamicallyAccessedMembers]` の付与 | ✅ | ➖ |
+| `[RequiresUnreferencedCode]` / `[RequiresDynamicCode]` の付与 | ✅ | ➖ |
+| `[DynamicDependency]` の付与 | ☑️(内部の固定依存) | ☑️(XAML/設定参照型の保護) |
+| `<IsAotCompatible>true</IsAotCompatible>` | ✅ | ➖ |
+| `rd.xml` / `TrimmerRootDescriptor` | ⚠️(原則使わない) | ✅(サードパーティ対応) |
+| `PublishAot=true` での検証 | ☑️(CI のサンプルアプリで) | ✅ |
+
+凡例: ✅ 主担当 / ☑️ 補助的に担当 / ⚠️ 原則避ける / ➖ 対象外
 
 ## 🪜 段階的対応ロードマップ
 
@@ -446,15 +448,13 @@ dotnet publish -r win-x64 -c Release -p:PublishAot=true
 
 ## ☑️ チェックリスト(ライブラリの AOT 対応完了条件)
 
-```
-□ IsAotCompatible を設定した
-□ PublishTrimmed=true / PublishAot=true の検証アプリでビルドした
-□ すべての IL2xxx / IL3xxx 警告を確認した
-□ 各警告に対して以下の優先順位で対処した:
-  1. 設計変更(ジェネリック API / Source Generator)で根本解決
-  2. [DynamicallyAccessedMembers] / [DynamicDependency] で保持
-  3. [RequiresUnreferencedCode] / [RequiresDynamicCode] で伝播
-  4. [UnconditionalSuppressMessage] で抑制(根拠を明記)
-□ 最終ビルドで警告がゼロであることを確認した
-□ AOT 環境(PublishAot した実行ファイル)で実行テストを行った
-```
+- [ ] IsAotCompatible を設定した
+- [ ] PublishTrimmed=true / PublishAot=true の検証アプリでビルドした
+- [ ] すべての IL2xxx / IL3xxx 警告を確認した
+- [ ] 各警告に対して以下の優先順位で対処した:
+      1. 設計変更(ジェネリック API / Source Generator)で根本解決
+      2. [DynamicallyAccessedMembers] / [DynamicDependency] で保持
+      3. [RequiresUnreferencedCode] / [RequiresDynamicCode] で伝播
+      4. [UnconditionalSuppressMessage] で抑制(根拠を明記)
+- [ ] 最終ビルドで警告がゼロであることを確認した
+- [ ] AOT 環境(PublishAot した実行ファイル)で実行テストを行った

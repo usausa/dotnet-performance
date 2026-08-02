@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// MEM-06 検証: 構造体引数の値渡し / in 渡しと、非 readonly 構造体での防御的コピー
+// MEM-04 study: passing struct arguments by value / by in, and defensive copies with a non-readonly struct
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class StructPassBenchmark
@@ -104,7 +104,7 @@ public class StructPassBenchmark
         return total;
     }
 
-    // 防御的コピーの有無: readonly メンバーなら発生しない
+    // Defensive copy or not: a readonly member does not cause one
     [Benchmark(OperationsPerInvoke = N)]
     public long InWithReadonlyMember()
     {
@@ -189,7 +189,7 @@ public readonly struct Readonly64(long a, long b, long c, long d, long e, long f
     public long H { get; } = h;
 }
 
-// readonly メンバー: in 渡しでも防御的コピーが発生しない
+// readonly member: no defensive copy even when passed by in
 public struct ReadonlyMember32
 {
     public long A { get; set; }
@@ -203,9 +203,9 @@ public struct ReadonlyMember32
     public readonly long Sum => A + B + C + D;
 }
 
-// 非 readonly メンバー(メモ化のため状態を書き込むので readonly にできない)。
-// in 渡しではアクセスごとに防御的コピーが発生し、コストに加えて
-// 「メモ化がコピーへ書かれるため次回に残らない」という正しさの罠もある。
+// Non-readonly member (it cannot be readonly because memoization writes state).
+// Passing by in causes a defensive copy on every access, which besides the cost also brings
+// a correctness trap: the memoized value is written to the copy and does not survive to the next call.
 public struct MutableMember32
 {
     private long memo;

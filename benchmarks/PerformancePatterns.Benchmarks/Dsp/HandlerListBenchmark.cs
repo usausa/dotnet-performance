@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Dsp;
 
-// DSP-03 実装例: マルチキャストデリゲート vs 不変配列 + Volatile 読み
+// DSP-03 example: multicast delegate vs immutable array with a Volatile read
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class HandlerListBenchmark

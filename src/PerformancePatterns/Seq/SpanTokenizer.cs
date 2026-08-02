@@ -3,9 +3,9 @@ namespace PerformancePatterns.Seq;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// SEQ-02: 任意の IEquatable な型のスパンを区切り要素で分割するゼロアロケーショントークナイザ。
-/// STK-01(ref struct)/ STK-03(struct iterator)/ JIT-02(IEquatable 制約)の複合適用例。
-/// 分割セマンティクスは string.Split(separator) と同一(空トークンを含む。空入力は空トークン 1 個)。
+/// SEQ-02: Zero-allocation tokenizer that splits a span of any IEquatable type on a separator element.
+/// A combined example of STK-01 (ref struct), STK-03 (struct iterator) and JIT-02 (IEquatable constraint).
+/// Split semantics match string.Split(separator): empty tokens are included, and empty input yields a single empty token.
 /// </summary>
 public ref struct SpanTokenizer<T>
     where T : IEquatable<T>
@@ -48,7 +48,7 @@ public ref struct SpanTokenizer<T>
             return false;
         }
 
-        // JIT-02: IEquatable<T> 制約により IndexOf は型特化(プリミティブでは SIMD)実装が選択される
+        // JIT-02: The IEquatable<T> constraint makes IndexOf resolve to a type-specialized implementation (SIMD for primitives)
         var index = source[start..].IndexOf(separator);
         tokenStart = start;
         if (index < 0)

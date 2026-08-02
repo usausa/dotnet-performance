@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Buf;
 
-// BUF-04 実装例: 4 KB バッファの取得 → 書き込み → 集計 → 解放のライフサイクルを比較
+// BUF-04 example: comparing the rent -> write -> aggregate -> release lifecycle of a 4 KB buffer
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class MemoryOwnerBenchmark

@@ -5,9 +5,9 @@ using System.Threading.Channels;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー⑤: System.Threading.Channels
-// 問い: 生産者消費者キューとしての要素あたりコストと、
-// SingleReader/SingleWriter オプション・Bounded の影響。
+// Study queue 5: System.Threading.Channels
+// Question: what is the per-element cost as a producer-consumer queue, and what impact do the
+// SingleReader/SingleWriter options and bounded channels have?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ChannelsBenchmark

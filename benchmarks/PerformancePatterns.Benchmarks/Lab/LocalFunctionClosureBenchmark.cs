@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// STK-04 検証: ローカル関数のキャプチャ有無(デリゲート変換時のクロージャ確保)
+// STK-04 study: capturing vs non-capturing local functions (closure allocation on delegate conversion)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class LocalFunctionClosureBenchmark
@@ -32,7 +32,7 @@ public class LocalFunctionClosureBenchmark
         {
             var target = i & 15;
 
-            // ローカルをキャプチャするローカル関数をデリゲート化 → クロージャ確保
+            // Converting a capturing local function to a delegate allocates a closure
             bool Match(int x) => x == target;
             total += Apply(values, Match);
         }
@@ -48,7 +48,7 @@ public class LocalFunctionClosureBenchmark
         {
             var target = i & 15;
 
-            // static ローカル関数(キャプチャ不可)+ state 引数 → デリゲートはキャッシュされる
+            // A static local function (which cannot capture) plus a state argument lets the delegate be cached
             static bool Match(int x, int t) => x == t;
             total += Apply(values, target, Match);
         }

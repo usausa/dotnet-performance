@@ -52,7 +52,7 @@ public sealed class BatchTest
         var source = new[] { 1, 2, 3, 4 };
         foreach (var segment in source.Batch(2))
         {
-            // コピーではなく元配列のビューであること
+            // Must be a view over the source array, not a copy
             Assert.Same(source, segment.Array);
         }
     }

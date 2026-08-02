@@ -1,4 +1,4 @@
-# BIT-02 / COL-04: SampledNameTable
+# BIT-01 / COL-04: SampledNameTable
 
 - Verdict: adopted (implemented)
 - string key: 0.84x (4 names) / 0.78x (16) / 0.77x (32) vs Dictionary

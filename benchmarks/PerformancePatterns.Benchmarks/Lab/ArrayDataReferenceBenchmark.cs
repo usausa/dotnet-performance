@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// MEM-02 検証: GetArrayDataReference — 逐次走査(反パターン確認)と、範囲保証済みランダムアクセス
+// MEM-02 study: GetArrayDataReference — a sequential walk (anti-pattern check) and random access with a guaranteed range
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ArrayDataReferenceBenchmark
@@ -24,7 +24,7 @@ public class ArrayDataReferenceBenchmark
             data[i] = i;
         }
 
-        // マスクで構成的に範囲内が保証された疑似ランダム添字(BIT-03 の形)
+        // Pseudo-random indices kept in range by construction with a mask (the BIT-02 shape)
         indexes = new int[1024];
         var state = 12345u;
         for (var i = 0; i < indexes.Length; i++)

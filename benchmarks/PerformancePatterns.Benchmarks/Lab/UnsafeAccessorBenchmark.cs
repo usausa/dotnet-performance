@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// TYP-03 検証: 非公開フィールドへのアクセス(UnsafeAccessor vs リフレクション)
+// TYP-03 study: accessing a private field (UnsafeAccessor vs reflection)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class UnsafeAccessorBenchmark
@@ -51,7 +51,7 @@ public class UnsafeAccessorBenchmark
         var total = 0L;
         for (var i = 0; i < N; i++)
         {
-            // FieldInfo.GetValue は値型をボックス化して返す
+            // FieldInfo.GetValue boxes a value type before returning it
             total += (int)CountField.GetValue(target)!;
         }
 
@@ -62,8 +62,8 @@ public class UnsafeAccessorBenchmark
     private static extern ref int GetCount(AccessTarget instance);
 }
 
-// 非公開フィールドを持つ対象型(外部ライブラリの内部状態を想定)。
-// Count は通常アクセスの基準用で、count はアクセサ対象の非公開フィールド(独立に保持)
+// Target type with a private field (standing in for the internal state of an external library).
+// Count is the baseline for normal access, and count is the private field the accessors target (held independently)
 internal sealed class AccessTarget
 {
     private readonly int count;
@@ -76,6 +76,6 @@ internal sealed class AccessTarget
 
     public int Count { get; }
 
-    // count の C# 側からの読み出し(主用途は UnsafeAccessor / リフレクション経由)
+    // Reads count from C# (the primary use is through UnsafeAccessor / reflection)
     public int GetCountDirect() => count;
 }

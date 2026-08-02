@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// TXT-09 検証: 固定長フィールドの数値左詰め整形とトリム
+// TXT-09 study: left-aligned numeric formatting into fixed-length fields, and trimming
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class FixedFieldFormatBenchmark
@@ -23,15 +23,15 @@ public class FixedFieldFormatBenchmark
     {
         value = 12345678;
 
-        // トリム対象: 前後にフィラーを持つ固定長フィールド
+        // Trim target: a fixed-length field with filler on both sides
         Array.Fill(padded, Filler);
         "TOKYO-0001".CopyTo(padded.AsSpan(4));
     }
 
-    // Verify 用: 現在のフィールド内容を取得
+    // For Verify: gets the current field content
     public string SnapshotField() => new(field);
 
-    // BCL: TryFormat は左詰めで書くので、残りを Fill するだけ
+    // BCL: TryFormat writes left-aligned, so only the remainder needs Fill
     [Benchmark(Baseline = true)]
     public char TryFormatThenFill()
     {
@@ -41,7 +41,7 @@ public class FixedFieldFormatBenchmark
         return span[0];
     }
 
-    // 手書き: LSB から前向きに書いて、最後に Reverse
+    // Handwritten: write forward from the least significant digit, then Reverse at the end
     [Benchmark]
     public char ManualLsbThenReverse()
     {
@@ -60,7 +60,7 @@ public class FixedFieldFormatBenchmark
         return span[0];
     }
 
-    // 手書き: 末尾から右詰めで書いて、先頭へ一括シフト(Reverse も桁数事前計算も不要)
+    // Handwritten: write right-aligned from the end, then shift to the front in one go (no Reverse and no digit-count precomputation)
     [Benchmark]
     public char ManualRightAlignShift()
     {
@@ -80,7 +80,7 @@ public class FixedFieldFormatBenchmark
         return span[0];
     }
 
-    // トリム: 手書きループで前後のフィラーを探す
+    // Trim: find the leading and trailing filler with a handwritten loop
     [Benchmark]
     public int TrimManualLoop()
     {
@@ -100,7 +100,7 @@ public class FixedFieldFormatBenchmark
         return end - start + 1;
     }
 
-    // トリム: ベクトル化済みの IndexOfAnyExcept / LastIndexOfAnyExcept
+    // Trim: the vectorized IndexOfAnyExcept / LastIndexOfAnyExcept
     [Benchmark]
     public int TrimVectorized()
     {

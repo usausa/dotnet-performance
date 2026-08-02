@@ -1,4 +1,4 @@
-# MEM-03: SkipLocalsInit (stackalloc zero-init cost)
+# MEM-01: SkipLocalsInit (stackalloc zero-init cost)
 
 - Verdict: adopted
 - stackalloc byte[4096] zero-init costs ~31 ns; [SkipLocalsInit] drops the call to 3.1-3.3 ns (0.09x, ~11x faster)

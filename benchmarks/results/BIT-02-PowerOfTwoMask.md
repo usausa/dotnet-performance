@@ -1,4 +1,4 @@
-# BIT-03: Power-of-two mask vs modulo (1024 bucket-index calculations)
+# BIT-02: Power-of-two mask vs modulo (1024 bucket-index calculations)
 
 - Verdict: adopted (for runtime-sized tables); const-size modulo needs no manual mask
 - Runtime-size modulo: 1,344.8 ns (div instruction) vs power-of-two mask 310.3 ns (0.23x)

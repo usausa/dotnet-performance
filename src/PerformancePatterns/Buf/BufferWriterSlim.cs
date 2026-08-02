@@ -4,10 +4,10 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// BUF-03: スタックファーストの逐次書き込みバッファ。
-/// 初期バッファ(stackalloc)が足りる間は完全にアロケーションフリーで、
-/// 超過時のみ ArrayPool からレンタルして内容を引き継ぐ。
-/// Grow はコールドパス分離(JIT-04)、返却時クリアは参照有無で分岐(JIT-05)。
+/// BUF-03: Stack-first sequential write buffer.
+/// Completely allocation-free while the initial buffer (stackalloc) is large enough;
+/// only on overflow does it rent from ArrayPool and carry the contents over.
+/// Grow is split into a cold path (JIT-04), and the clear on return branches on whether T holds references (JIT-05).
 /// <code>
 /// using var writer = new BufferWriterSlim&lt;byte&gt;(stackalloc byte[256]);
 /// writer.Write(header);
@@ -73,7 +73,7 @@ public ref struct BufferWriterSlim<T>
         WrittenCount++;
     }
 
-    // 成長はコールドパスとして分離し、呼び出し側のインライン化を妨げない(JIT-04)
+    // Growth is split into a cold path so the caller can still be inlined (JIT-04)
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void Grow(int required)
     {

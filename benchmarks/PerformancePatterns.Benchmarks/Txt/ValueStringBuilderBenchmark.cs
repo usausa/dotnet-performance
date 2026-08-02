@@ -23,7 +23,7 @@ public class ValueStringBuilderBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // 実行時生成のためインターンされない。24 文字 × 4 = 96 文字(初期バッファ 128 に収まる)
+        // Built at run time so it is not interned. 24 chars x 4 = 96 chars (fits in the 128-char initial buffer)
         part1 = new string('a', 24);
         part2 = new string('b', 24);
         part3 = new string('c', 24);

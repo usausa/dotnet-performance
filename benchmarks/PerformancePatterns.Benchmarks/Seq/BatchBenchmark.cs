@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Seq;
 
-// SEQ-04 / STK-03 実装例: 1024 要素を 100 件ずつのチャンクへ分割して合計する
+// SEQ-04 / STK-03 example: splitting 1024 elements into chunks of 100 and summing them
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class BatchBenchmark

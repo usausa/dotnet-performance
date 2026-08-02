@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// DSP-05 検証: パイプライン合成を毎回行う vs 初期化時に 1 回だけ行う
+// DSP-05 study: composing the pipeline on every call vs composing it once at initialization
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class PipelineComposeBenchmark

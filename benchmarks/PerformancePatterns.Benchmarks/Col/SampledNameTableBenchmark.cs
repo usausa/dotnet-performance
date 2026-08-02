@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Col;
 
-// BIT-02 / COL-04 実装例: 名前 → 値の解決を、辞書 / 線形探索 / サンプリングハッシュ表で比較
+// BIT-01 / COL-04 example: comparing name -> value resolution with a dictionary / a linear scan / a sampling hash table
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class SampledNameTableBenchmark
@@ -74,7 +74,7 @@ public class SampledNameTableBenchmark
     }
 }
 
-// net8.0 には AlternateLookup が無いため、クラスごと分離する(methodology 落とし穴 7)
+// net8.0 has no AlternateLookup, so the whole class is kept separate (methodology pitfall 7)
 #if NET9_0_OR_GREATER
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
@@ -151,7 +151,7 @@ internal static class NameTableFixture
         for (var i = 0; i < columns; i++)
         {
             names[i] = "Column" + i;
-            // 実行時生成のコピー(インターン済みリテラルによる参照等価の短絡を避ける)
+            // Runtime-built copy (avoids reference-equality short-circuit from interned literals)
             probes[i] = new string(names[i].AsSpan());
         }
 

@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// SEQ-03 検証: 構造体配列の Stream 読み書き — フィールド単位(BinaryReader/Writer) vs 一括再解釈
+// SEQ-03 study: reading and writing a struct array over a Stream — field by field (BinaryReader/Writer) vs bulk reinterpretation
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class StructStreamIoBenchmark
@@ -32,7 +32,7 @@ public class StructStreamIoBenchmark
 
         writeBuffer = new byte[Count * 16];
 
-        // 読み取り系ベンチマーク用の事前イメージ
+        // Pre-built image for the read benchmarks
         bulkImage = MemoryMarshal.AsBytes(source.AsSpan()).ToArray();
     }
 
@@ -84,7 +84,7 @@ public class StructStreamIoBenchmark
     }
 }
 
-// 16 バイト・パディングなしの転送レコード
+// 16-byte transfer record with no padding
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 internal struct PacketRecord
 {

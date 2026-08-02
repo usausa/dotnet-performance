@@ -11,7 +11,7 @@ using PerformancePatterns.Buf;
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class TemporaryBufferBenchmark
 {
-    // 64 は stackalloc 経路、4096 はプール経路の代表値
+    // 64 represents the stackalloc path and 4096 the pool path
     [Params(64, 4096)]
     public int Size { get; set; }
 

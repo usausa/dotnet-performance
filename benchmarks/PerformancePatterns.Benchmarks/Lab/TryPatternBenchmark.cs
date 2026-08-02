@@ -5,7 +5,7 @@ using System.Globalization;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// TXT-03 検証: 例外を制御フローに使う Parse vs TryParse(不正入力 10%)
+// TXT-03 study: Parse using exceptions for control flow vs TryParse (10% invalid input)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class TryPatternBenchmark
@@ -17,7 +17,7 @@ public class TryPatternBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // 10 件に 1 件が数値として不正
+        // One in ten items is not a valid number
         inputs = new string[N];
         for (var i = 0; i < N; i++)
         {

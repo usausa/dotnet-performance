@@ -6,8 +6,8 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー①: Unsafe.CopyBlockUnaligned
-// 問い: Span.CopyTo / Array.Copy に対して優位になる条件はあるか(可変長・定数長)。
+// Study queue 1: Unsafe.CopyBlockUnaligned
+// Question: are there conditions where it beats Span.CopyTo / Array.Copy (variable length and constant length)?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class CopyVariableBenchmark
@@ -55,7 +55,7 @@ public class CopyVariableBenchmark
     }
 }
 
-// 定数長: JIT が長さを既知としてコピーを mov 列に展開できるケース
+// Constant length: the case where the JIT knows the length and can expand the copy into a sequence of movs
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class CopyConstantBenchmark

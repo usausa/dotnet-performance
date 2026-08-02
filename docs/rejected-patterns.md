@@ -18,13 +18,22 @@ Measurement environment: Ryzen 9 5900X / .NET 10 (generation-dependent items are
 
 ---
 
-### R-02: Converting single-Span loops to GetReference + Unsafe.Add
+### R-02: Manual ref walking (GetReference / GetArrayDataReference + Unsafe.Add)
 
-🎯 **Intent:** Eliminate in-loop bounds checks with a manual ref walk using `MemoryMarshal.GetReference` + `Unsafe.Add`.
+🎯 **Intent:** eliminate in-loop bounds checks by walking memory manually with `MemoryMarshal.GetReference` / `MemoryMarshal.GetArrayDataReference` plus `Unsafe.Add`.
 
-📉 **Measured — why it is rejected:** In a standard for loop over a single Span the JIT already eliminates bounds checks completely, so the manual ref form is slower by exactly its setup cost (1.07–1.13x). Manual walking also has a far higher bug rate — miscomputed end conditions and the like (several real bugs were found during verification).
+📉 **Measured — why it is rejected:** on net10 it is not faster in **any** shape.
 
-✅ **Do this instead:** Write single-Span loops in the standard form `for (var i = 0; i < span.Length; i++)`. Manual ref walking only pays off when walking multiple Spans simultaneously (see the applicability table in MEM-01).
+- Single Span: the plain `for` loop already gets full bounds-check elimination, so the manual ref form only pays the setup cost (1.07-1.13x)
+- **Walking several Spans at once** (the shape this technique was supposed to win): the JIT auto-vectorizes the indexed loop (0.36 ns/element), and manual ref walking blocks that — **1.46x slower**
+- **Sequential array walk** (`GetArrayDataReference`): same mechanism, **1.30x slower**
+- **Random access with a structurally guaranteed range** (sampling and similar): **no difference** from the indexed form — the bounds check is effectively free
+
+Manual walking also has a high defect rate (several real bugs were found during verification: wrong end-ref computation, forgetting to advance one cursor).
+
+✅ **Do this instead:** write the indexed form, `for (var i = 0; i < span.Length; i++)`. Use `GetArrayDataReference` only when there is a **structural** reason — you need a head ref where a Span cannot be formed, or you are implementing a type that stores a ref — never for speed.
+
+🔗 **Measurement record:** [LAB-DualSpanWalk.md](../benchmarks/results/LAB-DualSpanWalk.md) / [LAB-ArrayDataReference.md](../benchmarks/results/LAB-ArrayDataReference.md)
 
 ---
 
@@ -48,7 +57,7 @@ Measurement environment: Ryzen 9 5900X / .NET 10 (generation-dependent items are
 - do-while (guard + do form): bounds checks **remain** inside the loop (63 bytes) — the generated code differs, but the time is unresolvable (➖ measurement noise)
 - descending for: loop cloning kicks in (85 bytes, no checks on the hot path) — again the generated code differs but the time is unresolvable (➖ measurement noise)
 
-✅ **Do this instead:** Choose for readability (default to for / while). do-while and descending loops produce genuinely different code, so use an ascending for wherever you are relying on bounds-check elimination. What matters is not the syntax but the data access shape (MEM-01 / COL-01 / MEM-04).
+✅ **Do this instead:** Choose for readability (default to for / while). do-while and descending loops produce genuinely different code, so use an ascending for wherever you are relying on bounds-check elimination. What matters is not the syntax but the data access shape (MEM-01 / COL-01 / MEM-02).
 
 ---
 
@@ -58,7 +67,7 @@ Measurement environment: Ryzen 9 5900X / .NET 10 (generation-dependent items are
 
 📉 **Measured — why it is rejected:** Even with the array itself pooled, each element object is still allocated individually, so the result ranges from no effect to counterproductive (you only add the pool management cost).
 
-✅ **Do this instead:** Make the elements structs first, then pool the array (MEM-04 + BUF-01). struct + pooling measures at about 6x and 0B.
+✅ **Do this instead:** Make the elements structs first, then pool the array (MEM-02 + BUF-01). struct + pooling measures at about 6x and 0B.
 
 ---
 
@@ -98,9 +107,9 @@ Measurement environment: Ryzen 9 5900X / .NET 10 (generation-dependent items are
 
 📉 **Measured — why it is rejected:** Either the same speed as reinterpretation via `MemoryMarshal.Cast` / `Unsafe.As`, or slower by the fixed overhead. The gain does not justify the cost of introducing an unsafe context (auditing, safety).
 
-✅ **Do this instead:** Write Span / ref based code. For reinterpretation use `MemoryMarshal.Cast` (measured zero-cost; in the BIT-05 re-measurement Cast beats fixed with non-overlapping CIs at 8 and 512 characters — precisely because no pinning is needed); for unmanaged reads and writes see SEQ-02 (struct I/O over Stream).
+✅ **Do this instead:** Write Span / ref based code. For reinterpretation use `MemoryMarshal.Cast` (measured zero-cost; in the BIT-04 re-measurement Cast beats fixed with non-overlapping CIs at 8 and 512 characters — precisely because no pinning is needed); for unmanaged reads and writes see SEQ-02 (struct I/O over Stream).
 
-🔗 **Measurement record:** [BIT-05-XxHash3.md](../benchmarks/results/BIT-05-XxHash3.md) (includes the Cast vs fixed comparison)
+🔗 **Measurement record:** [BIT-04-XxHash3.md](../benchmarks/results/BIT-04-XxHash3.md) (includes the Cast vs fixed comparison)
 
 ---
 
@@ -154,7 +163,7 @@ Measurement environment: Ryzen 9 5900X / .NET 10 (generation-dependent items are
 
 📉 **Measured — why it is rejected:** At variable lengths it lands at 0.98–1.03x with overlapping CIs (➖ measurement noise — the generated code at the call site differs, but both reach the same Memmove, so no difference shows up). At the constant length of 16B, which the JIT can unroll, there is a **real difference** of 0.83x and 45B less code, but it does not justify giving up safety (no bounds checks, no type information). `Array.Copy` is the slowest and bloats code size (1.7KB).
 
-✅ **Do this instead:** Default to `Span.CopyTo` (combined with the explicit slicing of MEM-05).
+✅ **Do this instead:** Default to `Span.CopyTo` (combined with the explicit slicing of MEM-03).
 
 🔗 **Measurement record:** [LAB-CopyBlockUnaligned.md](../benchmarks/results/LAB-CopyBlockUnaligned.md)
 
@@ -193,6 +202,16 @@ Measurement environment: Ryzen 9 5900X / .NET 10 (generation-dependent items are
 ✅ **Do this instead:** Emit `callvirt` as-is (the same as Roslyn). What does pay off in Emit-generated code is eliminating child delegate chains (2.3x) and targeting a Holder field (1.5x versus a closure array) — see GEN-01.
 
 🔗 **Measurement record:** [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md)
+
+### R-18: Hand-written unsigned-overflow range checks
+
+🎯 **Intent:** rewrite `min <= value && value <= max` as the single comparison `(uint)(value - min) <= (uint)(max - min)` to cut a branch.
+
+📉 **Measured — why it is rejected:** 548.5 vs 553.7 ns with overlapping CIs. **Comparing the Tier1 codegen shows the two forms are effectively identical** — the only difference is the encoding (`sub r8d,100` vs `add r8d,-100`), 45 bytes either way. The net10 JIT already fuses the two-comparison form into a single unsigned comparison, so rewriting it by hand buys nothing.
+
+✅ **Do this instead:** write the readable `(value >= min) && (value <= max)`. The manual form can still matter for compound conditions the JIT cannot prove — measure before adopting it there.
+
+🔗 **Measurement record:** [LAB-RangeCheck.md](../benchmarks/results/LAB-RangeCheck.md)
 
 ---
 

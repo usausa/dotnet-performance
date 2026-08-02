@@ -40,7 +40,7 @@ public sealed class SampledNameTableTest
     [Fact]
     public void CollidingKeysAreResolvedByFullComparison()
     {
-        // 長さ・先頭・中央・末尾が同一でハッシュが衝突するキー
+        // Keys whose length and first / middle / last characters are identical, so their hashes collide
         Assert.Equal(
             SampledNameTable<int>.CalculateHash("AxxxBxxxC".AsSpan()),
             SampledNameTable<int>.CalculateHash("AyyyByyyC".AsSpan()));
@@ -74,7 +74,7 @@ public sealed class SampledNameTableTest
 
         foreach (var name in names)
         {
-            // 実行時生成のコピー(参照等価に依存しないことの確認)
+            // Runtime-built copy (confirms the lookup does not rely on reference equality)
             var probe = new string(name.AsSpan());
             Assert.True(table.TryGetValue(probe.AsSpan(), out var value));
             Assert.Equal(name, value);

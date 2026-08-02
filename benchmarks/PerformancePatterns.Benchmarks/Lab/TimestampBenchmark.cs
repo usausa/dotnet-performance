@@ -5,9 +5,9 @@ using System.Diagnostics;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー④: 時刻・経過時間取得の低コスト化
-// 問い: キャッシュ TTL・タイムアウト判定用途で DateTime.UtcNow を
-// Environment.TickCount64 / Stopwatch.GetTimestamp に置き換える価値はどれだけあるか。
+// Study queue 4: cheaper ways to read the current time and elapsed time
+// Question: for cache TTL and timeout checks, how much is gained by replacing DateTime.UtcNow with
+// Environment.TickCount64 / Stopwatch.GetTimestamp?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class TimestampBenchmark

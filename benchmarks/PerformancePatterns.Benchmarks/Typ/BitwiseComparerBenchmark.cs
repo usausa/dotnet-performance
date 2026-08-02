@@ -5,8 +5,8 @@ using BenchmarkDotNet.Jobs;
 
 using PerformancePatterns.Typ;
 
-// TYP-02 実装例: 16 バイト構造体キーの辞書ルックアップを比較子別に比較
-// (IEquatable 無しの struct を既定比較子で使うと、Equals のたびにボックス化される)
+// TYP-02 example: comparing dictionary lookups with a 16-byte struct key across comparers
+// (using a struct without IEquatable with the default comparer boxes on every Equals call)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class BitwiseComparerBenchmark
@@ -80,7 +80,7 @@ public class BitwiseComparerBenchmark
     }
 }
 
-// IEquatable を実装しない 16 バイト構造体(既定比較子ではボックス化経路になる)
+// 16-byte struct that does not implement IEquatable (the default comparer takes the boxing path)
 public readonly struct PlainKey(long a, long b)
 {
     public long A { get; } = a;
@@ -88,7 +88,7 @@ public readonly struct PlainKey(long a, long b)
     public long B { get; } = b;
 }
 
-// IEquatable を実装した同レイアウトの構造体
+// Struct with the same layout that does implement IEquatable
 public readonly struct EquatableKey(long a, long b) : IEquatable<EquatableKey>
 {
     public long A { get; } = a;

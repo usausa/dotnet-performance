@@ -3,14 +3,14 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// ASY-05 検証: 同期完了パスの Task vs ValueTask(キャッシュヒット相当)
+// ASY-05 study: Task vs ValueTask on a synchronously completing path (equivalent to a cache hit)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ValueTaskBenchmark
 {
     private const int N = 100;
 
-    // Task<int> キャッシュ(-1〜8 の BCL キャッシュに乗らない値を使う)
+    // Task<int> cache (uses a value outside the BCL cache of -1 to 8)
     private int value;
 
     [GlobalSetup]
@@ -68,7 +68,7 @@ public class ValueTaskBenchmark
 
     private ValueTask<int> GetValueTaskAsync() => new(value);
 
-    // 完了済みを await する = キャッシュヒット時の実際の形(同期完了パス)
+    // Awaiting an already completed task is the real shape of a cache hit (the synchronous completion path)
     private async Task<int> GetAsyncTaskAsync()
     {
         await Task.CompletedTask.ConfigureAwait(false);

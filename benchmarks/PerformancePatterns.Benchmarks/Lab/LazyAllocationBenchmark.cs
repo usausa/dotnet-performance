@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// STK-07 検証: エラーリストの先行確保 vs 遅延確保(失敗率 10%)
+// STK-07 study: allocating the error list up front vs lazily (10% failure rate)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class LazyAllocationBenchmark
@@ -13,7 +13,7 @@ public class LazyAllocationBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // 10 件に 1 件が「失敗」(負値)
+        // One in ten items is a "failure" (a negative value)
         items = new int[100];
         for (var i = 0; i < items.Length; i++)
         {
@@ -51,7 +51,7 @@ public class LazyAllocationBenchmark
         return errors?.Count ?? 0;
     }
 
-    // 全件成功のケース(遅延確保なら割り当てゼロになる)
+    // The all-success case (with lazy allocation this allocates nothing)
     [Benchmark]
     public int LazyListAllValid()
     {
@@ -68,7 +68,7 @@ public class LazyAllocationBenchmark
     }
 }
 
-// STK-07 検証: 空結果の共有シングルトン
+// STK-07 study: a shared singleton for empty results
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class SharedEmptyBenchmark
@@ -99,7 +99,7 @@ public class SharedEmptyBenchmark
         return total;
     }
 
-    // 長さを非定数にして「毎回 new int[0]」の測定対象をアナライザから守る(意図的な悪い形)
+    // Use a non-constant length to shield the "new int[0] every time" case under measurement from the analyzer (deliberately the bad form)
     private static readonly int ZeroLength = string.Empty.Length;
 
     private static int[] CreateNew() => new int[ZeroLength];

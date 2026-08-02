@@ -3,8 +3,8 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー①: GC.AllocateUninitializedArray<T>
-// 問い: ゼロ初期化スキップの効果が出るサイズ閾値はどこか(小サイズはランタイムが通常確保にフォールバックする)。
+// Study queue 1: GC.AllocateUninitializedArray<T>
+// Question: at what size threshold does skipping zero-initialization pay off (for small sizes the runtime falls back to a normal allocation)?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class UninitializedArrayBenchmark

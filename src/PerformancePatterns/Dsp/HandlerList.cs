@@ -1,9 +1,9 @@
 namespace PerformancePatterns.Dsp;
 
 /// <summary>
-/// DSP-03: 購読者を不変配列で保持し、発火は <see cref="Volatile"/> 読み + foreach で行う。
-/// マルチキャストデリゲート(<c>+=</c>)が購読者 2 個以上で急激に劣化するのを回避する。
-/// 購読変更は copy-on-write のため、発火側にロックは不要。
+/// DSP-03: Holds subscribers in an immutable array; raising reads it via <see cref="Volatile"/> and iterates with foreach.
+/// Avoids the sharp degradation a multicast delegate (<c>+=</c>) suffers once there are two or more subscribers.
+/// Subscription changes are copy-on-write, so the raising side needs no lock.
 /// </summary>
 public sealed class HandlerList<T>
 {
@@ -54,7 +54,7 @@ public sealed class HandlerList<T>
 
     public void Publish(T value)
     {
-        // スナップショットを 1 回読むだけ。発火中の購読変更にも影響されない
+        // Read the snapshot once; subscription changes during the raise cannot affect it
         foreach (var handler in Volatile.Read(ref handlers))
         {
             handler(value);

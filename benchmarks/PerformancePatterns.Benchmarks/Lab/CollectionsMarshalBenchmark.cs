@@ -5,8 +5,8 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー②: COL-01(CollectionsMarshal)の自環境実測
-// 問い: List 反復の AsSpan 化と、辞書 read-modify-write の ref 化の効果を net10 で記録する。
+// Study queue 2: measuring COL-01 (CollectionsMarshal) on this machine
+// Question: record on net10 the effect of iterating a List through AsSpan and of doing dictionary read-modify-write by ref.
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class ListIterationBenchmark
@@ -78,7 +78,7 @@ public class DictionaryCountBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        // 実行時連結のためインターンされない。256 種 × 4 回出現
+        // Concatenated at run time, so not interned. 256 distinct keys, each appearing 4 times
         keys = new string[1024];
         for (var i = 0; i < keys.Length; i++)
         {

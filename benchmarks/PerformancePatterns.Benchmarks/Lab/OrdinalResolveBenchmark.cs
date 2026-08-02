@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// DAT-01 検証: 行マッピング時の列解決戦略(毎行 GetOrdinal / 序数キャッシュ struct)と GetValue ボックス化
+// DAT-01 study: column resolution strategies for row mapping (GetOrdinal per row / an ordinal-cache struct) and GetValue boxing
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class OrdinalResolveBenchmark
@@ -49,7 +49,7 @@ public class OrdinalResolveBenchmark
     {
         reader.Reset();
 
-        // リーダー 1 本につき 1 回だけ解決し、以後は構造体フィールドの読み出し
+        // Resolve once per reader; after that it is only a struct field read
         var ordinals = ResolveOrdinals(reader);
         var total = 0L;
         while (reader.Read())
@@ -68,7 +68,7 @@ public class OrdinalResolveBenchmark
         var total = 0L;
         while (reader.Read())
         {
-            // 型別メソッドを使わず GetValue + キャスト(値型はボックス化される)
+            // GetValue plus a cast instead of the typed methods (value types get boxed)
             var id = (int)reader.GetValue(ordinals.Id);
             var name = (string)reader.GetValue(ordinals.Name);
             var flag = (bool)reader.GetValue(ordinals.Flag);
@@ -119,9 +119,9 @@ public class OrdinalResolveBenchmark
     }
 }
 
-// 実プロバイダ相当の GetOrdinal(辞書引き)を持つ最小のインメモリリーダー。
-// DbDataReader 継承だと IDisposable の所有規則が連鎖するため、計測に必要な API 形状だけを再現する。
-// sealed のため実プロバイダの仮想ディスパッチ分は含まない(3 経路に共通のため、解決戦略の差分測定としては有効)
+// Minimal in-memory reader with a GetOrdinal (a dictionary lookup) equivalent to a real provider.
+// Deriving from DbDataReader would pull in a chain of IDisposable ownership rules, so only the API shape needed for the measurement is reproduced.
+// Being sealed, it excludes the virtual dispatch of a real provider (that is common to all three paths, so it is still valid for measuring the difference between resolution strategies)
 internal sealed class FakeDataReader
 {
     private readonly string[] names;

@@ -6,9 +6,9 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// 検証キュー②: IEnumerable<T> 引数の具象型分岐
-// 問い: `is T[]` / `is List<T>` で Span パスへ逃がす分岐は、配列・List でどれだけ効き、
-// 分岐が外れる列挙子ソースへのペナルティはあるか(LINQ 内部の定石の実証)。
+// Study queue 2: concrete-type dispatch on an IEnumerable<T> parameter
+// Question: how much does branching with `is T[]` / `is List<T>` into a Span path help for arrays and Lists, and
+// is there a penalty for enumerator sources where the branch misses (validating the idiom used inside LINQ)?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class EnumerableDispatchBenchmark

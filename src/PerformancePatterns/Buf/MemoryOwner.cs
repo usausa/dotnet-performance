@@ -4,11 +4,11 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// BUF-04: ArrayPool レンタルに using スコープを付与する IMemoryOwner&lt;T&gt; 実装。
-/// 要求長と実際のレンタル長(2 の累乗)の差を隠蔽し、正確な長さの Span / Memory を提供する。
-/// 二重 Dispose は Interlocked ガード(CON-01)で無害化。
-/// 同期処理内で完結するなら BUF-05(TemporaryBuffer)の方が所有オブジェクトの確保すら不要 —
-/// 本型は Memory&lt;T&gt; が必要な非同期 I/O 境界向け。
+/// BUF-04: IMemoryOwner&lt;T&gt; implementation that gives an ArrayPool rental a using scope.
+/// Hides the gap between the requested length and the actual rented length (a power of two), exposing Span / Memory of the exact length.
+/// Double Dispose is made harmless by an Interlocked guard (CON-01).
+/// If everything stays inside synchronous code, BUF-05 (TemporaryBuffer) avoids even the owner allocation —
+/// this type targets async I/O boundaries that require Memory&lt;T&gt;.
 /// </summary>
 public sealed class MemoryOwner<T> : IMemoryOwner<T>
 {
@@ -48,7 +48,7 @@ public sealed class MemoryOwner<T> : IMemoryOwner<T>
 
     public void Dispose()
     {
-        // CON-01: ロックレスの 1 回実行ガード(二重 Dispose・競合 Dispose を無害化)
+        // CON-01: Lock-free run-once guard (makes double and concurrent Dispose harmless)
         var toReturn = Interlocked.Exchange(ref array, null);
         if (toReturn is not null)
         {

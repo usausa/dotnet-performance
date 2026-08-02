@@ -3,10 +3,10 @@ namespace PerformancePatterns.Seq;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// SEQ-04: 遅延評価のチャンク分割。全体をマテリアライズせず、struct enumerator(STK-03)で
-/// アロケーションなしに固定サイズのまとまりを順に返す。
-/// Span 版はスライスのみ(コピーなし)、配列版は ArraySegment を返す(Enumerable.Chunk と違い
-/// チャンクごとの配列確保・コピーが発生しない)。
+/// SEQ-04: Lazily evaluated chunking. Without materializing the whole sequence, a struct enumerator (STK-03)
+/// yields fixed-size groups in order with no allocation.
+/// The Span overload only slices (no copy) and the array overload returns ArraySegment, so unlike Enumerable.Chunk
+/// there is no per-chunk array allocation or copy.
 /// </summary>
 public static class BatchExtensions
 {
@@ -32,7 +32,7 @@ public static class BatchExtensions
 }
 
 /// <summary>
-/// ReadOnlySpan のチャンク分割。foreach のダックタイピングで動作する ref struct enumerator。
+/// Chunking for ReadOnlySpan. A ref struct enumerator that works through foreach duck typing.
 /// </summary>
 public readonly ref struct SpanBatchEnumerable<T>
 {
@@ -83,7 +83,7 @@ public readonly ref struct SpanBatchEnumerable<T>
 }
 
 /// <summary>
-/// 配列のチャンク分割。ArraySegment を返すため、チャンクを Span 化しても Memory 化しても使える。
+/// Chunking for arrays. Because it returns ArraySegment, a chunk can be used as either a Span or a Memory.
 /// </summary>
 public readonly struct ArrayBatchEnumerable<T> : IEquatable<ArrayBatchEnumerable<T>>
 {

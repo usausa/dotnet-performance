@@ -5,7 +5,7 @@ using System.Buffers;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// ASY-07 検証: 全体バッファリング vs チャンク逐次処理(1 MB ペイロード)
+// ASY-07 study: buffering everything vs processing chunk by chunk (a 1 MB payload)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class StreamBufferingBenchmark
@@ -26,7 +26,7 @@ public class StreamBufferingBenchmark
         }
     }
 
-    // 全体を byte[] へバッファしてから処理(ReadAsByteArray 相当)
+    // Buffer everything into a byte[] before processing (equivalent to ReadAsByteArray)
     [Benchmark(Baseline = true)]
     public long FullBufferThenProcess()
     {
@@ -44,7 +44,7 @@ public class StreamBufferingBenchmark
         return total;
     }
 
-    // ArrayPool のチャンクで読みながら逐次処理(ピークメモリ = チャンクサイズ)
+    // Process while reading into ArrayPool chunks (peak memory = the chunk size)
     [Benchmark]
     public long StreamingPooledChunks()
     {

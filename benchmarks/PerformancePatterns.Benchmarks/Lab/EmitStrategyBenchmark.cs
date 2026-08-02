@@ -5,8 +5,8 @@ using System.Reflection.Emit;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// GEN-01 検証: Emit 生成ファクトリのターゲット戦略
-// closure 配列(object[] + castclass) vs Holder フィールド直読み、子デリゲート連鎖 vs インライン展開、Callvirt vs Call
+// GEN-01 study: target strategies for an Emit-generated factory
+// closure array (object[] + castclass) vs direct Holder field read, chained child delegates vs inline expansion, Callvirt vs Call
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class EmitStrategyBenchmark
@@ -38,7 +38,7 @@ public class EmitStrategyBenchmark
         var ctor = typeof(GenService).GetConstructor([typeof(GenDepA), typeof(GenDepB)])!;
         var module = typeof(EmitStrategyBenchmark).Module;
 
-        // closure 配列ターゲット: ldelem + castclass が毎回入る
+        // Closure array target: ldelem + castclass on every call
         var arrayMethod = new DynamicMethod("CreateByArray", typeof(object), [typeof(object[])], module, true);
         var il = arrayMethod.GetILGenerator();
         il.Emit(OpCodes.Ldarg_0);
@@ -53,7 +53,7 @@ public class EmitStrategyBenchmark
         il.Emit(OpCodes.Ret);
         closureArrayFactory = (Func<object>)arrayMethod.CreateDelegate(typeof(Func<object>), new object[] { depA, depB });
 
-        // Holder フィールドターゲット: 型付きフィールドの直読み(castclass 不要)
+        // Holder field target: a direct read of a typed field (no castclass)
         var holderMethod = new DynamicMethod("CreateByHolder", typeof(object), [typeof(GenHolder)], module, true);
         il = holderMethod.GetILGenerator();
         il.Emit(OpCodes.Ldarg_0);
@@ -64,7 +64,7 @@ public class EmitStrategyBenchmark
         il.Emit(OpCodes.Ret);
         holderFieldFactory = (Func<object>)holderMethod.CreateDelegate(typeof(Func<object>), new GenHolder { DepA = depA, DepB = depB });
 
-        // 子ファクトリ連鎖: 親が子 Func<object> を呼んで castclass する(インライン展開しない場合の形)
+        // Chained child factories: the parent calls a child Func<object> and castclasses the result (the shape without inline expansion)
         var childA = CreateChildFactory(module, GenHolder.DepAField);
         var childB = CreateChildFactory(module, GenHolder.DepBField);
         var holder = new GenHolder { DepA = depA, DepB = depB };
@@ -140,8 +140,8 @@ internal sealed class GenHolder
 
     public GenDepB DepB { get; set; } = default!;
 
-    // Emit の ldfld ターゲット(コンパイラ生成のバッキングフィールド)。
-    // 生成コードでは専用 Holder 型に相当し、プロパティ呼び出しではなくフィールド直読みを測るために使う。
+    // The ldfld target for Emit (a compiler-generated backing field).
+    // In generated code this corresponds to a dedicated Holder type, and it is used to measure a direct field read rather than a property call.
     public static System.Reflection.FieldInfo DepAField { get; } =
         typeof(GenHolder).GetField("<DepA>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
 

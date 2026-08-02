@@ -3,7 +3,7 @@ namespace PerformancePatterns.Benchmarks.Lab;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// MEM-04 検証: class 要素配列 vs struct 要素配列(コピー / ref アクセス)
+// MEM-02 study: an array of class elements vs an array of struct elements (copy / ref access)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class StructArrayRefBenchmark
@@ -42,7 +42,7 @@ public class StructArrayRefBenchmark
         var total = 0L;
         for (var i = 0; i < structEntries.Length; i++)
         {
-            var entry = structEntries[i];   // 16 バイトの値コピー
+            var entry = structEntries[i];   // 16-byte value copy
             total += entry.A + entry.B;
         }
 
@@ -55,7 +55,7 @@ public class StructArrayRefBenchmark
         var total = 0L;
         for (var i = 0; i < structEntries.Length; i++)
         {
-            ref var entry = ref structEntries[i];   // コピーなしの参照アクセス
+            ref var entry = ref structEntries[i];   // Reference access with no copy
             total += entry.A + entry.B;
         }
 
