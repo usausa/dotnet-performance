@@ -36,7 +36,7 @@ dotnet-performance/
 1. [x] パターン一覧の整備(77 パターン / 16 カテゴリ)
 2. [x] 検証キューの採否判定(22 件完了 → 本書の検証キュー章に記録)
 3. [x] 拡充候補パターンのドキュメント化(17 件を本文へ収録)
-4. [ ] パターンごとの実装例の拡充(実装 15 / 検証済 34 / 未着手 27)
+4. [ ] パターンごとの実装例の拡充(実装 21 / 検証済 49 / 未着手 6)
 5. [x] 未計測パターンの実測(16 パターンを検証、TXT-09 の桁順トリックは R-16 として不採用)
 6. [x] Source Generator 生成コード指針の文書化(GEN-02 + [docs/generated-code-patterns.md](docs/generated-code-patterns.md)。ジェネレータ実装自体は対象外とし、「何を生成すれば速いか」を既存実測に紐づけて確定)
 
@@ -86,34 +86,34 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 
 | ID | パターン | 目的 | AOT | 実装例 |
 |---|---|---|:---:|:---:|
-| [MEM-01](#mem-01-memorymarshalgetreference--unsafeadd) | MemoryMarshal.GetReference + Unsafe.Add | 境界チェックの完全除去 | ✅ | 未着手 |
+| [MEM-01](#mem-01-memorymarshalgetreference--unsafeadd) | MemoryMarshal.GetReference + Unsafe.Add | 境界チェックの完全除去 | ✅ | [検証済](benchmarks/results/MEM-01-DualSpanWalk.md) |
 | [MEM-02](#mem-02-getarraydatareference) | GetArrayDataReference | 配列先頭への直接参照取得 | ✅ | 未着手 |
 | [MEM-03](#mem-03-skiplocalsinit) | SkipLocalsInit | ローカル変数ゼロ初期化のスキップ | ✅ | [検証済](benchmarks/results/MEM-03-SkipLocalsInit.md) |
-| [MEM-04](#mem-04-struct-要素配列--ref-アクセスデータ指向レイアウト) | struct 要素配列 + ref アクセス | 要素ごとのヒープ確保と間接参照の排除 | ✅ | 未着手 |
+| [MEM-04](#mem-04-struct-要素配列--ref-アクセスデータ指向レイアウト) | struct 要素配列 + ref アクセス | 要素ごとのヒープ確保と間接参照の排除 | ✅ | [実装](src/PerformancePatterns/Typ/TypeMap.cs) |
 | [MEM-05](#mem-05-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より高速なスライス | ✅ | 未着手 |
 | [MEM-06](#mem-06-構造体引数の-in--ref-渡し戦略) | 構造体引数の in / ref 渡し | 大きな構造体の値コピー回避 | ✅ | [検証済](benchmarks/results/MEM-06-StructPass.md) |
-| [JIT-01](#jit-01-aggressiveinlining--aggressiveoptimization) | AggressiveInlining / AggressiveOptimization | インライン展開・最適化の強制 | ✅ | 未着手 |
+| [JIT-01](#jit-01-aggressiveinlining--aggressiveoptimization) | AggressiveInlining / AggressiveOptimization | インライン展開・最適化の強制 | ✅ | [検証済](benchmarks/results/JIT-01-Inlining.md) |
 | [JIT-02](#jit-02-iequatablet-制約による分岐除去) | IEquatable\<T\> 制約による分岐除去 | 比較の仮想ディスパッチ除去 | ✅ | [検証済](benchmarks/results/TYP-02-BitwiseComparer.md) |
-| [JIT-03](#jit-03-typeoft-分岐によるジェネリック特殊化) | typeof(T) 分岐特殊化 | ジェネリック変換の分岐除去 | ✅ | 未着手 |
-| [JIT-04](#jit-04-コールドパス分離throw-ヘルパー--grow-の-noinlining) | コールドパス分離 | ホットパスのインライン化促進 | ✅ | 未着手 |
+| [JIT-03](#jit-03-typeoft-分岐によるジェネリック特殊化) | typeof(T) 分岐特殊化 | ジェネリック変換の分岐除去 | ✅ | [検証済](benchmarks/results/JIT-03-TypeofBranch.md) |
+| [JIT-04](#jit-04-コールドパス分離throw-ヘルパー--grow-の-noinlining) | コールドパス分離 | ホットパスのインライン化促進 | ✅ | [実装](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
 | [JIT-05](#jit-05-isreferenceorcontainsreferences-による処理スキップ) | IsReferenceOrContainsReferences 分岐 | 参照なし型の後始末スキップ | ✅ | [検証済](benchmarks/results/JIT-05-ReferenceContainsBranch.md) |
-| [BIT-01](#bit-01-符号なしオーバーフローによる範囲チェック) | 符号なしオーバーフロー範囲チェック | 範囲判定の分岐削減 | ✅ | 未着手 |
+| [BIT-01](#bit-01-符号なしオーバーフローによる範囲チェック) | 符号なしオーバーフロー範囲チェック | 範囲判定の分岐削減 | ✅ | [検証済](benchmarks/results/BIT-01-RangeCheck.md) |
 | [BIT-02](#bit-02-ドメイン制約を活かした軽量ハッシュ生成) | ドメイン制約を活かした軽量ハッシュ | 既知キー集合の O(1) ハッシュ | ✅ | [実装](src/PerformancePatterns/Col/SampledNameTable.cs) |
 | [BIT-03](#bit-03-2-の累乗サイズ--マスクによる剰余置換) | 2 の累乗サイズ + マスク | 剰余(除算)のビット AND 化 | ✅ | [検証済](benchmarks/results/BIT-03-PowerOfTwoMask.md) |
 | [BIT-04](#bit-04-bitoperations-によるビット走査計数) | BitOperations | ビット走査・計数のハードウェア命令化 | ✅ | [検証済](benchmarks/results/BIT-04-BitOperations.md) |
 | [BIT-05](#bit-05-xxhash3-による汎用ハッシュ) | XxHash3 | 非暗号ハッシュの高速化 | ✅ | [検証済](benchmarks/results/BIT-05-XxHash3.md) |
-| [DSP-01](#dsp-01-sealed-による-devirtualization) | sealed による devirtualization | 仮想呼び出しの直接化 | ✅ | 未着手 |
+| [DSP-01](#dsp-01-sealed-による-devirtualization) | sealed による devirtualization | 仮想呼び出しの直接化 | ✅ | [検証済](benchmarks/results/DSP-01-SealedDevirt.md) |
 | [DSP-02](#dsp-02-呼び出し抽象化の選択指針) | 呼び出し抽象化の選択指針 | delegate/interface/関数ポインタの使い分け | ✅ | 未着手 |
 | [DSP-03](#dsp-03-ハンドラ列の不変配列化マルチキャストデリゲート回避) | ハンドラ列の不変配列化 | マルチキャストデリゲートの劣化回避 | ✅ | [実装](src/PerformancePatterns/Dsp/HandlerList.cs) |
-| [DSP-04](#dsp-04-static-ラムダの徹底tstate-引き回し) | static ラムダの徹底 | キャプチャ禁止を既定にし状態は TState で渡す | ✅ | 未着手 |
+| [DSP-04](#dsp-04-static-ラムダの徹底tstate-引き回し) | static ラムダの徹底 | キャプチャ禁止を既定にし状態は TState で渡す | ✅ | [検証済](benchmarks/results/DSP-04-StaticLambda.md) |
 | [DSP-05](#dsp-05-デリゲートパイプラインの事前確定) | デリゲート・パイプラインの事前確定 | 実行時の合成・分岐解決を初期化時へ | ✅ | [検証済](benchmarks/results/DSP-05-PipelineCompose.md) |
 | [STK-01](#stk-01-ref-structスタック専用型) | ref struct(スタック専用型) | ヒープエスケープの型レベル禁止 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#stk-02-spant--readonlyspant-によるゼロコピーアクセス) | Span\<T\> / ReadOnlySpan\<T\> | ゼロコピーの型付きビュー | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [STK-03](#stk-03-struct-iterator-パターン) | struct iterator パターン | foreach の仮想呼び出し・ヒープ確保除去 | ✅ | [実装](src/PerformancePatterns/Seq/BatchExtensions.cs) |
-| [STK-04](#stk-04-static-ローカルメソッドによる-iterator-の最適化) | static ローカルメソッド iterator | 即時バリデーション + クロージャ防止 | ✅ | 未着手 |
-| [STK-05](#stk-05-ボックス化回避と頻出値キャッシュ) | ボックス化回避と頻出値キャッシュ | object 境界のアロケーション排除 | ✅ | 未着手 |
+| [STK-04](#stk-04-static-ローカルメソッドによる-iterator-の最適化) | static ローカルメソッド iterator | 即時バリデーション + クロージャ防止 | ✅ | [検証済](benchmarks/results/STK-04-LocalFunctionClosure.md) |
+| [STK-05](#stk-05-ボックス化回避と頻出値キャッシュ) | ボックス化回避と頻出値キャッシュ | object 境界のアロケーション排除 | ✅ | [検証済](benchmarks/results/STK-05-BoxingCache.md) |
 | [STK-06](#stk-06-定数サイズ-stackalloc) | 定数サイズ stackalloc | localloc 回避とゼロ初期化制御 | ✅ | [検証済](benchmarks/results/STK-06-StackallocSize.md) |
-| [STK-07](#stk-07-遅延アロケーションと共有シングルトン) | 遅延アロケーションと共有シングルトン | 使うまで確保しない・空を共有する | ✅ | 未着手 |
+| [STK-07](#stk-07-遅延アロケーションと共有シングルトン) | 遅延アロケーションと共有シングルトン | 使うまで確保しない・空を共有する | ✅ | [検証済](benchmarks/results/STK-07-LazyAllocation.md) |
 | [STK-08](#stk-08-inlinearray-による構造体内固定長バッファ) | InlineArray | 構造体内固定長バッファ(.NET 8+) | ✅ | [検証済](benchmarks/results/STK-08-InlineArray.md) |
 | [STK-09](#stk-09-params-readonlyspant) | params ReadOnlySpan\<T\> | 可変長引数の配列確保除去(C# 13) | ✅ | [検証済](benchmarks/results/STK-09-ParamsSpan.md) |
 | [BUF-01](#buf-01-arraypoolt-によるバッファ再利用) | ArrayPool\<T\> | 使い捨てバッファの GC 圧力削減 | ✅ | [実装](src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
@@ -136,7 +136,7 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [COL-06](#col-06-コレクション変換の形状特化) | コレクション変換の形状特化 | 生成先の確保・コピー戦略の最適化 | ✅ | [検証済](benchmarks/results/COL-06-CollectionConvert.md) |
 | [TXT-01](#txt-01-ルックアップテーブルによる整形変換) | ルックアップテーブル整形 | 固定書式整形のテーブル化 | ✅ | [実装](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#txt-02-文字列構築の-stackalloc-ファースト化) | 文字列構築の stackalloc ファースト | StringBuilder 代替の低アロケーション構築 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
-| [TXT-03](#txt-03-try-パターンによる例外回避) | Try パターン | 例外を制御フローに使わない | ✅ | 未着手 |
+| [TXT-03](#txt-03-try-パターンによる例外回避) | Try パターン | 例外を制御フローに使わない | ✅ | [検証済](benchmarks/results/TXT-03-TryPattern.md) |
 | [TXT-04](#txt-04-バイト列トークンの直接判定) | バイト列トークン直接判定 | string 化せず u8/uint で判定 | ✅ | [検証済](benchmarks/results/TXT-04-TokenMatch.md) |
 | [TXT-05](#txt-05-utf8trywrite-による-utf-8-直接整形) | Utf8.TryWrite | UTF-8 補間の Span 直接書き込み | ✅ | [検証済](benchmarks/results/TXT-05-Utf8TryWrite.md) |
 | [TXT-06](#txt-06-ascii-特化比較) | ASCII 特化比較 | Ascii クラスによる大小無視処理 | ✅ | [検証済](benchmarks/results/TXT-06-Ascii.md) |
@@ -145,7 +145,7 @@ AOT で問題になるのは主に「柔軟性のためのリフレクション�
 | [TXT-09](#txt-09-固定長整形の応用イディオム) | 固定長整形の応用 | TryFormat + Fill・ベクトル化トリム | ✅ | [検証済](benchmarks/results/TXT-09-FixedFieldFormat.md) |
 | [TYP-01](#typ-01-静的型スロットtypemap--typeslot) | 静的型スロット(TypeMap / TypeSlot) | Type キー辞書の配列アクセス化 | ⚠️ | [実装](src/PerformancePatterns/Typ/TypeMap.cs) |
 | [TYP-02](#typ-02-bitwisecomparert生バイト比較) | BitwiseComparer\<T\> | unmanaged 値型の生バイト比較 | ✅ | [実装](src/PerformancePatterns/Typ/BitwiseComparer.cs) |
-| [TYP-03](#typ-03-unsafeaccessor非公開メンバーへの直接アクセス) | UnsafeAccessor | 非公開メンバーへの直接アクセス | ✅ | 未着手 |
+| [TYP-03](#typ-03-unsafeaccessor非公開メンバーへの直接アクセス) | UnsafeAccessor | 非公開メンバーへの直接アクセス | ✅ | [検証済](benchmarks/results/TYP-03-UnsafeAccessor.md) |
 | [TYP-04](#typ-04-ジェネリック-static-クラスによる型別キャッシュ) | ジェネリック static 型別キャッシュ | 型ごとの成果物の辞書レス取得 | ✅ | [実装](src/PerformancePatterns/Typ/TypeSlot.cs) |
 | [TYP-05](#typ-05-unsafeas-による型チェック省略キャスト) | Unsafe.As キャスト | 型保証済みキャストの高速化 | ✅ | 未着手 |
 | [TYP-06](#typ-06-型別成果物の静的事前組み立て) | 型別成果物の静的事前組み立て | 型ごとの文字列・SQL を初期化時に確定 | ✅ | [検証済](benchmarks/results/TYP-06-StaticArtifact.md) |
@@ -297,6 +297,16 @@ for (var i = 0; i < span.Length; i++)
 - 境界チェックが消える分、範囲の正しさは呼び出し側の責任になる。終端 ref の計算ミスや複数カーソル走査での ref 進め忘れは静かに範囲外を読む(実際に混入しやすいバグ)
 - 手動 ref 走査はコードサイズを増やしがちで、速くならない場面では純粋な負債になる。必ずベンチマークとセットで採用する
 
+**実測結果(Ryzen 9 5900X / net10、2 本の Span の zip 合計 1024 要素):**
+
+| 方式 | 時間 | 比率 |
+|---|---:|---|
+| 索引形 `a[i] + b[i]` | 367.7 ns | 1.00 |
+| 事前スライス + 索引形 | 368.6 ns | 1.00 |
+| **手動 ref 走査(GetReference + Unsafe.Add)** | 537.7 ns | **1.46(❌ 逆効果)** |
+
+**net10 では複数 Span の単純な索引ループを JIT が自動ベクトル化する**(0.36 ns/要素)。手動 ref 走査はこれを阻害し、コードサイズ最小(88 B)でも 1.46 倍遅い。**要素ごとの単純処理では索引形で書く**こと。手動 ref 走査が残る適用先は、ベクトル化されない複雑な要素処理・サンプリングアクセス(SampledNameTable の 3 文字参照など)・ストライド走査に限られる。→ [測定結果](benchmarks/results/MEM-01-DualSpanWalk.md)
+
 ---
 
 ### MEM-02: GetArrayDataReference
@@ -391,6 +401,10 @@ for (var i = 0; i < entries.Length; i++)
 - `ref var` で受けないと構造体コピーが発生して逆効果になりうる
 - class 要素のまま ArrayPool だけ導入しても効果はない(要素個別の確保が残る)。struct 化とセットで初めて効く
 - 発展形: ハッシュ表で先頭要素を struct スロットにインライン格納し、溢れのみ別領域(同一配列のストライド先など)に置くフラットレイアウト。ポインタ追跡をさらに削減できるが効果は数 % 規模で、衝突時アクセスで効く
+
+**リポジトリ内実装:** [TypeMap.cs](src/PerformancePatterns/Typ/TypeMap.cs) の `Entry[]`(struct 要素配列 + copy-on-write)
+
+**実測結果(Ryzen 9 5900X / net10、16 バイト要素 × 1024 の走査):** struct + ref アクセス 483.0 ns ≒ class 配列 493.5 ns(信頼区間重複 — **連続確保直後の class は局所性が崩れていないため**)、struct のコピーアクセスは 595.7 ns(1.21 倍 = ref が消すコピーペナルティ)。この形の実測に出ない構造的差: 1024 要素で struct は 16 KB 連続、class は約 40 KB のオブジェクト群 + 8 KB の参照配列で、**ヒープが経年するほど class 側の局所性は劣化する**。→ [測定結果](benchmarks/results/MEM-04-StructArrayRef.md)
 
 ---
 
@@ -502,6 +516,8 @@ public static bool TryGetValue<TKey>(...)
 - `AggressiveInlining` の付けすぎはコードサイズ肥大により命令キャッシュ効率を悪化させうる。小さなホットメソッドに限定する
 - `AggressiveOptimization` は .NET 8+ では Dynamic PGO(実行時プロファイルに基づく最適化)を無効化するため、かえって遅くなるケースがある。必ずベンチマークで確認してから使用する
 
+**実測結果(Ryzen 9 5900X / net10、ループ持ちヘルパー × 1024 呼び出し):** NoInlining 1.560 μs に対し既定 1.451 μs / Aggressive 1.338 μs。**インライン化自体の価値は実差**(NoInline は Aggressive と信頼区間非重複で +17%)だが、**既定と Aggressive の呼び出し側 Tier1 コードは 94 B で完全一致** — net10 の既定ポリシー(PGO)はループ持ちヘルパーも既にインライン化しており、**属性はヒューリスティクスが見送る形への保険**と位置づける。→ [測定結果](benchmarks/results/JIT-01-Inlining.md)
+
 ---
 
 ### JIT-02: IEquatable\<T\> 制約による分岐除去
@@ -569,6 +585,8 @@ public static T Convert<T>(int value)
 
 **ユースケース:** 型変換層、シリアライザ・フォーマッタのプリミティブ特殊化。
 
+**実測結果(Ryzen 9 5900X / net10、int[1024] の合計):** typeof(T) 分岐つきジェネリック 250.5 ns vs 手書き int 版 299.7 ns — **分岐コストはゼロ**(コードサイズ 35 vs 32 B でほぼ同一。見かけの 16% 差は配置由来の測定ゆらぎで、主張は「同等」まで)。フォールバック経路の正しさは Verify で確認。→ [測定結果](benchmarks/results/JIT-03-TypeofBranch.md)
+
 **関連する知見:** `typeof(X)` を `static readonly Type` フィールドにキャッシュする最適化は無意味(JIT が `typeof` 自体を定数化するため、実測で速度・コードサイズとも完全に同値)。可読性を優先してよい。
 
 ---
@@ -611,6 +629,10 @@ private static void ThrowInvalidState() => throw new InvalidOperationException(.
 ```
 
 **ユースケース:** builder/writer の Grow 処理、引数検証、稀なエラーパス全般。
+
+**リポジトリ内実装:** [BufferWriterSlim.cs](src/PerformancePatterns/Buf/BufferWriterSlim.cs) / [ValueStringBuilder.cs](src/PerformancePatterns/Txt/ValueStringBuilder.cs)(いずれも Grow を NoInlining 分離)
+
+**実測結果(Ryzen 9 5900X / net10、⚠️ 単離マイクロでは逆転):** 成長処理込みの太い Write(569 B、非インライン)1.253 μs に対し、分離 + AggressiveInlining の Write(ホット側 103 B)は **1.361 μs(1.09 倍)**。呼び出し 1 回のコストは小さく、強制展開でループ本体が太った分が上回った(JIT-01 の「付けすぎ注意」と整合)。**本パターンの価値は「呼び出し元へのインライン化を可能にし、その先の最適化を解放する」ことにあり、常に速くなる魔法ではない** — 適用は計測とセットで。→ [測定結果](benchmarks/results/JIT-04-ColdPathSplit.md)
 
 ---
 
@@ -687,6 +709,8 @@ public static bool IsInRange(int value, int min, int max)
 - 可読性は明確に劣る。マイクロベンチマークで効果を確認できるホットパスに限定する
 - 意図的なオーバーフロー利用であることを `unchecked` で明示する(プロジェクト設定が checked でも壊れないようにする)
 - `min <= max` の成立が前提。破ると全入力が範囲外判定になる
+
+**実測結果(Ryzen 9 5900X / net10、1024 値の範囲判定):** 548.5 vs 553.7 ns で信頼区間重複。**Tier1 の生成コードを比較すると、JIT が 2 比較形を自動で符号なし 1 比較へ融合しており実質同一**(差は `sub r8d,100` vs `add r8d,-100` の符号化のみ、45 B)。**単純な min/max 判定では手書き変換は不要(差なし)** — 可読な 2 比較形で書いてよい。手書き形が意味を持つのは、JIT が範囲を証明できない複合条件・チェック網羅の分岐削減に限られる。→ [測定結果](benchmarks/results/BIT-01-RangeCheck.md)
 
 ---
 
@@ -880,6 +904,16 @@ XxHash3 は 8 文字時点で既に速く、長いほど差が開く。`MemoryMa
 public sealed class MessagePackFormatter : IFormatter { ... }
 ```
 
+**実測結果(Ryzen 9 5900X / net10、単一実装のインターフェース経由呼び出し × 1024):**
+
+| 保持形 | 時間 | 比率 |
+|---|---:|---|
+| インターフェース参照(非 sealed 実装) | 536.8 ns | 1.00 |
+| インターフェース参照(sealed 実装) | 509.1 ns | 0.97(➖誤差、コードサイズ 84 B で同一) |
+| **具象 sealed 型の参照** | 233.1 ns | **0.44**(27 B、直接呼び出し + インライン化) |
+
+**net10 ではインターフェース参照越しの呼び出しは sealed でも速くならなかった**(生成コードサイズ一致)。効くのは**フィールド・変数を具象 sealed 型で持つ**こと(0.44 倍)。sealed 自体はコストゼロなので既定にする方針は不変だが、期待する効果は「具象型で持てる場面」「AOT / PGO なし環境」「JIT の単相 devirt の後押し」に置く。→ [測定結果](benchmarks/results/DSP-01-SealedDevirt.md)
+
 **設計指針:** 継承を設計意図として明示的に許すクラス以外、ライブラリの実装クラスはすべて sealed を既定とする(BCL も同方針)。
 
 ---
@@ -987,6 +1021,8 @@ public T? Find<TState>(TState state, Func<T, TState, bool> predicate) { ... }
 ```
 
 **ユースケース:** LINQ 風ユーティリティ、コレクション検索、辞書の GetOrAdd、継続・コールバック登録、Result/Option 型の Map/Bind。
+
+**実測結果(Ryzen 9 5900X / net10、反復ごとに変わるローカルを条件に使う検索):** キャプチャするラムダ 11.2 ns + **88 B/回**(クロージャ + デリゲート)に対し、static ラムダ + TState は **4.66 ns / 0 B(0.42 倍)**(コンパイラがデリゲートをキャッシュ)。→ [測定結果](benchmarks/results/DSP-04-StaticLambda.md)
 
 **設計指針:** 手順として「①ラムダにはまず `static` を付ける → ②コンパイルエラーになったらその状態が本当に必要か見直す → ③必要なら `TState` で渡す」を規約化する。STK-04(static ローカルメソッド iterator)と同じ原則の適用範囲拡大であり、コールバックを受ける公開 API 側は TState 版を常に用意して呼び出し側がこの規約を守れるようにする。
 
@@ -1197,6 +1233,10 @@ public static IEnumerable<IReadOnlyList<T>> Batch<T>(this IEnumerable<T> source,
 
 **ユースケース:** `IEnumerable<T>` を返すすべての拡張メソッド、`yield return` を含む LINQ 系メソッド。
 
+**リポジトリ内実装:** [BatchExtensions.cs](src/PerformancePatterns/Seq/BatchExtensions.cs) の `ThrowIfInvalidSize`(static ローカル throw ヘルパー = 即時バリデーション分離の実例)
+
+**実測結果(Ryzen 9 5900X / net10、デリゲート変換して渡す形):** キャプチャするローカル関数 11.45 ns + 88 B/回、static ローカル関数 + state 引数 15.13 ns / **0 B**。割り当て排除の主張は成立するが、**デリゲートとして渡すホットパスなら static ラムダ + TState(DSP-04: 4.66 ns / 0 B)の方が速い**。static ローカル関数の主戦場は直接呼び出し(インライン化される)と iterator/バリデーション分離であり、キャッシュ済みデリゲート用途では DSP-04 の形を使う。→ [測定結果](benchmarks/results/STK-04-LocalFunctionClosure.md)
+
 ---
 
 ### STK-05: ボックス化回避と頻出値キャッシュ
@@ -1237,6 +1277,8 @@ public static object Box(int value) => value switch
 - struct メソッドのデリゲート束縛
 - 列挙型・値型の `Enum.Parse`(非ジェネリック版)・`GetHashCode`/`Equals(object)` の既定実装経由の比較
 - `params object[]` への値型展開(C# 13 の `params ReadOnlySpan<T>` で回避可能)
+
+**実測結果(Ryzen 9 5900X / net10、-1/0/1 を object[] へ格納):** 直接ボックス化 5.98 ns + 24 B/回、事前キャッシュ switch は **0 B だが 7.66 ns(1.29 倍遅い)**。net10 のヒープ確保(ポインタバンプ)は分岐 3 本より安い — **キャッシュの価値は時間ではなく GC 圧の排除**であり、常駐・高頻度パスに限って採用する(⚠️条件付き)。エスケープしないボックスは JIT が既にスタック化する(上記 0.004 ns)ため、対象は「エスケープする既知値」のみ。→ [測定結果](benchmarks/results/STK-05-BoxingCache.md)
 
 ---
 
@@ -1306,6 +1348,11 @@ private static readonly PropertyChangedEventArgs CountChangedEventArgs = new(nam
 ```
 
 **ユースケース:** Result/検証系のエラー収集、ViewModel 付随オブジェクト(Disposables 等)、通知イベント引数(`PropertyChangedEventArgs` はプロパティ名ごとに static キャッシュ)、Null Object(空実装のシングルトン)。
+
+**実測結果(Ryzen 9 5900X / net10):**
+
+- エラーリスト(失敗率 10%): 遅延確保 69.2 ns ≒ 先行確保 67.2 ns(信頼区間重複)で、失敗がある限り両者とも 216 B。**全件成功パスでは遅延側の割り当てが完全にゼロ**(先行確保は常に 216 B)— 勝ちは速度ではなく割り当ての構造
+- 空配列: **net10 では `new int[0]`(定数畳み込み可能な形)も実測割り当てゼロ**(ランタイムが空配列を共有化)。ただし生成コードは `[]`(共有参照ロード 11 B)の方がヘルパー呼び出し(27 B)より短い。可搬性・コードサイズの点で `[]` / `Array.Empty<T>()` を既定にする判断は不変 → [測定結果](benchmarks/results/STK-07-LazyAllocation.md)
 
 **注意:** 遅延確保フィールドはスレッド安全性が必要なら lock または CON-02 と組み合わせる(単一スレッド前提の型ならそのままでよい)。
 
@@ -2186,6 +2233,8 @@ ValueStringBuilder(stackalloc 初期バッファ + ArrayPool 拡張の ref struc
 - ライブラリの公開 API は `TryXxx(out T result)` を正とし、例外版(`Xxx`)は Try 版のラッパーとして提供する
 - 内部実装でも BCL の Try 系 API(`int.TryParse`, `Utf8Parser.TryParse` 等)を使い、try/catch を制御フローにしない
 
+**実測結果(Ryzen 9 5900X / net10、不正入力 10% の整数パース):** 例外制御フロー 183.8 ns/回 + 48 B(**例外 1 回 ≒ 1.8 μs**)に対し、TryParse は **4.67 ns / 0 B(0.03 倍 = 約 39 倍)**。コードサイズも 8,117 B vs 1,712 B(EH の足場分)。→ [測定結果](benchmarks/results/TXT-03-TryPattern.md)
+
 ---
 
 ### TXT-04: バイト列トークンの直接判定
@@ -2549,6 +2598,8 @@ private static extern ref string? GetMessageField(Exception exception);
 - 対象メンバーは名前文字列で指定するため、参照先ライブラリの内部実装変更で実行時エラー(`MissingFieldException` / `MissingMethodException`)になる。内部 API は互換性契約の対象外である前提で、バージョン更新時にテストで検出できる体制を作る
 - ジェネリック型・ジェネリックメソッド対応は .NET 9 以降(.NET 8 では非対応)。非公開「型」自体を扱う場合は .NET 10 の `UnsafeAccessorTypeAttribute` を使う
 - 自分のコードベース内では通常の internal + `InternalsVisibleTo` を優先し、UnsafeAccessor は「変更できない外部コード」への手段と位置づける
+
+**実測結果(Ryzen 9 5900X / net10、非公開 int フィールドの読み出し):** UnsafeAccessor 0.264 ns = 公開プロパティ 0.269 ns(**コードサイズ 23 B で同一 = 直接フィールドロードへコンパイル**)。`FieldInfo.GetValue` は 9.33 ns + **24 B/回のボックス化**(34.8 倍)。→ [測定結果](benchmarks/results/TYP-03-UnsafeAccessor.md)
 
 ---
 
@@ -3222,6 +3273,30 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 
 ---
 
+## 🤖 net10 では手書き不要になった最適化(ランタイム自動化の記録)
+
+かつて有効だった(または有効とされてきた)手書き最適化のうち、**現行ランタイム(.NET 10)が自動で行うため書く必要がなくなったもの**の一覧。生成コード・AI によるコード生成では、これらを「速くするため」に出力しないこと(可読な素直な形で書けば同じコードになる)。
+
+| 手書きしていた形 | ランタイムが自動でやること | 確認方法 | 記録 |
+|---|---|---|---|
+| `(uint)(v - min) <= max - min` の範囲チェック変換 | JIT が 2 比較形を符号なし 1 比較へ自動融合 | Tier1 生成コード一致 | [BIT-01](benchmarks/results/BIT-01-RangeCheck.md) |
+| 定数 2 の累乗サイズの `%` を `&` マスクへ書き換え | JIT が定数剰余を AND 形へ畳み込み | 実測でマスクと同水準 | [BIT-03](benchmarks/results/BIT-03-PowerOfTwoMask.md) |
+| 小さなヘルパーへの `AggressiveInlining` 付与 | 既定ポリシー(PGO)がループ持ちでもインライン化 | 呼び出し側 Tier1 コード一致(94 B) | [JIT-01](benchmarks/results/JIT-01-Inlining.md) |
+| `new T[0]` を `Array.Empty<T>()` へ置換 | 空配列を共有化し割り当てゼロに(コードサイズは `[]` が小) | BDN 割り当てゼロ実測 | [STK-07](benchmarks/results/STK-07-LazyAllocation.md) |
+| 単一 Span ループの `GetReference` + `Unsafe.Add` 化 | 標準 for で境界チェックを完全除去 | 手動化は 1.07〜1.13 倍遅 | [R-02](docs/rejected-patterns.md) |
+| **複数 Span** の単純ループの手動 ref 走査 | 索引形を自動ベクトル化(0.36 ns/要素) | 手動化はベクトル化を阻害し 1.46 倍遅 | [MEM-01](benchmarks/results/MEM-01-DualSpanWalk.md) |
+| `typeof(X)` の static readonly キャッシュ | Tier1 で凍結 RuntimeType ポインタの即値へ定数化 | 生成コード完全一致(11 B) | [R-01](docs/rejected-patterns.md) |
+| ループ構文の書き分け(for / while) | 同一の命令列へ正規化 | 生成コード一致(28 B) | [R-04](docs/rejected-patterns.md) |
+| デリゲート Invoke の `call` 置換(null チェック回避) | ターゲットフィールド読みが null チェックを兼務 | 生成コード完全一致(229 B) | [R-17](docs/rejected-patterns.md) |
+| 手書きの桁整形ループ(右詰めシフト・逆順書き) | `TryFormat` 内部が桁数計算・2 桁テーブル・アンロール済み | TryFormat の 2.5〜4.8 倍遅 | [R-16](docs/rejected-patterns.md) |
+| 自前ハッシュループ(FNV-1a 等) | `string.GetHashCode` / XxHash3 がベクトル化済み | 64 文字以降で自前が逆転負け | [BIT-05](benchmarks/results/BIT-05-XxHash3.md) |
+| エスケープしないボックスの回避 | エスケープ解析がスタック化(0.004 ns) | STK-05 実測例 | [STK-05](#stk-05-ボックス化回避と頻出値キャッシュ) |
+| 末尾要素の事前タッチによる境界チェック誘導 | ヒントなしで同一(全バリアント差なし) | net10 / net8 実測 | [R-15](docs/rejected-patterns.md) |
+
+**読み方:** ここに載っている形は「書いても壊れない」が、**書く理由がもうない**。手書きが依然必要な境界(複合条件の範囲チェック、実行時サイズのマスク、複数 Span の同時走査、エスケープするボックス等)は各パターン本文・不採用記録の「代わりにやること」を参照。
+
+---
+
 ## ❌ 採用しない手法(不採用一覧)
 
 実測で効果なし・逆効果と判定した手法。**コード生成・レビューでこれらを「最適化」として適用しないこと。** 各手法の狙い・実測・代替の詳細は [docs/rejected-patterns.md](docs/rejected-patterns.md) を参照。
@@ -3269,6 +3344,10 @@ Holder フィールドターゲットはコンパイル済みクロージャと�
 | BUF-04 ラッパー vs 素の Rent/Return の時間 | 2.8 vs 3.0 μs、信頼区間重複 | — | ➖ **誤差**(時間軸)。ラッパーコストは計測分解能以下。採否は安全性・割り当て軸で判断し採用 |
 | COL-06 `ToImmutable` vs `MoveToImmutable`(256 要素)の時間 | 288 vs 279 ns、信頼区間重複 | コードサイズ 2,035 vs 903 B で**別物** | ➖ **誤差**(この条件の時間軸のみ)。16 要素では実差(24.3 vs 17.7 ns)、割り当ては常に半減 |
 | STK-08 InlineArray vs stackalloc | 4.93 vs 4.71 ns、**信頼区間非重複** | コードサイズ 112 vs 134 B | **実差**(誤差ではない)。stackalloc が僅かに速く、InlineArray の価値は「構造体フィールドに置ける」こと |
+| BIT-01 手書き符号なし範囲チェック | 548.5 vs 553.7 ns、信頼区間重複 | Tier1 で**実質同一**(`sub r8d,100` vs `add r8d,-100` の符号化違いのみ、45 B) | ❌ **差なし**(net10 の JIT は 2 比較形を自動で符号なし 1 比較へ融合する) |
+| JIT-01 AggressiveInlining 属性(ループ持ちヘルパー) | 1.451 vs 1.338 μs、信頼区間重複 | 呼び出し側 Tier1 コード**完全一致**(94 B) | ❌ **差なし**(既定ポリシーが既にインライン化。NoInlining のみ +17% の実差 = インライン化自体の価値は実証) |
+| STK-07 `new int[0]` vs `Array.Empty` | 0.28 vs 0.31 ns、信頼区間重複 | **別物**(ヘルパー呼び出し 27 B vs 共有参照ロード 11 B) | ➖ **誤差**(時間軸)。net10 では両者とも割り当てゼロ(ランタイムが空配列を共有化)。コードサイズと可搬性で `[]` を既定に |
+| DSP-01 インターフェース参照越しの sealed 有無 | 536.8 vs 509.1 ns、信頼区間重複 | コードサイズ 84 B で一致(一次確認) | ➖ **誤差**。効くのは具象 sealed 型で保持する形(0.44 倍の実差) |
 | R-01 typeof の static readonly キャッシュ | 完全に同値 | Tier1 で**同一の即値ロードに一致**(11 B。昇格前はキャッシュ側に初期化チェックが残り 48 B) | ❌ **差なし**(コールドパスではキャッシュ側が不利ですらある) |
 | R-04 ループ構文 for / while | 完全に同値 | **命令列一致**(28 B) | ❌ **差なし**(「正規化」が成り立つのはこの 2 形式) |
 | R-04 do-while / 降順 for | 完全に同値 | **別物**(do はループ内境界チェック残存 63 B、降順はクローン 85 B) | ➖ **誤差**。既定は for / while |

@@ -41,6 +41,8 @@ public static class Program
         VerifyUnmeasuredBatch3();
         VerifyImplementationBatch3();
         VerifyStarFiveBatch();
+        VerifyStarFourBatchA();
+        VerifyStarFourBatchB();
 
         // 実行例: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -79,6 +81,20 @@ public static class Program
                 typeof(PipelinesBenchmark),
                 typeof(AsyncEnumerableBenchmark),
                 typeof(DisposeGuardBenchmark),
+                typeof(StructArrayRefBenchmark),
+                typeof(DualSpanWalkBenchmark),
+                typeof(TypeofBranchBenchmark),
+                typeof(ColdPathSplitBenchmark),
+                typeof(LocalFunctionClosureBenchmark),
+                typeof(TryPatternBenchmark),
+                typeof(SealedDevirtBenchmark),
+                typeof(UnsafeAccessorBenchmark),
+                typeof(RangeCheckBenchmark),
+                typeof(LazyAllocationBenchmark),
+                typeof(SharedEmptyBenchmark),
+                typeof(StaticLambdaBenchmark),
+                typeof(BoxingCacheBenchmark),
+                typeof(InliningBenchmark),
                 typeof(SkipLocalsInitBenchmark),
                 typeof(PowerOfTwoMaskBenchmark),
                 typeof(BufferWriterSlimBenchmark),
@@ -715,6 +731,131 @@ public static class Program
         if ((mask.PowerOfTwoMask() != expected) || (mask.ConstSizeModulo() != expected))
         {
             throw new InvalidOperationException("Verify failed. PowerOfTwoMask");
+        }
+    }
+
+    private static void VerifyStarFourBatchA()
+    {
+        // BIT-01: 2 方式のカウント一致
+        var range = new RangeCheckBenchmark();
+        range.Setup();
+        if (range.TwoComparisons() != range.UnsignedSingleComparison())
+        {
+            throw new InvalidOperationException("Verify failed. RangeCheck");
+        }
+
+        // STK-07: 遅延確保でも同じエラー数、全成功時はゼロ
+        var lazy = new LazyAllocationBenchmark();
+        lazy.Setup();
+        if ((lazy.EagerList() != 10) || (lazy.LazyList() != 10) || (lazy.LazyListAllValid() != 0))
+        {
+            throw new InvalidOperationException("Verify failed. LazyAllocation");
+        }
+
+        var shared = new SharedEmptyBenchmark();
+        if ((shared.NewEmptyArray() != 0) || (shared.SharedEmptyArray() != 0))
+        {
+            throw new InvalidOperationException("Verify failed. SharedEmpty");
+        }
+
+        // DSP-04: キャプチャ形と state 形の結果一致(0..15 の合計 × ループ回数/16)
+        var lambda = new StaticLambdaBenchmark();
+        lambda.Setup();
+        if (lambda.CaptureLocal() != lambda.StaticWithState())
+        {
+            throw new InvalidOperationException("Verify failed. StaticLambda");
+        }
+
+        // STK-05: ボックス経路によらず合計一致(-1/0/1 の列)
+        var boxing = new BoxingCacheBenchmark();
+        boxing.Setup();
+        if (boxing.DirectBoxing() != boxing.CachedBox())
+        {
+            throw new InvalidOperationException("Verify failed. BoxingCache");
+        }
+
+        // JIT-01: 3 方式の結果一致
+        var inlining = new InliningBenchmark();
+        inlining.Setup();
+        if ((inlining.DefaultPolicy() != inlining.Aggressive()) || (inlining.DefaultPolicy() != inlining.NoInline()))
+        {
+            throw new InvalidOperationException("Verify failed. Inlining");
+        }
+    }
+
+    private static void VerifyStarFourBatchB()
+    {
+        // MEM-04: 3 方式の合計一致(0..1023 の A + 2A)
+        var structArray = new StructArrayRefBenchmark();
+        structArray.Setup();
+        var expectedEntries = 3L * 1023 * 1024 / 2;
+        if ((structArray.ClassArray() != expectedEntries) ||
+            (structArray.StructArrayCopy() != expectedEntries) ||
+            (structArray.StructArrayRef() != expectedEntries))
+        {
+            throw new InvalidOperationException("Verify failed. StructArrayRef");
+        }
+
+        // MEM-01: 3 方式の合計一致
+        var dualSpan = new DualSpanWalkBenchmark();
+        dualSpan.Setup();
+        if ((dualSpan.Indexed() != dualSpan.IndexedPreSliced()) || (dualSpan.Indexed() != dualSpan.RefWalk()))
+        {
+            throw new InvalidOperationException("Verify failed. DualSpanWalk");
+        }
+
+        // JIT-03: 特殊化経路が手書きと一致し、フォールバックは長さを返すこと
+        var typeofBranch = new TypeofBranchBenchmark();
+        typeofBranch.Setup();
+        if ((typeofBranch.HandwrittenIntSum() != typeofBranch.GenericWithTypeofBranch()) ||
+            (TypeofBranchBenchmark.SumFallback(new long[8]) != 8))
+        {
+            throw new InvalidOperationException("Verify failed. TypeofBranch");
+        }
+
+        // JIT-04: 両実装の書き込み数一致
+        var coldPath = new ColdPathSplitBenchmark();
+        coldPath.Setup();
+        if ((coldPath.FatMethod() != 1024) || (coldPath.SplitColdPath() != 1024))
+        {
+            throw new InvalidOperationException("Verify failed. ColdPathSplit");
+        }
+
+        // STK-04: キャプチャ形と static 形の結果一致
+        var localFunction = new LocalFunctionClosureBenchmark();
+        localFunction.Setup();
+        if (localFunction.CapturingLocalFunction() != localFunction.StaticLocalFunction())
+        {
+            throw new InvalidOperationException("Verify failed. LocalFunctionClosure");
+        }
+
+        // TXT-03: 例外形と Try 形の結果一致
+        var tryPattern = new TryPatternBenchmark();
+        tryPattern.Setup();
+        if (tryPattern.ExceptionControlFlow() != tryPattern.TryPattern())
+        {
+            throw new InvalidOperationException("Verify failed. TryPattern");
+        }
+
+        // DSP-01: 3 方式の合計一致
+        var devirt = new SealedDevirtBenchmark();
+        devirt.Setup();
+        var expectedSum = 1023L * 1024 / 2;
+        if ((devirt.OpenInterface() != expectedSum) ||
+            (devirt.SealedInterface() != expectedSum) ||
+            (devirt.SealedConcrete() != expectedSum))
+        {
+            throw new InvalidOperationException("Verify failed. SealedDevirt");
+        }
+
+        // TYP-03: 3 経路の読み出し一致
+        var accessor = new UnsafeAccessorBenchmark();
+        accessor.Setup();
+        if ((accessor.PublicProperty() != 4200) ||
+            (accessor.UnsafeAccessorField() != 4200) ||
+            (accessor.ReflectionGetValue() != 4200))
+        {
+            throw new InvalidOperationException("Verify failed. UnsafeAccessor");
         }
     }
 
