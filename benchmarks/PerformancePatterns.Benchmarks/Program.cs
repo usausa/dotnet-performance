@@ -43,6 +43,7 @@ public static class Program
         VerifyStarFiveBatch();
         VerifyStarFourBatchA();
         VerifyStarFourBatchB();
+        VerifyStarThreeBatch();
 
         // 実行例: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -81,6 +82,13 @@ public static class Program
                 typeof(PipelinesBenchmark),
                 typeof(AsyncEnumerableBenchmark),
                 typeof(DisposeGuardBenchmark),
+                typeof(SliceStyleBenchmark),
+                typeof(ArrayDataReferenceBenchmark),
+                typeof(StructStreamIoBenchmark),
+                typeof(FrozenBuildBenchmark),
+                typeof(FrozenLookupBenchmark),
+                typeof(UnsafeAsCastBenchmark),
+                typeof(CallAbstractionBenchmark),
                 typeof(StructArrayRefBenchmark),
                 typeof(DualSpanWalkBenchmark),
                 typeof(TypeofBranchBenchmark),
@@ -856,6 +864,77 @@ public static class Program
             (accessor.ReflectionGetValue() != 4200))
         {
             throw new InvalidOperationException("Verify failed. UnsafeAccessor");
+        }
+    }
+
+    private static void VerifyStarThreeBatch()
+    {
+        // MEM-05: 2 記法の結果一致
+        var slice = new SliceStyleBenchmark();
+        slice.Setup();
+        if (slice.SliceMethod() != slice.RangeOperator())
+        {
+            throw new InvalidOperationException("Verify failed. SliceStyle");
+        }
+
+        // MEM-02: 逐次 2 方式・ランダム 2 方式の一致
+        var arrayRef = new ArrayDataReferenceBenchmark();
+        arrayRef.Setup();
+        if ((arrayRef.SequentialFor() != arrayRef.SequentialRefWalk()) ||
+            (arrayRef.RandomIndexed() != arrayRef.RandomRefAdd()))
+        {
+            throw new InvalidOperationException("Verify failed. ArrayDataReference");
+        }
+
+        // SEQ-03: 一括書き込みイメージをフィールド単位で読み戻して一致すること
+        var structIo = new StructStreamIoBenchmark();
+        structIo.Setup();
+        var writtenBulk = structIo.WriteBulkCast();
+        var writtenFields = structIo.WriteFieldByField();
+        if (writtenBulk != writtenFields)
+        {
+            throw new InvalidOperationException("Verify failed. StructStreamIo (length)");
+        }
+
+        if ((structIo.ReadFieldByField() != 1023 * 7L) || (structIo.ReadBulkCast() != 1023 * 7L))
+        {
+            throw new InvalidOperationException("Verify failed. StructStreamIo (roundtrip)");
+        }
+
+        // COL-02: 構築件数・検索合計の一致
+        var frozenBuild = new FrozenBuildBenchmark { Count = 16 };
+        frozenBuild.Setup();
+        if ((frozenBuild.BuildDictionary() != 16) || (frozenBuild.BuildFrozen() != 16))
+        {
+            throw new InvalidOperationException("Verify failed. FrozenBuild");
+        }
+
+        var frozenLookup = new FrozenLookupBenchmark { Count = 16 };
+        frozenLookup.Setup();
+        if ((frozenLookup.LookupDictionary() != 120) || (frozenLookup.LookupFrozen() != 120))
+        {
+            throw new InvalidOperationException("Verify failed. FrozenLookup");
+        }
+
+        // TYP-05: 3 方式の合計一致
+        var unsafeAs = new UnsafeAsCastBenchmark();
+        unsafeAs.Setup();
+        if ((unsafeAs.CastClass() != unsafeAs.IsPattern()) || (unsafeAs.CastClass() != unsafeAs.UnsafeAs()))
+        {
+            throw new InvalidOperationException("Verify failed. UnsafeAsCast");
+        }
+
+        // DSP-02: 5 方式の合計一致
+        var abstraction = new CallAbstractionBenchmark();
+        abstraction.Setup();
+        var expected = 1023L * 1024 / 2;
+        if ((abstraction.DirectSealed() != expected) ||
+            (abstraction.ViaInterface() != expected) ||
+            (abstraction.ViaAbstract() != expected) ||
+            (abstraction.ViaDelegate() != expected) ||
+            (abstraction.ViaFunctionPointer() != expected))
+        {
+            throw new InvalidOperationException("Verify failed. CallAbstraction");
         }
     }
 
