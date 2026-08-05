@@ -1,11 +1,10 @@
 # MEM-04: Struct argument passing (by value vs in)
 
-- Verdict: conditional - on x86-64-v4 the by-value copy penalty largely disappeared, and "the win grows with struct size" no longer holds
-- Comparing each pair directly: 8-byte in/by-value 0.99x, **32-byte 0.81x** (1.164 vs 1.444 ns, non-overlapping CIs), **64-byte 0.98x** (1.211 vs 1.235 ns)
-- On the previous Ryzen 9 5900X baseline the same pairs were 0.83x / 0.73x / 0.55x, i.e. monotonically better with size. Here only the 32-byte case still pays
-- Everything except the mutable-member case now sits in a 1.16-1.44 ns band, which is the non-inlined call overhead itself - the copy is no longer what dominates
-- **Defensive copy trap is the finding that survives intact**: in + non-readonly member 1.879 ns = 1.57x of in + readonly member, code size 219 B vs 109 B
-- All variants allocation-free. Keep `in` for large readonly structs (it never costs anything and code size drops: 63/79 B vs 76/99 B), but do not expect it to show up in timings on this hardware
+- Verdict: conditional
+- in vs by-value (non-inlined call): 8-byte 0.99x, 32-byte 0.81x (1.164 vs 1.444 ns, non-overlapping CIs), 64-byte 0.98x - only the 32-byte case shows a real time win; small and large copies alike are largely hidden behind the call itself
+- Everything except the mutable-member case sits in a 1.16-1.44 ns band - the non-inlined call overhead, not the copy, dominates
+- The real hazard is the defensive copy: in + non-readonly member 1.879 ns = 1.57x of in + readonly member, code size 219 B vs 109 B
+- All variants allocation-free. in is never slower and trims code size (63/79 B vs 76/99 B) - a safe default for readonly structs, but verify any claimed time win by measurement
 
 ```
 

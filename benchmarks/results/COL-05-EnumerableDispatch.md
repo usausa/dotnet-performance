@@ -1,10 +1,10 @@
 # COL-05: IEnumerable concrete-type dispatch
 
-- Verdict: adopted (conditional) - the conditions tightened
-- List source 0.83x via CollectionsMarshal.AsSpan branch (253.7 -> 210.2 ns). Was 0.56x on the previous Ryzen 9 5900X baseline: List's own enumerator gained 1.94x from the newer core, so most of the win evaporated
-- Array source: no gain on net10 (guarded devirtualization already handles it; 213.8 vs 209.8 ns)
-- **The iterator fallback now costs 1.13x** (486.7 -> 552.0 ns, non-overlapping CIs). It was free on the previous baseline (829.0 vs 822.8 ns), so the type tests are no longer a "free bet" - a lazy-iterator argument pays for the branches it never uses
-- Net: worth it when the input is predominantly List; against it when lazy iterators are common. On AOT the array branch remains valuable (no dynamic PGO)
+- Verdict: adopted (conditional)
+- List source 0.83x via the CollectionsMarshal.AsSpan branch (253.7 -> 210.2 ns)
+- Array source: no gain on net10 with dynamic PGO (guarded devirtualization already specializes the enumerator; 213.8 vs 209.8 ns) - on AOT the array branch remains valuable
+- The iterator fallback pays 1.13x (486.7 -> 552.0 ns, non-overlapping CIs): a lazy-iterator argument pays for the type tests it never uses
+- Net: worth it when inputs are predominantly List/array; skip it when lazy iterators are common
 
 ```
 

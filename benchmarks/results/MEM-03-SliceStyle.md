@@ -1,8 +1,8 @@
 # MEM-03: Slice(offset, length) vs range operator
 
-- Verdict: adopted (small but real)
-- 122.8 vs 136.8 ns for 256 slices (0.90x, non-overlapping CIs); code size 100 vs 103 B
-- ~0.05 ns per slice: only worth writing deliberately in hot loops; elsewhere pick for readability
+- Verdict: measurement noise (time unresolvable; codegen differs slightly)
+- 106.6 vs 107.0 ns for 256 slices, CIs overlap; code size 100 vs 103 B
+- No time basis for preferring Slice(offset, length) on this JIT/core - choose whichever reads better (on older cores a small real difference in favor of Slice was measurable, so the form is not harmful either)
 
 ```
 

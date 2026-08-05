@@ -1,10 +1,10 @@
 # DSP-01: sealed devirtualization (single-impl interface call)
 
-- Verdict: conditional - and on x86-64-v4 the remaining time win is nearly gone too
-- Via interface reference, sealed vs open still measures equal (220.7 vs 221.9 ns, CIs overlap, code size 84 B both)
-- **SealedConcrete (typed reference) is now only 0.98x** (215.2 vs 220.7 ns - non-overlapping CIs, so a real but ~2% difference). It was 0.44x on the previous Ryzen 9 5900X baseline: the newer core predicts the indirect branch well enough that devirtualization buys almost no time
-- What survives is **code size: 27 B vs 84 B**. That is where the value now sits - inlining headroom at the call site, AOT (no dynamic PGO), and smaller hot code
-- sealed remains free, so keep it as the default; just do not sell it as a speed optimization on this class of hardware
+- Verdict: conditional
+- Via interface reference, sealed vs open measures equal (220.7 vs 221.9 ns, CIs overlap, code size 84 B both)
+- Concrete sealed reference: 0.98x time (a real but ~2% difference), code 27 B vs 84 B - the payoff is the direct call's code size and inlining headroom, not wall-clock time; the indirect call itself predicts well on modern cores
+- The code-size/devirtualization win matters most under AOT or without dynamic PGO, where the runtime cannot despeculate the call site
+- sealed remains free - keep it as the default, but do not expect interface-typed call sites to get faster from sealing alone
 
 ```
 

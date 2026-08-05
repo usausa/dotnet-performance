@@ -1,10 +1,9 @@
 # LAB: Pinned (POH) buffer for speed (rejected, R-13)
 
-- Verdict: rejected (for performance purposes) - the rejection now rests on allocation cost alone
-- **The "fixed is free" basis no longer holds**: fixed 0.1184 ns vs POH pointer 0.0149 ns, non-overlapping CIs and different code size (56 vs 33 B). On the previous Ryzen 9 5900X baseline the POH pointer was the slower of the two (0.85 vs 0.74 ns, ratio 1.15); here it is 0.13x
-- The gap is ~0.10 ns per pin, so it only shows up if you pin on an extremely hot path
-- POH allocation 19.3x vs normal (961 vs 49.9 ns) + Gen1/Gen2 collections - this is what keeps the pattern rejected for general use
-- POH is for long-lived I/O buffers (fragmentation avoidance), allocate once at startup
+- Verdict: rejected (for performance purposes)
+- POH allocation 961 ns vs normal 49.9 ns (19.3x) + Gen1/Gen2 collections - never allocate POH buffers per operation
+- fixed 0.118 ns vs pre-pinned pointer 0.015 ns (code 56 vs 33 B): a real but ~0.1 ns-per-pin difference, visible only in pin-per-iteration hot loops
+- POH is a fragmentation countermeasure for long-lived I/O buffers allocated once at startup, not a speed tool
 
 ```
 

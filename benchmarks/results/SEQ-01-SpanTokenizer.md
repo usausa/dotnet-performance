@@ -1,10 +1,10 @@
 # SEQ-01: SpanTokenizer
 
-- Verdict: adopted (implemented) - but on x86-64-v4 the speed win is now token-count dependent
-- 0.47x at 4 tokens vs string.Split; at 64 tokens it is **1.15x, i.e. SLOWER** (non-overlapping CIs, a real difference)
-- The durable win is allocation: 216 B (4 tokens) / 3096 B (64 tokens) -> 0 B in every case
-- Still ahead of MemoryExtensions.Split (BCL 1.04-1.13x slower), so it remains the better of the span-based tokenizers
-- Reversal vs the previous Ryzen 9 5900X / x86-64-v3 baseline (0.34x / 0.70x): string.Split gained 1.54x at 64 tokens on AVX-512 hardware while this scalar walk did not. Reach for it for allocation and for short inputs, not as a blanket speed win on long ones
+- Verdict: adopted (implemented) - zero allocation always; the time win is limited to short inputs
+- 4 tokens: 0.47x vs string.Split; 64 tokens: 1.15x (slower, non-overlapping CIs) - string.Split's vectorized core scales better on long inputs
+- Allocation 216 B / 3,096 B -> 0 B in every case; code size ~5 KB -> 0.7 KB
+- Ahead of MemoryExtensions.Split (1.04-1.13x slower than this) among the span-based approaches
+- Choose it for allocation elimination and short token counts, not as a blanket speed win
 
 ## SpanTokenizerBenchmark (vs string.Split)
 
