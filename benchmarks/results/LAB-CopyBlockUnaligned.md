@@ -10,45 +10,45 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method             | Size | Mean      | Error     | StdDev    | Min        | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
-|------------------- |----- |----------:|----------:|----------:|-----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
-| **SpanCopyTo**         | **16**   |  **2.401 ns** | **0.4158 ns** | **0.6224 ns** |  **1.4157 ns** |  **3.188 ns** |  **3.043 ns** |  **1.08** |    **0.44** |     **673 B** |         **-** |          **NA** |
-| ArrayCopy          | 16   |  3.078 ns | 0.1303 ns | 0.1868 ns |  2.7887 ns |  3.469 ns |  3.289 ns |  1.39 |    0.44 |   1,706 B |         - |          NA |
-| CopyBlockUnaligned | 16   |  1.827 ns | 0.5201 ns | 0.7624 ns |  0.9734 ns |  2.891 ns |  2.660 ns |  0.83 |    0.44 |     635 B |         - |          NA |
-|                    |      |           |           |           |            |           |           |       |         |           |           |             |
-| **SpanCopyTo**         | **512**  |  **9.328 ns** | **0.1499 ns** | **0.2244 ns** |  **8.9511 ns** |  **9.875 ns** |  **9.658 ns** |  **1.00** |    **0.03** |     **654 B** |         **-** |          **NA** |
-| ArrayCopy          | 512  | 10.017 ns | 0.4071 ns | 0.6093 ns |  8.9523 ns | 11.143 ns | 10.682 ns |  1.07 |    0.07 |   1,687 B |         - |          NA |
-| CopyBlockUnaligned | 512  |  9.170 ns | 0.1412 ns | 0.2113 ns |  8.6641 ns |  9.497 ns |  9.397 ns |  0.98 |    0.03 |     616 B |         - |          NA |
-|                    |      |           |           |           |            |           |           |       |         |           |           |             |
-| **SpanCopyTo**         | **4096** | **45.331 ns** | **3.2149 ns** | **4.8120 ns** | **36.8707 ns** | **51.096 ns** | **49.662 ns** |  **1.01** |    **0.16** |     **631 B** |         **-** |          **NA** |
-| ArrayCopy          | 4096 | 49.591 ns | 1.1152 ns | 1.6692 ns | 46.2714 ns | 52.735 ns | 51.708 ns |  1.11 |    0.13 |   1,740 B |         - |          NA |
-| CopyBlockUnaligned | 4096 | 46.267 ns | 1.5413 ns | 2.3070 ns | 39.7751 ns | 49.725 ns | 48.943 ns |  1.03 |    0.13 |     593 B |         - |          NA |
+| Method             | Size | Mean       | Error     | StdDev    | Median     | Min        | Max        | P90        | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|------------------- |----- |-----------:|----------:|----------:|-----------:|-----------:|-----------:|-----------:|------:|--------:|----------:|----------:|------------:|
+| **SpanCopyTo**         | **16**   |  **1.0310 ns** | **0.0052 ns** | **0.0075 ns** |  **1.0326 ns** |  **1.0168 ns** |  **1.0428 ns** |  **1.0408 ns** |  **1.00** |    **0.01** |     **657 B** |         **-** |          **NA** |
+| ArrayCopy          | 16   |  1.6386 ns | 0.0231 ns | 0.0332 ns |  1.6308 ns |  1.6092 ns |  1.7736 ns |  1.6533 ns |  1.59 |    0.03 |   1,694 B |         - |          NA |
+| CopyBlockUnaligned | 16   |  0.8392 ns | 0.0093 ns | 0.0133 ns |  0.8380 ns |  0.8149 ns |  0.8643 ns |  0.8575 ns |  0.81 |    0.01 |     619 B |         - |          NA |
+|                    |      |            |           |           |            |            |            |            |       |         |           |           |             |
+| **SpanCopyTo**         | **512**  |  **4.7445 ns** | **0.0397 ns** | **0.0557 ns** |  **4.7286 ns** |  **4.6763 ns** |  **4.9087 ns** |  **4.7951 ns** |  **1.00** |    **0.02** |     **652 B** |         **-** |          **NA** |
+| ArrayCopy          | 512  |  5.7657 ns | 0.0162 ns | 0.0243 ns |  5.7649 ns |  5.7246 ns |  5.8215 ns |  5.7944 ns |  1.22 |    0.01 |   1,671 B |         - |          NA |
+| CopyBlockUnaligned | 512  |  4.3506 ns | 0.0186 ns | 0.0267 ns |  4.3497 ns |  4.3019 ns |  4.4156 ns |  4.3789 ns |  0.92 |    0.01 |     614 B |         - |          NA |
+|                    |      |            |           |           |            |            |            |            |       |         |           |           |             |
+| **SpanCopyTo**         | **4096** | **25.8064 ns** | **0.2123 ns** | **0.3178 ns** | **25.8598 ns** | **25.3305 ns** | **26.3525 ns** | **26.1954 ns** |  **1.00** |    **0.02** |     **619 B** |         **-** |          **NA** |
+| ArrayCopy          | 4096 | 26.9068 ns | 0.2651 ns | 0.3628 ns | 26.8280 ns | 26.6048 ns | 28.0352 ns | 27.2880 ns |  1.04 |    0.02 |   1,744 B |         - |          NA |
+| CopyBlockUnaligned | 4096 | 26.0984 ns | 0.3311 ns | 0.4748 ns | 26.3741 ns | 25.5297 ns | 26.6703 ns | 26.6365 ns |  1.01 |    0.02 |     581 B |         - |          NA |
 
 ## CopyConstantBenchmark (16 B)
 
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method               | Mean      | Error     | StdDev    | Min       | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
-|--------------------- |----------:|----------:|----------:|----------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
-| SpanCopyTo16         | 1.1533 ns | 0.0584 ns | 0.0874 ns | 0.9017 ns | 1.283 ns | 1.264 ns |  1.01 |    0.11 |     106 B |         - |          NA |
-| CopyBlockUnaligned16 | 0.9563 ns | 0.0457 ns | 0.0684 ns | 0.7887 ns | 1.079 ns | 1.039 ns |  0.83 |    0.09 |      61 B |         - |          NA |
+| Method               | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|--------------------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| SpanCopyTo16         | 0.2233 ns | 0.0053 ns | 0.0079 ns | 0.2081 ns | 0.2354 ns | 0.2318 ns |  1.00 |    0.05 |     106 B |         - |          NA |
+| CopyBlockUnaligned16 | 0.1801 ns | 0.0035 ns | 0.0052 ns | 0.1708 ns | 0.1903 ns | 0.1868 ns |  0.81 |    0.04 |      61 B |         - |          NA |
 

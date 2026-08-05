@@ -1,25 +1,26 @@
 # LAB: Pinned (POH) buffer for speed (rejected, R-13)
 
-- Verdict: rejected (for performance purposes)
-- fixed pinning is ~free (0.74 ns); POH pointer access not faster (0.85 ns)
-- POH allocation 17.5x vs normal + Gen2 collections
+- Verdict: rejected (for performance purposes) - the rejection now rests on allocation cost alone
+- **The "fixed is free" basis no longer holds**: fixed 0.1184 ns vs POH pointer 0.0149 ns, non-overlapping CIs and different code size (56 vs 33 B). On the previous Ryzen 9 5900X baseline the POH pointer was the slower of the two (0.85 vs 0.74 ns, ratio 1.15); here it is 0.13x
+- The gap is ~0.10 ns per pin, so it only shows up if you pin on an extremely hot path
+- POH allocation 19.3x vs normal (961 vs 49.9 ns) + Gen1/Gen2 collections - this is what keeps the pattern rejected for general use
 - POH is for long-lived I/O buffers (fragmentation avoidance), allocate once at startup
 
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method              | Mean          | Error      | StdDev     | Min           | Max           | P90           | Ratio    | RatioSD | Gen0   | Code Size | Gen1   | Gen2   | Allocated | Alloc Ratio |
-|-------------------- |--------------:|-----------:|-----------:|--------------:|--------------:|--------------:|---------:|--------:|-------:|----------:|-------:|-------:|----------:|------------:|
-| PinWithFixed        |     0.7394 ns |  0.0089 ns |  0.0118 ns |     0.7221 ns |     0.7698 ns |     0.7550 ns |     1.00 |    0.02 |      - |      56 B |      - |      - |         - |          NA |
-| PinnedPointerDirect |     0.8514 ns |  0.0067 ns |  0.0089 ns |     0.8382 ns |     0.8719 ns |     0.8630 ns |     1.15 |    0.02 |      - |      33 B |      - |      - |         - |          NA |
-| AllocateNormal      |    79.0096 ns |  3.2665 ns |  4.4712 ns |    72.0148 ns |    88.0862 ns |    86.3869 ns |   106.88 |    6.16 | 0.2462 |      46 B |      - |      - |    4120 B |          NA |
-| AllocatePinned      | 1,380.9222 ns | 14.3044 ns | 20.0528 ns | 1,342.7143 ns | 1,429.7455 ns | 1,399.9497 ns | 1,868.01 |   39.32 | 1.3084 |     217 B | 1.3084 | 1.3084 |    4120 B |          NA |
+| Method              | Mean        | Error      | StdDev     | Min         | Max           | P90         | Ratio    | RatioSD | Gen0   | Code Size | Gen1   | Gen2   | Allocated | Alloc Ratio |
+|-------------------- |------------:|-----------:|-----------:|------------:|--------------:|------------:|---------:|--------:|-------:|----------:|-------:|-------:|----------:|------------:|
+| PinWithFixed        |   0.1184 ns |  0.0060 ns |  0.0090 ns |   0.1024 ns |     0.1393 ns |   0.1307 ns |     1.01 |    0.11 |      - |      56 B |      - |      - |         - |          NA |
+| PinnedPointerDirect |   0.0149 ns |  0.0047 ns |  0.0067 ns |   0.0013 ns |     0.0241 ns |   0.0227 ns |     0.13 |    0.06 |      - |      33 B |      - |      - |         - |          NA |
+| AllocateNormal      |  49.9137 ns |  1.2972 ns |  1.8604 ns |  42.8221 ns |    52.3023 ns |  51.6976 ns |   423.97 |   34.84 | 0.4923 |      46 B |      - |      - |    4120 B |          NA |
+| AllocatePinned      | 961.0727 ns | 23.9547 ns | 32.7895 ns | 938.1147 ns | 1,089.3459 ns | 996.6645 ns | 8,163.46 |  659.81 | 1.3084 |     217 B | 1.3084 | 1.3084 |    4120 B |          NA |

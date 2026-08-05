@@ -1,69 +1,52 @@
 # SEQ-01: SpanTokenizer
 
-- Verdict: adopted (implemented)
-- 0.30-0.34x (4 tokens) / 0.62-0.70x (64 tokens) vs string.Split, 216-3096 B -> 0 B
-- Faster than MemoryExtensions.Split (BCL is 1.07-1.26x slower)
+- Verdict: adopted (implemented) - but on x86-64-v4 the speed win is now token-count dependent
+- 0.47x at 4 tokens vs string.Split; at 64 tokens it is **1.15x, i.e. SLOWER** (non-overlapping CIs, a real difference)
+- The durable win is allocation: 216 B (4 tokens) / 3096 B (64 tokens) -> 0 B in every case
+- Still ahead of MemoryExtensions.Split (BCL 1.04-1.13x slower), so it remains the better of the span-based tokenizers
+- Reversal vs the previous Ryzen 9 5900X / x86-64-v3 baseline (0.34x / 0.70x): string.Split gained 1.54x at 64 tokens on AVX-512 hardware while this scalar walk did not. Reach for it for allocation and for short inputs, not as a blanket speed win on long ones
 
 ## SpanTokenizerBenchmark (vs string.Split)
 
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 8.0  : .NET 8.0.29 (8.0.29, 8.0.2926.32403), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 9.0  : .NET 9.0.18 (9.0.18, 9.0.1826.31522), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
-IterationCount=15  LaunchCount=2  WarmupCount=10  
+Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
+LaunchCount=2  WarmupCount=10  
 
 ```
-| Method        | Job                 | Runtime   | Tokens | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Gen1   | Allocated | Alloc Ratio |
-|-------------- |-------------------- |---------- |------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|-------:|----------:|------------:|
-| **StringSplit**   | **MediumRun-.NET 10.0** | **.NET 10.0** | **4**      |  **44.24 ns** |  **0.555 ns** |  **0.778 ns** |  **42.53 ns** |  **45.81 ns** |  **45.12 ns** |  **1.00** |    **0.02** |   **4,814 B** | **0.0129** |      **-** |     **216 B** |        **1.00** |
-| SpanTokenizer | MediumRun-.NET 10.0 | .NET 10.0 | 4      |  15.21 ns |  0.156 ns |  0.233 ns |  14.72 ns |  15.63 ns |  15.49 ns |  0.34 |    0.01 |     548 B |      - |      - |         - |        0.00 |
-|               |                     |           |        |           |           |           |           |           |           |       |         |           |        |        |           |             |
-| StringSplit   | MediumRun-.NET 8.0  | .NET 8.0  | 4      |  51.48 ns |  1.056 ns |  1.548 ns |  48.70 ns |  54.01 ns |  53.55 ns |  1.00 |    0.04 |   2,635 B | 0.0129 |      - |     216 B |        1.00 |
-| SpanTokenizer | MediumRun-.NET 8.0  | .NET 8.0  | 4      |  15.47 ns |  0.281 ns |  0.420 ns |  14.69 ns |  16.50 ns |  16.02 ns |  0.30 |    0.01 |     579 B |      - |      - |         - |        0.00 |
-|               |                     |           |        |           |           |           |           |           |           |       |         |           |        |        |           |             |
-| StringSplit   | MediumRun-.NET 9.0  | .NET 9.0  | 4      |  49.41 ns |  0.644 ns |  0.944 ns |  46.59 ns |  51.10 ns |  50.46 ns |  1.00 |    0.03 |   2,922 B | 0.0129 |      - |     216 B |        1.00 |
-| SpanTokenizer | MediumRun-.NET 9.0  | .NET 9.0  | 4      |  15.98 ns |  0.529 ns |  0.775 ns |  14.93 ns |  17.23 ns |  16.85 ns |  0.32 |    0.02 |     586 B |      - |      - |         - |        0.00 |
-|               |                     |           |        |           |           |           |           |           |           |       |         |           |        |        |           |             |
-| **StringSplit**   | **MediumRun-.NET 10.0** | **.NET 10.0** | **64**     | **534.65 ns** | **10.922 ns** | **15.665 ns** | **508.20 ns** | **567.71 ns** | **555.88 ns** |  **1.00** |    **0.04** |   **4,998 B** | **0.1850** | **0.0019** |    **3096 B** |        **1.00** |
-| SpanTokenizer | MediumRun-.NET 10.0 | .NET 10.0 | 64     | 371.66 ns |  2.160 ns |  3.233 ns | 360.43 ns | 377.63 ns | 375.22 ns |  0.70 |    0.02 |     573 B |      - |      - |         - |        0.00 |
-|               |                     |           |        |           |           |           |           |           |           |       |         |           |        |        |           |             |
-| StringSplit   | MediumRun-.NET 8.0  | .NET 8.0  | 64     | 601.93 ns | 12.393 ns | 18.550 ns | 565.16 ns | 637.82 ns | 625.21 ns |  1.00 |    0.04 |   2,648 B | 0.1850 | 0.0019 |    3096 B |        1.00 |
-| SpanTokenizer | MediumRun-.NET 8.0  | .NET 8.0  | 64     | 373.19 ns |  2.619 ns |  3.839 ns | 365.10 ns | 382.34 ns | 378.78 ns |  0.62 |    0.02 |     582 B |      - |      - |         - |        0.00 |
-|               |                     |           |        |           |           |           |           |           |           |       |         |           |        |        |           |             |
-| StringSplit   | MediumRun-.NET 9.0  | .NET 9.0  | 64     | 537.42 ns | 18.136 ns | 27.145 ns | 493.03 ns | 588.80 ns | 573.95 ns |  1.00 |    0.07 |   2,941 B | 0.1850 | 0.0019 |    3096 B |        1.00 |
-| SpanTokenizer | MediumRun-.NET 9.0  | .NET 9.0  | 64     | 363.24 ns |  4.172 ns |  6.244 ns | 356.14 ns | 378.98 ns | 372.14 ns |  0.68 |    0.04 |     567 B |      - |      - |         - |        0.00 |
+| Method        | Tokens | Mean      | Error    | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Gen0   | Code Size | Gen1   | Allocated | Alloc Ratio |
+|-------------- |------- |----------:|---------:|----------:|----------:|----------:|----------:|------:|--------:|-------:|----------:|-------:|----------:|------------:|
+| **StringSplit**   | **4**      |  **26.04 ns** | **0.429 ns** |  **0.587 ns** |  **25.22 ns** |  **27.75 ns** |  **26.59 ns** |  **1.00** |    **0.03** | **0.0258** |   **5,036 B** |      **-** |     **216 B** |        **1.00** |
+| SpanTokenizer | 4      |  12.19 ns | 0.676 ns |  1.011 ns |  11.51 ns |  15.55 ns |  13.43 ns |  0.47 |    0.04 |      - |     707 B |      - |         - |        0.00 |
+|               |        |           |          |           |           |           |           |       |         |        |           |        |           |             |
+| **StringSplit**   | **64**     | **347.78 ns** | **8.806 ns** | **11.756 ns** | **328.95 ns** | **393.33 ns** | **355.30 ns** |  **1.00** |    **0.05** | **0.3700** |   **5,219 B** | **0.0043** |    **3096 B** |        **1.00** |
+| SpanTokenizer | 64     | 399.93 ns | 0.803 ns |  1.177 ns | 398.15 ns | 402.55 ns | 401.46 ns |  1.15 |    0.04 |      - |     722 B |      - |         - |        0.00 |
 
 ## SpanTokenizerBclComparisonBenchmark (vs MemoryExtensions.Split, .NET 9+)
 
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 9.0  : .NET 9.0.18 (9.0.18, 9.0.1826.31522), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
-IterationCount=15  LaunchCount=2  WarmupCount=10  
+Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
+LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                | Job                 | Runtime   | Tokens | Mean      | Error    | StdDev   | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
-|---------------------- |-------------------- |---------- |------- |----------:|---------:|---------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
-| **SpanTokenizer**         | **MediumRun-.NET 10.0** | **.NET 10.0** | **4**      |  **14.55 ns** | **0.229 ns** | **0.343 ns** |  **14.01 ns** |  **15.42 ns** |  **15.00 ns** |  **1.00** |    **0.03** |     **548 B** |         **-** |          **NA** |
-| MemoryExtensionsSplit | MediumRun-.NET 10.0 | .NET 10.0 | 4      |  18.33 ns | 0.107 ns | 0.147 ns |  17.98 ns |  18.57 ns |  18.50 ns |  1.26 |    0.03 |     751 B |         - |          NA |
-|                       |                     |           |        |           |          |          |           |           |           |       |         |           |           |             |
-| SpanTokenizer         | MediumRun-.NET 9.0  | .NET 9.0  | 4      |  14.82 ns | 0.215 ns | 0.315 ns |  14.37 ns |  15.62 ns |  15.34 ns |  1.00 |    0.03 |     586 B |         - |          NA |
-| MemoryExtensionsSplit | MediumRun-.NET 9.0  | .NET 9.0  | 4      |  18.49 ns | 0.186 ns | 0.278 ns |  17.86 ns |  18.91 ns |  18.82 ns |  1.25 |    0.03 |     749 B |         - |          NA |
-|                       |                     |           |        |           |          |          |           |           |           |       |         |           |           |             |
-| **SpanTokenizer**         | **MediumRun-.NET 10.0** | **.NET 10.0** | **64**     | **357.72 ns** | **2.432 ns** | **3.640 ns** | **351.15 ns** | **365.10 ns** | **361.30 ns** |  **1.00** |    **0.01** |     **573 B** |         **-** |          **NA** |
-| MemoryExtensionsSplit | MediumRun-.NET 10.0 | .NET 10.0 | 64     | 385.90 ns | 3.814 ns | 5.708 ns | 377.65 ns | 398.11 ns | 394.07 ns |  1.08 |    0.02 |     776 B |         - |          NA |
-|                       |                     |           |        |           |          |          |           |           |           |       |         |           |           |             |
-| SpanTokenizer         | MediumRun-.NET 9.0  | .NET 9.0  | 64     | 358.31 ns | 4.791 ns | 7.171 ns | 349.94 ns | 376.13 ns | 369.82 ns |  1.00 |    0.03 |     567 B |         - |          NA |
-| MemoryExtensionsSplit | MediumRun-.NET 9.0  | .NET 9.0  | 64     | 384.86 ns | 2.161 ns | 3.235 ns | 380.22 ns | 391.43 ns | 389.37 ns |  1.07 |    0.02 |     730 B |         - |          NA |
+| Method                | Tokens | Mean      | Error    | StdDev   | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|---------------------- |------- |----------:|---------:|---------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| **SpanTokenizer**         | **4**      |  **11.70 ns** | **0.123 ns** | **0.168 ns** |  **11.64 ns** |  **11.54 ns** |  **12.20 ns** |  **11.98 ns** |  **1.00** |    **0.02** |     **707 B** |         **-** |          **NA** |
+| MemoryExtensionsSplit | 4      |  13.26 ns | 0.040 ns | 0.057 ns |  13.25 ns |  13.16 ns |  13.42 ns |  13.32 ns |  1.13 |    0.02 |     910 B |         - |          NA |
+|                       |        |           |          |          |           |           |           |           |       |         |           |           |             |
+| **SpanTokenizer**         | **64**     | **405.80 ns** | **4.386 ns** | **6.429 ns** | **404.18 ns** | **399.98 ns** | **426.29 ns** | **416.64 ns** |  **1.00** |    **0.02** |     **722 B** |         **-** |          **NA** |
+| MemoryExtensionsSplit | 64     | 420.89 ns | 2.122 ns | 3.043 ns | 422.60 ns | 417.17 ns | 425.06 ns | 424.06 ns |  1.04 |    0.02 |     922 B |         - |          NA |
 

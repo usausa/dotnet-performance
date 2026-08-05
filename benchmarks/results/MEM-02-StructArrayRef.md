@@ -8,17 +8,17 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method          | Mean     | Error    | StdDev   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
-|---------------- |---------:|---------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
-| ClassArray      | 493.5 ns | 14.21 ns | 21.27 ns | 459.0 ns | 530.7 ns | 524.5 ns |  1.00 |    0.06 |      52 B |         - |          NA |
-| StructArrayCopy | 595.7 ns | 12.57 ns | 18.81 ns | 564.2 ns | 623.7 ns | 617.3 ns |  1.21 |    0.06 |      70 B |         - |          NA |
-| StructArrayRef  | 483.0 ns | 10.13 ns | 15.17 ns | 455.6 ns | 512.3 ns | 499.8 ns |  0.98 |    0.05 |      64 B |         - |          NA |
+| Method          | Mean     | Error   | StdDev  | Min      | Max      | P90      | Ratio | Code Size | Allocated | Alloc Ratio |
+|---------------- |---------:|--------:|--------:|---------:|---------:|---------:|------:|----------:|----------:|------------:|
+| ClassArray      | 401.6 ns | 0.64 ns | 0.89 ns | 399.9 ns | 403.1 ns | 402.8 ns |  1.00 |      52 B |         - |          NA |
+| StructArrayCopy | 414.7 ns | 1.67 ns | 2.39 ns | 411.4 ns | 420.9 ns | 417.3 ns |  1.03 |      70 B |         - |          NA |
+| StructArrayRef  | 412.9 ns | 3.45 ns | 4.94 ns | 408.3 ns | 431.0 ns | 419.1 ns |  1.03 |      64 B |         - |          NA |
