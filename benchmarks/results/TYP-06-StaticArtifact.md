@@ -1,9 +1,9 @@
 # TYP-06: Static pre-built artifacts per type
 
 - Verdict: adopted
-- Generic static field read: 0.09 ns / code size 6 B (effectively free, same as TYP-01 generic path)
-- Dictionary<Type,string> cache: 4.8 ns (0.042x vs rebuild); rebuild every call: 116 ns + 760 B
-- Static generic beats dictionary cache by ~53x; use dictionary only when the type is not known statically
+- Generic static field read: ~0 ns / code size 6 B (below measurement resolution, same as TYP-01 generic path)
+- Dictionary<Type,string> cache: 2.7 ns (0.048x vs rebuild); rebuild every call: 57.0 ns + 760 B
+- Static generic is effectively free; use dictionary only when the type is not known statically
 
 ```
 

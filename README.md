@@ -39,12 +39,14 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 
 ## 📋 Pattern index (summary)
 
+> 🔬 marks patterns whose documented conclusion is not supported by the current measurements (net10 / x86-64-v4): the direction of the comparison or the recommendation itself changed, and the pattern text needs revision.
+
 | ID | Pattern | Goal | AOT | Example |
 |---|---|---|:---:|:---:|
 | [MEM-01](#-mem-01-skiplocalsinit) | SkipLocalsInit | Skip zero-initialization of locals | ✅ | [Verified](benchmarks/results/MEM-01-SkipLocalsInit.md) |
 | [MEM-02](#-mem-02-struct-element-array--ref-access-data-oriented-layout) | struct element array + ref access | Eliminate per-element heap allocation and indirection | ✅ | [Implemented](src/PerformancePatterns/Typ/TypeMap.cs) |
-| [MEM-03](#-mem-03-explicit-slicing-with-sliceoffset-length) | Explicit Slice(offset, length) | Slicing faster than the range operator | ✅ | [Verified](benchmarks/results/MEM-03-SliceStyle.md) |
-| [MEM-04](#-mem-04-passing-struct-arguments-by-in--ref) | Passing struct arguments by in / ref | Avoid value copies of large structs | ✅ | [Verified](benchmarks/results/MEM-04-StructPass.md) |
+| 🔬 [MEM-03](#-mem-03-explicit-slicing-with-sliceoffset-length) | Explicit Slice(offset, length) | Slicing faster than the range operator | ✅ | [Verified](benchmarks/results/MEM-03-SliceStyle.md) |
+| 🔬 [MEM-04](#-mem-04-passing-struct-arguments-by-in--ref) | Passing struct arguments by in / ref | Avoid value copies of large structs | ✅ | [Verified](benchmarks/results/MEM-04-StructPass.md) |
 | [STK-01](#-stk-01-ref-struct-stack-only-type) | ref struct (stack-only type) | Ban heap escape at the type level | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-zero-copy-access-with-spant--readonlyspant) | Span\<T\> / ReadOnlySpan\<T\> | Zero-copy typed view | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [STK-03](#-stk-03-struct-iterator-pattern) | struct iterator pattern | Remove virtual calls and heap allocation from foreach | ✅ | [Implemented](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -66,7 +68,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [JIT-03](#️-jit-03-generic-specialization-via-typeoft-branches) | typeof(T) branch specialization | Remove branches from generic conversion | ✅ | [Verified](benchmarks/results/JIT-03-TypeofBranch.md) |
 | [JIT-04](#️-jit-04-cold-path-separation-throw-helpers--noinlining-on-grow) | Cold-path separation | Promote inlining of the hot path | ✅ | [Implemented](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
 | [JIT-05](#️-jit-05-skipping-work-with-isreferenceorcontainsreferences) | IsReferenceOrContainsReferences branch | Skip cleanup for reference-free types | ✅ | [Verified](benchmarks/results/JIT-05-ReferenceContainsBranch.md) |
-| [DSP-01](#-dsp-01-devirtualization-via-sealed) | Devirtualization via sealed | Turn virtual calls into direct calls | ✅ | [Verified](benchmarks/results/DSP-01-SealedDevirt.md) |
+| 🔬 [DSP-01](#-dsp-01-devirtualization-via-sealed) | Devirtualization via sealed | Turn virtual calls into direct calls | ✅ | [Verified](benchmarks/results/DSP-01-SealedDevirt.md) |
 | [DSP-02](#-dsp-02-choosing-a-call-abstraction) | Choosing a call abstraction | When to use delegate / interface / function pointer | ✅ | [Verified](benchmarks/results/DSP-02-CallAbstraction.md) |
 | [DSP-03](#-dsp-03-immutable-handler-arrays-avoiding-multicast-delegates) | Immutable array of handlers | Avoid multicast delegate degradation | ✅ | [Implemented](src/PerformancePatterns/Dsp/HandlerList.cs) |
 | [DSP-04](#-dsp-04-static-lambdas-everywhere-threading-tstate-through) | static lambdas throughout | Make no-capture the default and pass state via TState | ✅ | [Verified](benchmarks/results/DSP-04-StaticLambda.md) |
@@ -81,8 +83,8 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [BIT-02](#-bit-02-power-of-two-sizing-plus-masking-to-replace-modulo) | Power-of-two size + mask | Turn modulo (division) into a bitwise AND | ✅ | [Verified](benchmarks/results/BIT-02-PowerOfTwoMask.md) |
 | [BIT-03](#-bit-03-bit-scanning-and-counting-with-bitoperations) | BitOperations | Hardware instructions for bit scanning and counting | ✅ | [Verified](benchmarks/results/BIT-03-BitOperations.md) |
 | [BIT-04](#-bit-04-general-purpose-hashing-with-xxhash3) | XxHash3 | Faster non-cryptographic hashing | ✅ | [Verified](benchmarks/results/BIT-04-XxHash3.md) |
-| [VEC-01](#-vec-01-explicit-simd-vectort--vector256) | Explicit SIMD | Bulk processing with Vector\<T\> / Vector256 | ✅ | [Verified](benchmarks/results/VEC-01-VectorSum.md) |
-| [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | General-purpose span splitting (zero allocation) | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
+| 🔬 [VEC-01](#-vec-01-explicit-simd-vectort--vector256) | Explicit SIMD | Bulk processing with Vector\<T\> / Vector256 | ✅ | [Verified](benchmarks/results/VEC-01-VectorSum.md) |
+| 🔬 [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | General-purpose span splitting (zero allocation) | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-02](#-seq-02-struct-io-over-stream) | Struct I/O over Stream | Direct binary read/write of structs | ✅ | [Verified](benchmarks/results/SEQ-02-StructStreamIo.md) |
 | [SEQ-03](#-seq-03-lazy-sequence-processing-batch--segment--traverse) | Batch / Segment / Traverse | Low-allocation sequence processing | ✅ | [Implemented](src/PerformancePatterns/Seq/BatchExtensions.cs) |
 | [SEQ-04](#-seq-04-ring-buffer-with-incremental-delimiter-search) | Ring buffer + incremental search | Splitting a streaming receive | ✅ | [Verified](benchmarks/results/SEQ-04-RingSplit.md) |
@@ -90,7 +92,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [COL-02](#️-col-02-conditional-adoption-of-frozendictionary) | Conditional use of FrozenDictionary | Faster lookup for immutable dictionaries | ✅ | [Verified](benchmarks/results/COL-02-FrozenCondition.md) |
 | [COL-03](#️-col-03-span-key-lookups-with-getalternatelookup) | GetAlternateLookup | Dictionary lookup with a Span key | ✅ | [Verified](benchmarks/results/COL-04-SampledNameTable.md) |
 | [COL-04](#️-col-04-choosing-a-lookup-strategy-for-small-element-counts) | Small-set lookup strategy | Choose the implementation by size and shape | ✅ | [Implemented](src/PerformancePatterns/Col/SampledNameTable.cs) |
-| [COL-05](#️-col-05-concrete-type-dispatch-for-ienumerable-parameters) | IEnumerable concrete-type dispatch | Route List/array inputs onto a Span path | ✅ | [Verified](benchmarks/results/COL-05-EnumerableDispatch.md) |
+| 🔬 [COL-05](#️-col-05-concrete-type-dispatch-for-ienumerable-parameters) | IEnumerable concrete-type dispatch | Route List/array inputs onto a Span path | ✅ | [Verified](benchmarks/results/COL-05-EnumerableDispatch.md) |
 | [COL-06](#️-col-06-shape-specialized-collection-conversion) | Shape-specialized collection conversion | Optimize the allocation and copy strategy for the destination | ✅ | [Verified](benchmarks/results/COL-06-CollectionConvert.md) |
 | [TXT-01](#-txt-01-formatting-and-conversion-with-lookup-tables) | Lookup-table formatting | Table-driven fixed-format formatting | ✅ | [Implemented](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#-txt-02-stackalloc-first-string-building) | stackalloc-first string building | Low-allocation alternative to StringBuilder | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
@@ -110,7 +112,6 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [ASY-07](#-asy-07-streaming-io) | Streaming I/O | Avoid buffering everything | ✅ | [Verified](benchmarks/results/ASY-07-StreamBuffering.md) |
 | [CON-01](#-con-01-one-shot-guards-with-interlocked) | Interlocked one-shot guard | Lock-free run-once for Dispose and initialization | ✅ | [Verified](benchmarks/results/CON-01-DisposeGuard.md) |
 | [SYS-01](#️-sys-01-low-cost-time-and-elapsed-time-reads) | Low-cost timestamps | Avoid DateTime.UtcNow | ✅ | [Verified](benchmarks/results/SYS-01-Timestamp.md) |
-| [SYS-02](#️-sys-02-faster-pinvoke-libraryimport--suppressgctransition) | Faster P/Invoke | LibraryImport + SuppressGCTransition | ✅ | [Verified](benchmarks/results/SYS-02-PInvoke.md) |
 | [DAT-01](#️-dat-01-optimizing-column-resolution-in-db-access) | Optimized column resolution for DB access | Ordinal caching and single-pass column resolution | ✅ | [Verified](benchmarks/results/DAT-01-OrdinalResolve.md) |
 | [GEN-01](#-gen-01-strategies-for-fast-emit-generated-code) | Speed strategies for Emit-generated code | Inlining of generated delegates and similar | ❌ | [Verified](benchmarks/results/GEN-01-EmitStrategy.md) |
 | [GEN-02](#-gen-02-designing-source-generator-output) | Designing Source Generator output | Guide to what to generate for speed | ✅ | [Guide](docs/generated-code-patterns.md) |
@@ -143,7 +144,7 @@ public bool MoveNext()
 
 **Use cases:** Extremely hot methods such as `MoveNext()`.
 
-**Measured (Ryzen 9 5900X / net10, a method call containing stackalloc byte[4096]):** 34.3 ns with zero-init drops to **3.1 ns with `[SkipLocalsInit]` (0.09x = roughly 11x)**, and code size drops from 610 B to 177 B (the memset path disappears). The cost is proportional to the stackalloc size (the allocated length, not the used length). → [Results](benchmarks/results/MEM-01-SkipLocalsInit.md)
+**Measured (net10 / x86-64-v4, a method call containing stackalloc byte[4096]):** 19.1 ns with zero-init drops to **1.6 ns with `[SkipLocalsInit]` (0.09x = roughly 11x)**, and code size drops from 604 B to 177 B (the memset path disappears). The cost is proportional to the stackalloc size (the allocated length, not the used length). → [Results](benchmarks/results/MEM-01-SkipLocalsInit.md)
 
 **Caveats:**
 
@@ -185,7 +186,7 @@ for (var i = 0; i < entries.Length; i++)
 
 **Implementation in this repo:** the `Entry[]` in [TypeMap.cs](src/PerformancePatterns/Typ/TypeMap.cs) (struct element array + copy-on-write)
 
-**Measured (Ryzen 9 5900X / net10, walking 1024 × 16-byte elements):** struct + ref access 483.0 ns ≒ class array 493.5 ns (overlapping CIs — **a freshly, contiguously allocated class array has not yet lost locality**), while copying struct access costs 595.7 ns (1.21x = the copy penalty that ref removes). The structural difference this shape does not surface: at 1024 elements the structs occupy 16 KB contiguously, while the classes are roughly 40 KB of objects plus an 8 KB reference array, so **the class side degrades in locality as the heap ages**. → [Results](benchmarks/results/MEM-02-StructArrayRef.md)
+**Measured (net10 / x86-64-v4, walking 1024 × 16-byte elements):** struct + ref access 412.9 ns ≒ struct copy access 414.7 ns ≒ class array 401.6 ns (all within ~3% — **a freshly, contiguously allocated class array has not yet lost locality, and a 16-byte copy is effectively free**). The structural difference this shape does not surface: at 1024 elements the structs occupy 16 KB contiguously, while the classes are roughly 40 KB of objects plus an 8 KB reference array, so **the class side degrades in locality as the heap ages** — that structural win, not the micro timing, is the reason to adopt. → [Results](benchmarks/results/MEM-02-StructArrayRef.md)
 
 ---
 
@@ -212,7 +213,7 @@ BinaryPrimitives.WriteInt32BigEndian(buffer.Slice(i * 4, 4), value);
 
 **Use cases:** Slicing inside serializer and encoder hot loops in general.
 
-**Measured (Ryzen 9 5900X / net10, 256 slices + endpoint reads):** `Slice(offset, 16)` 122.8 ns vs the range operator 136.8 ns (**0.90x, a real difference with non-overlapping CIs**). Code size is 100 vs 103 B. The gap is **about 0.05 ns per slice**, so make a point of it only inside hot loops. → [Results](benchmarks/results/MEM-03-SliceStyle.md)
+**Measured (net10 / x86-64-v4, 256 slices + endpoint reads):** `Slice(offset, 16)` 106.6 ns vs the range operator 107.0 ns (**CIs overlap — no time difference resolvable**). The generated code is not identical: the range operator carries an extra register shuffle per iteration (15 vs 14 instructions, 103 vs 100 B), but a wide out-of-order core absorbs it. Slice still produces the marginally tighter code, so preferring it in hot loops costs nothing — elsewhere choose readability. → [Results](benchmarks/results/MEM-03-SliceStyle.md)
 
 **Caveats:** The readability difference is tiny, so `Slice(offset, length)` is a fine default on hot paths. For a one-off slice the difference is measurement noise.
 
@@ -253,17 +254,17 @@ public void Draw(in MutableContext context) => context.Value.Use();
 - If you use `in`, make the type a `readonly struct`. For structs with fields, also apply the `readonly` member modifier
 - The same goes for return values: consider `ref readonly` / `ref` returns for large structs
 
-**Measured (Ryzen 9 5900X / net10, non-inlined calls):**
+**Measured (net10 / x86-64-v4, non-inlined calls):**
 
 | Struct size | By value | By in | Ratio |
 |---:|---:|---:|---|
-| 8 bytes | 1.70 ns | 1.41 ns | 0.83 |
-| 32 bytes | 1.56 ns | 1.14 ns | 0.73 |
-| 64 bytes | 2.47 ns | 1.37 ns | **0.55** |
-| in + readonly member | — | 1.60 ns | (baseline) |
-| in + non-readonly member | — | 2.97 ns | **1.86 (❌ defensive copy)** |
+| 8 bytes | 1.21 ns | 1.21 ns | 0.99 |
+| 32 bytes | 1.44 ns | 1.16 ns | **0.81** |
+| 64 bytes | 1.24 ns | 1.21 ns | 0.98 |
+| in + readonly member | — | 1.20 ns | (baseline) |
+| in + non-readonly member | — | 1.88 ns | **1.57 (❌ defensive copy)** |
 
-The larger the struct, the bigger the win from `in`. The defensive-copy trap is confirmed by measurement too: passing by `in` to a non-readonly member is 1.86x slower and doubles code size from 109 B to 219 B. → [Results](benchmarks/results/MEM-04-StructPass.md)
+Only the 32-byte case shows a real time win — copies up to 64 bytes are largely hidden behind the non-inlined call itself, so do not expect a size-proportional payoff. `in` is never slower and trims code size (63/79 B vs 76/99 B), making it a safe default for readonly structs. The defensive-copy trap is the real hazard: passing by `in` to a non-readonly member is 1.57x slower and doubles code size from 109 B to 219 B. → [Results](benchmarks/results/MEM-04-StructPass.md)
 
 **Caveats:** The effect varies with size, call frequency, and whether the JIT inlines. Inlining can make the copy disappear entirely, so measure before and after.
 
@@ -363,7 +364,7 @@ foreach (var line in text.SplitLines())
 
 **Implementation in this repo:** [BatchExtensions.cs](src/PerformancePatterns/Seq/BatchExtensions.cs) (SEQ-03 chunking implemented with a struct enumerator) / [Tests](tests/PerformancePatterns.Tests/Seq/BatchTest.cs) / [Results](benchmarks/results/SEQ-03-Batch.md)
 
-**Measured (Ryzen 9 5900X / net10, from the SEQ-03 measurements):** foreach over a struct enumerator runs at 0.61-0.80x of `Enumerable.Chunk` (which goes through IEnumerator), with zero allocation and 1/12 to 1/16 the code size.
+**Measured (net10 / x86-64-v4, from the SEQ-03 measurements):** foreach over a struct enumerator runs at 0.63-0.74x of `Enumerable.Chunk` (which goes through IEnumerator), with zero allocation and 1/12 to 1/16 the code size.
 
 **Caveats:** Exposing a struct enumerator as `IEnumerable<T>` boxes it and erases the benefit. Expose a `GetEnumerator()` that returns the struct directly, and if `IEnumerable<T>` support is required, separate it out with an explicit implementation.
 
@@ -431,7 +432,7 @@ public static IEnumerable<IReadOnlyList<T>> Batch<T>(this IEnumerable<T> source,
 
 **Implementation in this repo:** `ThrowIfInvalidSize` in [BatchExtensions.cs](src/PerformancePatterns/Seq/BatchExtensions.cs) (a static local throw helper — an example of separating out eager validation)
 
-**Measured (Ryzen 9 5900X / net10, converted to a delegate and passed):** a capturing local function costs 11.45 ns + 88 B per call; a static local function with a state argument costs 15.13 ns / **0 B**. The allocation-elimination claim holds, but **on a hot path where you pass a delegate, a static lambda + TState (DSP-04: 4.66 ns / 0 B) is faster**. Static local functions earn their keep in direct calls (which get inlined) and in iterator/validation separation; for cached-delegate scenarios use the DSP-04 shape. → [Results](benchmarks/results/STK-04-LocalFunctionClosure.md)
+**Measured (net10 / x86-64-v4, converted to a delegate and passed):** a capturing local function costs 7.00 ns + 88 B per call; a static local function with a state argument costs 15.26 ns / **0 B**. The allocation-elimination claim holds, but **on a hot path where you pass a delegate, a static lambda + TState (DSP-04: 2.96 ns / 0 B) is faster**. Static local functions earn their keep in direct calls (which get inlined) and in iterator/validation separation; for cached-delegate scenarios use the DSP-04 shape. → [Results](benchmarks/results/STK-04-LocalFunctionClosure.md)
 
 ---
 
@@ -474,7 +475,7 @@ public static object Box(int value) => value switch
 - The non-generic `Enum.Parse` on enums, and comparisons that go through the default `GetHashCode` / `Equals(object)` implementations of value types
 - Expanding value types into `params object[]` (avoidable with C# 13 `params ReadOnlySpan<T>`)
 
-**Measured (Ryzen 9 5900X / net10, storing -1/0/1 into an object[]):** direct boxing costs 5.98 ns + 24 B per call, while the pre-cached switch is **0 B but 7.66 ns (1.29x slower)**. Heap allocation on net10 (pointer bump) is cheaper than three branches — **the value of the cache is not time but the removal of GC pressure**, so adopt it only on long-lived, high-frequency paths (⚠️ conditional). Non-escaping boxes are already stack-allocated by the JIT (the 0.004 ns above), so the target is strictly "known values that escape". → [Results](benchmarks/results/STK-05-BoxingCache.md)
+**Measured (net10 / x86-64-v4, storing -1/0/1 into an object[]):** direct boxing costs 3.68 ns + 24 B per call, while the pre-cached switch is **2.54 ns / 0 B (0.69x)** — the cache wins on both time and allocation here. The branch-vs-allocation balance is CPU-dependent (a pointer-bump alloc can outpace the switch on some cores), but the GC-pressure removal holds regardless, so adopt it on long-lived, high-frequency paths. Non-escaping boxes are already stack-allocated by the JIT, so the target is strictly "known values that escape". → [Results](benchmarks/results/STK-05-BoxingCache.md)
 
 ---
 
@@ -482,15 +483,15 @@ public static object Box(int value) => value switch
 
 **Goal:** Allocate stackalloc with a compile-time constant size (it becomes a fixed region in the frame) and slice off what you need. A variable-size allocation compiles to the costly `localloc` instruction.
 
-**Effect (measured, Ryzen 9 5900X / net10):**
+**Effect (measured, net10 / x86-64-v4):**
 
 | Allocation form | With SkipLocalsInit | With zero-init |
 |---|---|---|
-| Constant 512 (+ slice) | **1.6 ns** | 6.6 ns |
-| Variable size 512 | 4.6 ns (about 3x) | **14.8 ns (about 9x)** |
+| Constant 512 (+ slice) | **0.27 ns** | 1.4 ns |
+| Variable size 512 | 1.8 ns (about 6x) | **6.1 ns (about 4x)** |
 
-- With a constant size the zero-init cost is fixed and predictable too. A variable size pays the localloc cost itself plus a slower form of zero-init
-- Also demonstrates the removal effect of MEM-01 (SkipLocalsInit): 6.6 → 1.6ns
+- With a constant size the zero-init cost is fixed and predictable too. A variable size pays the localloc cost itself plus a slower form of zero-init — constant + SkipLocalsInit is the only combination that stays sub-nanosecond
+- Also demonstrates the removal effect of MEM-01 (SkipLocalsInit): 1.4 → 0.27ns
 
 **AOT:** ✅ No issues
 
@@ -545,10 +546,10 @@ private static readonly PropertyChangedEventArgs CountChangedEventArgs = new(nam
 
 **Use cases:** Error collection in Result/validation code, ViewModel-associated objects (Disposables and similar), notification event args (`PropertyChangedEventArgs` cached statically per property name), Null Object (a singleton empty implementation).
 
-**Measured (Ryzen 9 5900X / net10):**
+**Measured (net10 / x86-64-v4):**
 
-- Error list (10% failure rate): lazy allocation 69.2 ns ≒ eager allocation 67.2 ns (overlapping CIs), and both allocate 216 B as long as a failure occurs. **On the all-success path the lazy side allocates nothing at all** (the eager side always allocates 216 B) — the win is structural in allocation, not in speed
-- Empty arrays: **on net10 even `new int[0]` (a form that can be constant-folded) allocates nothing in practice** (the runtime shares the empty array). The codegen for `[]` (an 11 B shared-reference load) is still shorter than the helper call (27 B). The decision to default to `[]` / `Array.Empty<T>()` for portability and code size is unchanged → [Results](benchmarks/results/STK-07-LazyAllocation.md)
+- Error list (10% failure rate): lazy allocation 46.1 ns vs eager allocation 37.3 ns (1.24x — the null check plus branchy first-add costs a little when failures do occur), and both allocate 216 B as long as a failure occurs. **On the all-success path the lazy side is 0.57x and allocates nothing at all** (the eager side always allocates 216 B) — the win is structural in allocation, sized by how rare the failure path is
+- Empty arrays: **on net10 even `new int[0]` allocates nothing in practice** (the runtime shares the empty array), and both `[]` and `new int[0]` now compile to the same 12 B shared-reference load — no difference in time, allocation, or code. Defaulting to `[]` / `Array.Empty<T>()` remains fine as a style/portability choice → [Results](benchmarks/results/STK-07-LazyAllocation.md)
 
 **Caveats:** If a lazily allocated field needs thread safety, guard it with a lock or combine it with CON-01 (a single-threaded type can leave it as is).
 
@@ -583,7 +584,7 @@ Span<int> span = slots;
 
 **Use cases:** Small fixed-length work areas, inline storage of hash table entries (an extension of MEM-02), history buffers in state machines.
 
-**Measured (Ryzen 9 5900X / net10, writing and summing int×8):** against `new int[8]` at 7.18 ns / 56 B, stackalloc is 4.71 ns (0.66) and InlineArray 4.93 ns (0.69) — both with zero allocation. **stackalloc is marginally faster (0.22 ns gap, a real difference with non-overlapping CIs).** The value of InlineArray is not speed but that it can be held as a struct field. → [Results](benchmarks/results/STK-08-InlineArray.md)
+**Measured (net10 / x86-64-v4, writing and summing int×8):** against `new int[8]` at 4.81 ns / 56 B, stackalloc is 2.87 ns (0.60) and InlineArray 2.92 ns (0.61) — both with zero allocation and equal in time (CIs overlap); InlineArray's code is slightly smaller (112 vs 134 B). The value of InlineArray is that it can be held as a struct field. → [Results](benchmarks/results/STK-08-InlineArray.md)
 
 **Caveats:** The element count is a compile-time constant. It cannot be used for variable lengths, so design the overflow path to switch to the BUF-05 tiered strategy.
 
@@ -619,7 +620,7 @@ public static void Trace(params ReadOnlySpan<string> values)
 
 **Use cases:** Logging and diagnostics APIs, variadic key joining, utilities that take several values.
 
-**Measured (Ryzen 9 5900X / net10, 3 arguments):** `params T[]` 6.26 ns / 48 B → `params ReadOnlySpan<T>` **1.84 ns / 0 B (0.29x)**. The allocation disappears with no change to the call syntax. → [Results](benchmarks/results/STK-09-ParamsSpan.md)
+**Measured (net10 / x86-64-v4, 3 arguments):** `params T[]` 4.46 ns / 48 B → `params ReadOnlySpan<T>` **1.10 ns / 0 B (0.25x)**. The allocation disappears with no change to the call syntax. → [Results](benchmarks/results/STK-09-ParamsSpan.md)
 
 **Caveats:** When replacing `params T[]` in a public library API, consider keeping both overloads for compatibility with existing calls that pass an array explicitly.
 
@@ -696,7 +697,7 @@ public static void Write<T>(this IBufferWriter<byte> writer, T value)
 
 **Implementation in this repo:** [PooledBufferWriter.cs](src/PerformancePatterns/Buf/PooledBufferWriter.cs) (ArrayPool-backed + JIT-04 Grow separation + JIT-05 per-type clearing) / [Tests](tests/PerformancePatterns.Tests/Buf/PooledBufferWriterTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Buf/BufferWriterBenchmark.cs) / [Results](benchmarks/results/BUF-02-BufferWriter.md)
 
-**Measured (Ryzen 9 5900X / net10, writing 64 chunks of 16B):** against `MemoryStream` + ToArray, `ArrayBufferWriter` is 0.56x and `PooledBufferWriter` 0.63x. ArrayBufferWriter is fastest for a single pass, but PooledBufferWriter cuts **allocation from 2,976B to 32B (the writer object only)**, zeroing GC pressure across repeated writes.
+**Measured (net10 / x86-64-v4, writing 64 chunks of 16B):** against `MemoryStream` + ToArray, `ArrayBufferWriter` is 0.68x and `PooledBufferWriter` **0.57x — the fastest of the three** while also cutting **allocation from 2,976B to 32B (the writer object only)**, zeroing GC pressure across repeated writes.
 
 ---
 
@@ -725,15 +726,15 @@ writer.Dispose(); // returns the rental if the pool was used
 
 **Implementation in this repo:** [BufferWriterSlim.cs](src/PerformancePatterns/Buf/BufferWriterSlim.cs) / [Tests](tests/PerformancePatterns.Tests/Buf/BufferWriterSlimTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Buf/BufferWriterSlimBenchmark.cs) / [Results](benchmarks/results/BUF-03-BufferWriterSlim.md)
 
-**Measured (Ryzen 9 5900X / net10, write lifecycle of N × 16 bytes):**
+**Measured (net10 / x86-64-v4, write lifecycle of N × 16 bytes):**
 
 | Approach | 64 B (fits the stack) | 4096 B (growth path) |
 |---|---|---|
-| `ArrayBufferWriter` (baseline) | 43.4 ns / 312 B | 2,395 ns / **8,056 B** |
-| PooledBufferWriter (BUF-02) | 47.6 ns / 32 B | 2,635 ns / 32 B |
-| **BufferWriterSlim** | 42.6 ns / **0 B** | 2,651 ns / **0 B** |
+| `ArrayBufferWriter` (baseline) | 25.2 ns / 312 B | 1,427 ns / **8,056 B** |
+| PooledBufferWriter (BUF-02) | 24.3 ns / 32 B | 1,328 ns / 32 B |
+| **BufferWriterSlim** | **19.0 ns** / **0 B** | **1,283 ns** / **0 B** |
 
-On time the three approaches have overlapping confidence intervals and cannot be separated (➖ measurement noise — the codegen itself does differ; see the record of noise / no-difference rulings). **Decide on the allocation axis:** 312 B → 0 at 64 B, and 8,056 B → 0 on the growth path. Use Slim within a synchronous scope; choose BUF-02 when you need to pass it as `IBufferWriter<T>` or hold it in a field.
+Slim wins on both axes: 0.76x at 64 B and 0.90x on the growth path (non-overlapping CIs), with allocation at 312 B → 0 and 8,056 B → 0. Use Slim within a synchronous scope; choose BUF-02 when you need to pass it as `IBufferWriter<T>` or hold it in a field.
 
 **Caveats:** Aim for a stackalloc size of roughly 256-512 bytes, and avoid allocating inside recursion or loops (to guard against stack overflow).
 
@@ -763,7 +764,7 @@ ParsePacket(owner.Span);
 
 **Implementation in this repo:** [MemoryOwner.cs](src/PerformancePatterns/Buf/MemoryOwner.cs) (conforms to `IMemoryOwner<T>`; double Dispose is handled by the CON-01 Interlocked guard) / [Tests](tests/PerformancePatterns.Tests/Buf/MemoryOwnerTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Buf/MemoryOwnerBenchmark.cs) / [Results](benchmarks/results/BUF-04-MemoryOwner.md)
 
-**Measured (Ryzen 9 5900X / net10, rent → write → aggregate → release of 4 KB):** time is dominated by fill+sum and lands at 2.5-3.0 μs, and **MemoryOwner cannot be separated from a bare Rent/Return because the confidence intervals overlap (➖ measurement noise = the wrapper cost is below the measurement resolution)**. Allocation is 4,120 B for `new byte[]`, 0 B for bare ArrayPool, **32 B for MemoryOwner (the owner object only)**, and 0 B for TemporaryBuffer. The value is on the design side: enforced using, exact lengths, and double-Dispose safety. Within a synchronous scope use BUF-05 (TemporaryBuffer); across an async boundary use this type.
+**Measured (net10 / x86-64-v4, rent → write → aggregate → release of 4 KB):** time is dominated by fill+sum and lands at 1.63-1.65 μs, and **MemoryOwner cannot be separated from a bare Rent/Return because the ranges overlap (➖ measurement noise = the wrapper cost is below the measurement resolution)**. Allocation is 4,120 B for `new byte[]`, 0 B for bare ArrayPool, **32 B for MemoryOwner (the owner object only)**, and 0 B for TemporaryBuffer. The value is on the design side: enforced using, exact lengths, and double-Dispose safety. Within a synchronous scope use BUF-05 (TemporaryBuffer); across an async boundary use this type.
 
 **Notes:** Conforming to the `IMemoryOwner<T>` interface allows interop with the `MemoryPool<T>` family of APIs. Since it cannot be a ref struct when crossing async methods, implement it as a class or struct.
 
@@ -819,7 +820,7 @@ Process(buffer.Span);
 
 **Implementation in this repo:** [TemporaryBuffer.cs](src/PerformancePatterns/Buf/TemporaryBuffer.cs) / [Tests](tests/PerformancePatterns.Tests/Buf/TemporaryBufferTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Buf/TemporaryBufferBenchmark.cs) / [Results](benchmarks/results/BUF-05-TemporaryBuffer.md)
 
-**Measured (Ryzen 9 5900X / net8-10):** at 4096 elements it runs at 0.11-0.32x of `new T[]` (3-9x faster, from removing the zero-init cost) with 0B. The 64-element stackalloc path is slightly slower than `new` (5.1ns vs 3.5ns) but goes from 88B to 0B — **the value at small sizes is not speed but zeroing GC pressure**. Compared with using `ArrayPool` directly it wins at small sizes (the stackalloc path avoids the pool access).
+**Measured (net10 / x86-64-v4):** at 4096 elements it runs at 0.09x of `new T[]` (about 11x faster, from removing the zero-init cost) with 0B. The 64-element stackalloc path is slightly slower than `new` (2.3ns vs 2.0ns) but goes from 88B to 0B — **the value at small sizes is not speed but zeroing GC pressure**. Compared with using `ArrayPool` directly it wins at small sizes (the stackalloc path avoids the pool access: 2.3 vs 4.2 ns).
 
 **Caveats:**
 
@@ -832,14 +833,14 @@ Process(buffer.Span);
 
 **Goal:** Skip zero-initialization when allocating a heap array (the heap counterpart of SkipLocalsInit). For temporary buffers you are certain to overwrite in full.
 
-**Effect (measured, Ryzen 9 5900X / net10, vs `new byte[N]`):**
+**Effect (measured, net10 / x86-64-v4, vs `new byte[N]`):**
 
 | Size | Ratio | Verdict |
 |---|---|---|
-| 256B / 2048B | 1.05 / **1.27 (counterproductive)** | At small sizes the runtime falls back to a normal allocation and only the call overhead remains |
-| 4096B | 0.64 | Effective |
-| 64KB | **0.14 (about 7x)** | The sweet spot |
-| 1MB (LOH class) | 1.00 | Per-allocation GC cost dominates and the difference vanishes |
+| 256B / 2048B | 0.98 / 0.94 | At small sizes the zero-init being skipped is too small to matter |
+| 4096B | 0.60 | Effective |
+| 64KB | **0.18 (about 5x)** | The sweet spot |
+| 1MB (LOH class) | 0.98 | Per-allocation GC cost dominates and the difference vanishes |
 
 **AOT:** ✅ No issues
 
@@ -909,7 +910,7 @@ public static void Return(StringBuilder builder)
 - Without a cap on the retained size, an instance that once grew large stays resident
 - A pool holding reference types extends object lifetimes unless internal references are cleared on return
 
-**Measured (Ryzen 9 5900X / net10, assembling a key string with StringBuilder):** against 40.9 ns + 648 B for a fresh `new StringBuilder(256)` each time, the `[ThreadStatic]` single-slot pool costs **27.8 ns + 64 B (0.68x; the allocation is the result string only = 0.10x)**. → [Results](benchmarks/results/BUF-07-ObjectPool.md)
+**Measured (net10 / x86-64-v4, assembling a key string with StringBuilder):** against 19.97 ns + 648 B for a fresh `new StringBuilder(256)` each time, the `[ThreadStatic]` single-slot pool costs **13.51 ns + 64 B (0.68x; the allocation is the result string only = 0.10x)**. → [Results](benchmarks/results/BUF-07-ObjectPool.md)
 
 ---
 
@@ -943,7 +944,7 @@ public static bool TryGetValue<TKey>(...)
 - Overusing `AggressiveInlining` bloats code size and can hurt instruction-cache efficiency. Limit it to small hot methods
 - On .NET 8+, `AggressiveOptimization` disables Dynamic PGO (optimization driven by runtime profiles), so it can end up slower. Always confirm with a benchmark before using it
 
-**Measured (Ryzen 9 5900X / net10, helper containing a loop x 1024 calls):** NoInlining 1.560 μs vs. default 1.451 μs / Aggressive 1.338 μs. **Inlining itself is a real difference** (NoInline is +17% over Aggressive, with non-overlapping CIs), but **the caller's Tier1 codegen is byte-identical at 94 B for default and Aggressive** — net10's default policy (PGO) already inlines helpers containing loops, so treat **the attribute as insurance for shapes the heuristics decline**. → [Results](benchmarks/results/JIT-01-Inlining.md)
+**Measured (net10 / x86-64-v4, helper containing a loop x 1024 calls):** NoInlining 1.180 μs vs. default 0.943 μs / Aggressive 0.959 μs. **Inlining itself is a real difference** (NoInline is +25% over the default, with non-overlapping CIs), but **the caller's codegen is byte-identical at 100 B for default and Aggressive** — net10's default policy (PGO) already inlines helpers containing loops, so treat **the attribute as insurance for shapes the heuristics decline**. → [Results](benchmarks/results/JIT-01-Inlining.md)
 
 ---
 
@@ -1012,7 +1013,7 @@ public static T Convert<T>(int value)
 
 **Use cases:** Type-conversion layers; primitive specialization in serializers and formatters.
 
-**Measured (Ryzen 9 5900X / net10, summing int[1024]):** The generic version with typeof(T) branches runs 250.5 ns vs. 299.7 ns for a hand-written int version — **the branches cost nothing** (code size 35 vs 32 B, essentially identical; the apparent 16% gap is layout-induced measurement jitter, so the claim only goes as far as "equivalent"). Correctness of the fallback path is confirmed by Verify. → [Results](benchmarks/results/JIT-03-TypeofBranch.md)
+**Measured (net10 / x86-64-v4, summing int[1024]):** The generic version with typeof(T) branches runs 212.4 ns vs. 213.7 ns for a hand-written int version — **the branches cost nothing** (code size 35 vs 32 B, essentially identical: the JIT folds `typeof(T) == typeof(int)` to a constant per instantiation and removes the branch). Correctness of the fallback path is confirmed by Verify. → [Results](benchmarks/results/JIT-03-TypeofBranch.md)
 
 **Related finding:** Caching `typeof(X)` in a `static readonly Type` field is pointless (the JIT turns `typeof` itself into a constant; measurements show identical time and code size). Prefer readability.
 
@@ -1059,7 +1060,7 @@ private static void ThrowInvalidState() => throw new InvalidOperationException(.
 
 **Implementation in this repo:** [BufferWriterSlim.cs](src/PerformancePatterns/Buf/BufferWriterSlim.cs) / [ValueStringBuilder.cs](src/PerformancePatterns/Txt/ValueStringBuilder.cs) (both split Grow out with NoInlining)
 
-**Measured (Ryzen 9 5900X / net10, ⚠️ reversed in an isolated microbenchmark):** A fat Write with growth inlined (569 B, not inlined) runs 1.253 μs, while the split version with AggressiveInlining (103 B on the hot side) runs **1.361 μs (1.09x)**. A single call is cheap, and the loop body swelling under forced expansion outweighed it (consistent with JIT-01's "don't overuse it"). **The value of this pattern is that it makes inlining into the caller possible and unlocks the optimizations beyond it — it is not magic that always makes things faster** — apply it together with measurement. → [Results](benchmarks/results/JIT-04-ColdPathSplit.md)
+**Measured (net10 / x86-64-v4, isolated microbenchmark):** A fat Write with growth inlined (569 B, not inlined) runs 635.1 ns, while the split version with AggressiveInlining (103 B on the hot side) runs **631.1 ns (0.99x)** — equal time with a 5.5x smaller hot method. A single call per Write is cheap, so the split does not show up as time in isolation. **The value of this pattern is that it makes inlining into the caller possible and unlocks the optimizations beyond it — it is not magic that always makes things faster** — apply it together with measurement. → [Results](benchmarks/results/JIT-04-ColdPathSplit.md)
 
 ---
 
@@ -1067,11 +1068,11 @@ private static void ThrowInvalidState() => throw new InvalidOperationException(.
 
 **Goal:** For a type `T` that contains no references, branch around the cleanup (array clearing and the like) that exists only to release GC references.
 
-**Effect (measured, Ryzen 9 5900X / net10):**
+**Effect (measured, net10 / x86-64-v4):**
 
 - The JIT constant-folds `RuntimeHelpers.IsReferenceOrContainsReferences<T>()` per type and deletes the untaken branch outright
-- Clearing `int[1024]`: 40.9ns unconditionally → **0.19ns** with the branch (the work vanishes entirely; code size 510B → 28B)
-- For reference types (`string[]`, the side that does need clearing) the check costs nothing measurable (184.5ns vs 189.5ns, identical code size)
+- Clearing `int[1024]`: 19.0ns unconditionally → **0.008ns** with the branch (the work vanishes entirely; code size 510B → 28B)
+- For reference types (`string[]`, the side that does need clearing) the check costs nothing measurable (101.5ns vs 102.4ns, identical code size)
 
 **AOT:** ✅ No issues (value types are fully specialized and folded to a constant under AOT as well)
 
@@ -1115,15 +1116,15 @@ public void Return(T[] array)
 public sealed class BinaryFormatter : IFormatter { ... }
 ```
 
-**Measured (Ryzen 9 5900X / net10, calls through an interface with a single implementation x 1024):**
+**Measured (net10 / x86-64-v4, calls through an interface with a single implementation x 1024):**
 
 | How it is held | Time | Ratio |
 |---|---:|---|
-| Interface reference (non-sealed impl) | 536.8 ns | 1.00 |
-| Interface reference (sealed impl) | 509.1 ns | 0.97 (➖ measurement noise; identical code size of 84 B) |
-| **Concrete sealed-type reference** | 233.1 ns | **0.44** (27 B, direct call + inlining) |
+| Interface reference (non-sealed impl) | 220.7 ns | 1.00 |
+| Interface reference (sealed impl) | 221.9 ns | 1.01 (➖ measurement noise; identical code size of 84 B) |
+| **Concrete sealed-type reference** | 215.2 ns | **0.98** (27 B, direct call + inlining) |
 
-**On net10, calls through an interface reference did not get faster from sealed** (identical codegen size). What helps is **holding the field or variable as the concrete sealed type** (0.44x). sealed itself is free, so making it the default stands unchanged, but expect the payoff where you can hold the concrete type, under AOT or without PGO, and as a nudge for the JIT's monomorphic devirtualization. → [Results](benchmarks/results/DSP-01-SealedDevirt.md)
+**On net10, calls through an interface reference did not get faster from sealed** (identical codegen size), and a well-predicted monomorphic interface call costs almost nothing on this class of hardware — even holding the concrete sealed type buys only ~2% of time. What the concrete type does deliver is **code size (27 B vs 84 B) and inlining headroom**, which is where the payoff sits under AOT or without dynamic PGO. sealed itself is free, so making it the default stands unchanged. → [Results](benchmarks/results/DSP-01-SealedDevirt.md)
 
 **Design guidance:** Make sealed the default for every library implementation class except those that deliberately allow inheritance by design (the BCL follows the same policy).
 
@@ -1140,19 +1141,19 @@ public sealed class BinaryFormatter : IFormatter { ... }
 - Use a static local function rather than a lambda for small in-method logic (measured: code size 185B vs 6B; the local function is fully inlined and both the delegate allocation and the call disappear)
 - Function pointers (`delegate*<T>`) have the smallest code size but **can be the slowest form on net10** (see the measurements below). Only adopt them on the strength of a benchmark
 
-**Measured (Ryzen 9 5900X / net10, addition x 1024):**
+**Measured (net10 / x86-64-v4, addition x 1024):**
 
 | How it is held | Time | Ratio | Code size |
 |---|---:|---|---:|
-| **Held as a concrete sealed type** | **265.4 ns** | **1.00** | 27 B |
-| Through an abstract base | 463.4 ns | 1.75 | 81 B |
-| Delegate (static lambda) | 461.7 ns | 1.74 | 85 B |
-| Through an interface | 549.0 ns | 2.07 | 84 B |
-| **Function pointer `delegate*`** | **1,601.7 ns** | **6.04 (❌ slowest)** | 42 B |
+| **Held as a concrete sealed type** | **215.8 ns** | **1.00** | 27 B |
+| Through an abstract base | 223.6 ns | 1.04 | 81 B |
+| Through an interface | 224.3 ns | 1.04 | 84 B |
+| Delegate (static lambda) | 254.6 ns | 1.18 | 85 B |
+| **Function pointer `delegate*`** | **1,250.7 ns** | **5.80 (❌ slowest)** | 42 B |
 
 **Why the function pointer comes out slowest:** The JIT cannot inline `calli`, and Dynamic PGO's speculative optimization (guarded devirtualization) does not apply either. A delegate's `Invoke`, by contrast, lets PGO guess the target and inline it, so **"a raw pointer must be faster" does not hold on net10**. Function pointers belong at interop boundaries, under AOT, and on polymorphic targets where speculation cannot help — they are not a general-purpose speed tool.
 
-The ordering delegate ≒ abstract < interface also holds up, so the old wisdom that "delegates are heavier than interfaces" is false. → [Results](benchmarks/results/DSP-02-CallAbstraction.md)
+A well-predicted monomorphic virtual call is nearly free (~4%), so delegate ≒ abstract ≒ interface — the old wisdom that "delegates are heavier than interfaces" is false. → [Results](benchmarks/results/DSP-02-CallAbstraction.md)
 
 **AOT:** ✅ No issues (managed function pointers are AOT-compatible)
 
@@ -1202,18 +1203,18 @@ public void Publish(T value)
 
 **Implementation in this repo:** [HandlerList.cs](src/PerformancePatterns/Dsp/HandlerList.cs) / [Tests](tests/PerformancePatterns.Tests/Dsp/HandlerListTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Dsp/HandlerListBenchmark.cs) / [Results](benchmarks/results/DSP-03-HandlerList.md)
 
-**Measured (Ryzen 9 5900X / net10, by subscriber count):**
+**Measured (net10 / x86-64-v4, by subscriber count):**
 
 | Subscribers | Multicast | Immutable array | Ratio |
 |---:|---:|---:|---|
-| 1 | 0.84 ns | 2.38 ns | 2.87 (❌ the array is slower) |
-| 2 | 5.71 ns | 3.48 ns | 0.61 |
-| 4 | 11.70 ns | 4.26 ns | **0.36** |
-| 8 | 18.85 ns | 7.85 ns | 0.42 |
+| 1 | 0.12 ns | 0.68 ns | 5.72 (❌ the array is slower) |
+| 2 | 3.49 ns | 1.11 ns | **0.32** |
+| 4 | 6.05 ns | 1.85 ns | 0.31 |
+| 8 | 11.00 ns | 3.47 ns | 0.32 |
 
 Multicast degrades roughly in proportion to the subscriber count, while the array grows only gently. **The break-even point is two subscribers.**
 
-**Caveats:** Where a single subscriber dominates, a plain delegate remains fastest (the array version measures 2.9x slower). If unsubscribes are frequent, factor in the cost of rebuilding the array.
+**Caveats:** Where a single subscriber dominates, a plain delegate remains fastest (a single delegate invokes directly with no loop). If unsubscribes are frequent, factor in the cost of rebuilding the array.
 
 ---
 
@@ -1247,7 +1248,7 @@ public T? Find<TState>(TState state, Func<T, TState, bool> predicate) { ... }
 
 **Use cases:** LINQ-style utilities, collection searches, dictionary GetOrAdd, continuation/callback registration, and Map/Bind on Result/Option types.
 
-**Measured (Ryzen 9 5900X / net10, a search whose predicate uses a local that changes each iteration):** A capturing lambda costs 11.2 ns + **88 B per call** (closure + delegate), while a static lambda with TState costs **4.66 ns / 0 B (0.42x)** (the compiler caches the delegate). → [Results](benchmarks/results/DSP-04-StaticLambda.md)
+**Measured (net10 / x86-64-v4, a search whose predicate uses a local that changes each iteration):** A capturing lambda costs 7.09 ns + **88 B per call** (closure + delegate), while a static lambda with TState costs **2.96 ns / 0 B (0.42x)** (the compiler caches the delegate). → [Results](benchmarks/results/DSP-04-StaticLambda.md)
 
 **Design guidance:** Codify the sequence "① put `static` on the lambda first → ② if it fails to compile, reconsider whether that state is really needed → ③ if it is, pass it as `TState`". This is the same principle as STK-04 (static local method iterators) applied more broadly; public APIs that take callbacks should always offer a TState overload so callers can follow the rule.
 
@@ -1292,7 +1293,7 @@ public Widget() => onChanged = HandleChanged;
 
 **Related trick:** In APIs where resubscription or reconfiguration runs every time (`OnParametersSet` and friends), compare against the previous target with `ReferenceEquals` and **skip the whole operation when nothing changed**.
 
-**Measured (Ryzen 9 5900X / net10, three middleware stages):** Composing on every call costs 42.6 ns + 264 B (3 closures + delegate creation), while **precomposition costs 2.62 ns / 0 B (0.063x = about 16x)**. A bare terminal call is 0.10 ns, so traversing the precomposed chain fits in about 2.5 ns across three stages. → [Results](benchmarks/results/DSP-05-PipelineCompose.md)
+**Measured (net10 / x86-64-v4, three middleware stages):** Composing on every call costs 19.7 ns + 264 B (3 closures + delegate creation), while **precomposition costs 1.27 ns / 0 B (0.064x = about 16x)**. A bare terminal call is ~0 ns, so traversing the precomposed chain fits in about 1.3 ns across three stages. → [Results](benchmarks/results/DSP-05-PipelineCompose.md)
 
 **Caveats:** The benefit scales with the complexity of the composition and the call frequency.
 
@@ -1343,14 +1344,14 @@ map.TryGetValue(typeof(MyService), out var svc);
 
 **Implementation in this repo:** [TypeMap.cs](src/PerformancePatterns/Typ/TypeMap.cs) / [TypeSlot.cs](src/PerformancePatterns/Typ/TypeSlot.cs) / [Tests](tests/PerformancePatterns.Tests/Typ/TypeMapTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Typ/TypeMapBenchmark.cs) / [Results](benchmarks/results/TYP-01-TypeMap.md)
 
-**Measured (Ryzen 9 5900X / net10, resolving against 8 registered types):**
+**Measured (net10 / x86-64-v4, resolving against 8 registered types):**
 
 | Path | Time | Ratio | Code size |
 |---|---:|---|---:|
-| `Dictionary<Type, T>` (baseline) | 7.27 ns | 1.00 | 921 B |
-| `FrozenDictionary` | 8.85 ns | 1.22 (❌ slower) | 45 B |
-| **TypeMap generic path** | **0.14 ns** | **0.02 (about 54x)** | 34 B |
-| TypeMap runtime-Type path | 14.0 ns | 1.93 (❌ slower) | 3,486 B |
+| `Dictionary<Type, T>` (baseline) | 2.47 ns | 1.00 | 921 B |
+| `FrozenDictionary` | 3.07 ns | 1.25 (❌ slower) | 45 B |
+| **TypeMap generic path** | **0.23 ns** | **0.09 (about 11x)** | 34 B |
+| TypeMap runtime-Type path | 10.4 ns | 4.22 (❌ slower) | 3,486 B |
 
 **The value is in the generic path only** (the slot number becomes a JIT constant, making it effectively "an index into an array"). The runtime-Type path is a dictionary lookup followed by an array access, so it is slower than a plain Dictionary; adopt this only when you can design the primary path around calls whose type is known statically.
 
@@ -1393,15 +1394,15 @@ public sealed class BitwiseComparer<T> : IEqualityComparer<T>
 
 **Implementation in this repo:** [BitwiseComparer.cs](src/PerformancePatterns/Typ/BitwiseComparer.cs) (`IEqualityComparer<T>` + `IComparer<T>`, hashing via `HashCode.AddBytes`) / [Tests](tests/PerformancePatterns.Tests/Typ/BitwiseComparerTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Typ/BitwiseComparerBenchmark.cs) / [Results](benchmarks/results/TYP-02-BitwiseComparer.md)
 
-**Measured (Ryzen 9 5900X / net10, per dictionary lookup on a 16-byte struct key):**
+**Measured (net10 / x86-64-v4, per dictionary lookup on a 16-byte struct key):**
 
 | Comparer | Time | Ratio | Allocation |
 |---|---:|---|---:|
-| Default comparer + struct without IEquatable (baseline) | 25.7 ns | 1.00 | **96 B (❌ boxing)** |
-| **BitwiseComparer + the same struct** | 11.8 ns | **0.46** | 0 B |
-| Default comparer + struct implementing IEquatable | 5.6 ns | 0.22 | 0 B |
+| Default comparer + struct without IEquatable (baseline) | 15.8 ns | 1.00 | **96 B (❌ boxing)** |
+| **BitwiseComparer + the same struct** | 8.4 ns | **0.54** | 0 B |
+| Default comparer + struct implementing IEquatable | 3.7 ns | 0.23 | 0 B |
 
-**Using a struct that does not implement IEquatable as a dictionary key with the default comparer boxes on every lookup.** BitwiseComparer brings that to 0.46x with zero allocation, without writing an Equals. A hand-written `IEquatable` implementation (0.22) is still fastest, though, so **if you own the type, implementing IEquatable is the first choice**. This comparer is for external types, for bypassing a custom Equals, and for generated code that swaps the comparer through a type parameter.
+**Using a struct that does not implement IEquatable as a dictionary key with the default comparer boxes on every lookup.** BitwiseComparer brings that to 0.54x with zero allocation, without writing an Equals. A hand-written `IEquatable` implementation (0.23) is still fastest, though, so **if you own the type, implementing IEquatable is the first choice**. This comparer is for external types, for bypassing a custom Equals, and for generated code that swaps the comparer through a type parameter.
 
 **Caveats:** Structs containing padding can compare unequal despite being logically equal, because the padding bytes are uninitialized. Restrict use to types with a padding-free layout (or `Pack = 1`).
 
@@ -1444,7 +1445,7 @@ private static extern ref string? GetMessageField(Exception exception);
 - Generic types and generic methods are supported from .NET 9 on (not in .NET 8). To work with a non-public *type* itself, use .NET 10's `UnsafeAccessorTypeAttribute`
 - Within your own codebase prefer plain internal plus `InternalsVisibleTo`; treat UnsafeAccessor as the tool for "external code you cannot change"
 
-**Measured (Ryzen 9 5900X / net10, reading a non-public int field):** UnsafeAccessor 0.264 ns = public property 0.269 ns (**identical code size of 23 B = compiled to a direct field load**). `FieldInfo.GetValue` costs 9.33 ns + **24 B of boxing per call** (34.8x). → [Results](benchmarks/results/TYP-03-UnsafeAccessor.md)
+**Measured (net10 / x86-64-v4, reading a non-public int field):** UnsafeAccessor 0.192 ns = public property 0.192 ns (**identical code size of 23 B = compiled to a direct field load**). `FieldInfo.GetValue` costs 4.77 ns + **24 B of boxing per call** (24.9x). → [Results](benchmarks/results/TYP-03-UnsafeAccessor.md)
 
 ---
 
@@ -1472,7 +1473,7 @@ public static T? Convert<T>(string value)
 
 **Implementation in this repo:** [TypeSlot.cs](src/PerformancePatterns/Typ/TypeSlot.cs) (`TypeSlot<T>.Index` — the minimal form of this pattern, and the basis for TYP-01)
 
-**Measured:** In the equivalent run (TYP-06), reading a generic static field costs **0.09 ns / 6 B of code** (0.001x of rebuilding every time, and about 53x faster than a `Dictionary<Type, T>` cache) → [TYP-06-StaticArtifact.md](benchmarks/results/TYP-06-StaticArtifact.md)
+**Measured:** In the equivalent run (TYP-06), reading a generic static field costs **~0 ns / 6 B of code** (below measurement resolution; the `Dictionary<Type, T>` cache costs 2.7 ns) → [TYP-06-StaticArtifact.md](benchmarks/results/TYP-06-StaticArtifact.md)
 
 **Caveats:** Static constructor initialization runs only once per type, on first use. If you put fallible initialization in it, the `TypeInitializationException` stays cached from then on, so design it to store a fallback value meaning "unsupported" on failure.
 
@@ -1487,13 +1488,13 @@ public static T? Convert<T>(string value)
 - `(Action<object?>)obj` 3.43ns → `Unsafe.As<Action<object?>>(obj)` 1.59ns (about 2x), code size 498B → 67B
 - Typed resolution in a DI registry (`Resolve<T>`) is about 1.7x as well, and it curbs the cast-code bloat per generic instantiation
 
-**Measured (Ryzen 9 5900X / net10, a 1024-element object[] whose types are structurally guaranteed):**
+**Measured (net10 / x86-64-v4, a 1024-element object[] whose types are structurally guaranteed):**
 
 | Approach | Time | Ratio | Code size |
 |---|---:|---|---:|
-| `(string)value` (castclass) | 718.4 ns | 1.00 | 274 B |
-| `is string text` pattern | 551.5 ns | 0.82 | 57 B |
-| **`Unsafe.As<string>(value)`** | **344.7 ns** | **0.51** | **33 B** |
+| `(string)value` (castclass) | 335.5 ns | 1.00 | 274 B |
+| `is string text` pattern | 324.7 ns | 0.97 | 57 B |
+| **`Unsafe.As<string>(value)`** | **212.8 ns** | **0.63** | **33 B** |
 
 castclass drags in a cast helper and an exception path, making the code 8x larger. Use Unsafe.As **only where the registry design can guarantee the type invariant** (a wrong type means silent memory corruption). → [Results](benchmarks/results/TYP-05-UnsafeAsCast.md)
 
@@ -1563,15 +1564,15 @@ var sql = SqlInsert<Order>.Sql;
 
 **Use cases:** SQL generation in O/R mappers, log and diagnostic strings containing type names, and serializer schema fragments.
 
-**Measured (Ryzen 9 5900X / net10, obtaining a SQL fragment):**
+**Measured (net10 / x86-64-v4, obtaining a SQL fragment):**
 
 | Approach | Time | Ratio | Allocation | Code size |
 |---|---:|---|---:|---:|
-| Rebuild every time (baseline) | 116 ns | 1.00 | 760 B | 5,238 B |
-| `Dictionary<Type, string>` cache | 4.8 ns | 0.042 | 0 B | 921 B |
-| **Generic static field** | **0.09 ns** | **0.001** | **0 B** | **6 B** |
+| Rebuild every time (baseline) | 57.0 ns | 1.00 | 760 B | 5,220 B |
+| `Dictionary<Type, string>` cache | 2.7 ns | 0.048 | 0 B | 936 B |
+| **Generic static field** | **~0 ns** | **0.000** | **0 B** | **6 B** |
 
-Reading a static field is essentially free (the same shape as TYP-01's generic path). Even against the dictionary cache it is about 53x faster. Use the dictionary only for calls where the type is not known statically. → [Results](benchmarks/results/TYP-06-StaticArtifact.md)
+Reading a static field is essentially free — below measurement resolution (the same shape as TYP-01's generic path). Use the dictionary only for calls where the type is not known statically. → [Results](benchmarks/results/TYP-06-StaticArtifact.md)
 
 **Caveats:** If the type initializer throws, the `TypeInitializationException` stays cached from then on. Design any fallible construction to store a fallback value meaning "unsupported" (the same caveat as TYP-04).
 
@@ -1661,15 +1662,15 @@ var index = hash & mask;
 
 **Implementation in this repo:** [SampledNameTable.cs](src/PerformancePatterns/Col/SampledNameTable.cs) (rounds the bucket count to a power of two and indexes with `hash & mask`)
 
-**Measured (Ryzen 9 5900X / net10, 1024 bucket index computations):**
+**Measured (net10 / x86-64-v4, 1024 bucket index computations):**
 
 | Approach | Time | Ratio |
 |---|---:|---|
-| `%` with a runtime size (division instruction) | 1,344.8 ns | 1.00 |
-| **Power-of-two mask `&`** | 310.3 ns | **0.23** |
-| `%` with a constant size | 253.0 ns | 0.19 |
+| `%` with a runtime size (division instruction) | 1,203.5 ns | 1.00 |
+| **Power-of-two mask `&`** | 215.3 ns | **0.18** |
+| `%` with a constant size | 213.3 ns | 0.18 |
 
-**Manual masking is only needed when the size is decided at runtime.** For `%` against a constant power of two the JIT already lowers to an AND, so write it as-is (the gap to the mask version has identical lower bounds and comes from variance). → [Results](benchmarks/results/BIT-02-PowerOfTwoMask.md)
+**Manual masking is only needed when the size is decided at runtime.** For `%` against a constant power of two the JIT already lowers to an AND, so write it as-is (mask and constant-modulo produce the same 51 B of code and identical time). → [Results](benchmarks/results/BIT-02-PowerOfTwoMask.md)
 
 **Caveats:**
 
@@ -1682,10 +1683,10 @@ var index = hash & mask;
 
 **Goal:** Replace naive loops for bitmap scanning and bit counting with hardware instructions (`TrailingZeroCount` / `PopCount` / `Log2` etc.).
 
-**Effect (measured, Ryzen 9 5900X / net10, 64 sparse ulongs with 7 bits set):**
+**Effect (measured, net10 / x86-64-v4, 64 sparse ulongs with 7 bits set):**
 
-- Scanning set bits: full 64-bit loop 1,604ns → TZCNT approach **210ns (0.13, 7.6x)**
-- Counting bits: manual loop 1,062ns → `PopCount` **15.8ns (0.01, 67x)**
+- Scanning set bits: full 64-bit loop 1,056ns → TZCNT approach **141ns (0.13, 7.5x)**
+- Counting bits: manual loop 854ns → `PopCount` **12.8ns (0.01, 67x)**
 
 **AOT:** ✅ No issues (hardware instructions on supporting CPUs, software fallback elsewhere)
 
@@ -1734,16 +1735,17 @@ var hash = XxHash3.HashToUInt64(MemoryMarshal.AsBytes(value.AsSpan()));
 - Short ASCII token matching → TXT-04 (direct byte comparison)
 - General purpose, long inputs, or a stable value is required → this pattern
 
-**Measured (Ryzen 9 5900X / net10, versus string.GetHashCode):**
+**Measured (net10 / x86-64-v4, versus string.GetHashCode):**
 
 | Implementation | 8 chars | 64 chars | 512 chars |
 |---|---|---|---|
 | `string.GetHashCode` (baseline) | 1.00 | 1.00 | 1.00 |
-| **XxHash3 (via Cast)** | **0.34** | **0.25** | **0.11** |
-| XxHash3 (via fixed) | 0.38 | 0.24 | 0.12 |
-| Sampled hash (BIT-01) | 0.19 | 0.03 | 0.003 |
+| **XxHash3 (via Cast)** | **0.26** | **0.21** | **0.09** |
+| XxHash3 (via fixed) | 0.25 | 0.21 | 0.07 |
+| FNV-1a hand-written loop | 0.45 | **1.05 (❌)** | **1.53 (❌)** |
+| Sampled hash (BIT-01) | 0.06 | 0.008 | 0.001 |
 
-XxHash3 is already faster at 8 characters and the gap widens with length. `MemoryMarshal.AsBytes` is never slower than `fixed`, and at 8 / 512 characters it is marginally faster with non-overlapping CIs (no pinning required) — enough to confirm the reinterpretation is zero-cost. A hand-written hash loop cannot beat the vectorized BCL, so do not roll your own. → [Results](benchmarks/results/BIT-04-XxHash3.md)
+XxHash3 is already faster at 8 characters and the gap widens with length. `MemoryMarshal.AsBytes` and `fixed` are equivalent (no pinning required, so prefer the cast) — the reinterpretation is zero-cost. A hand-written hash loop (FNV-1a) is beaten by the vectorized BCL from 64 characters on, so do not roll your own. → [Results](benchmarks/results/BIT-04-XxHash3.md)
 
 **Caveats:** Being a non-cryptographic hash, it cannot be used for tamper detection or signatures.
 
@@ -1755,14 +1757,16 @@ XxHash3 is already faster at 8 characters and the gap widens with length. `Memor
 
 **Goal:** Run data-parallel work — aggregation, transformation, search — in bulk with hardware SIMD instructions.
 
-**Effect (measured, Ryzen 9 5900X (AVX2) / net10, sum of int[4096]):**
+**Effect (measured, net10 / x86-64-v4 (AVX-512), sum of int[4096]):**
 
 | Implementation | Ratio |
 |---|---|
-| Scalar loop | 1.00 (1,111ns) |
-| `Enumerable.Sum` (BCL, already vectorized) | 0.24 |
-| `Vector<T>` | 0.16 |
-| `Vector256` directly | **0.11 (8.9x)** |
+| Scalar loop | 1.00 (826ns) |
+| `Enumerable.Sum` (BCL, already vectorized) | 0.31 |
+| `Vector256` directly | 0.22 |
+| **`Vector<T>` (width-agnostic)** | **0.14 (7.0x)** |
+
+Explicit SIMD beats the scalar loop by a wide margin on any SIMD-capable CPU — that policy does not depend on hardware. **Which form wins does:** `Vector<T>` follows the hardware width (16 int lanes on AVX-512) while `Vector256` is pinned at 8 lanes, so the width-agnostic form wins here; on AVX2-only CPUs both run 8 wide and can come out even. **Default to width-agnostic `Vector<T>`** and hardcode a width only when the algorithm needs specific lane semantics.
 
 **AOT:** ✅ No issues (AOT also emits SIMD instructions for the target ISA. Provide an `IsHardwareAccelerated` guard plus a scalar fallback)
 
@@ -1821,7 +1825,7 @@ foreach (var token in new SpanTokenizer<char>(line.AsSpan(), ','))
 
 **Implementation in this repo:** [SpanTokenizer.cs](src/PerformancePatterns/Seq/SpanTokenizer.cs) / [Tests](tests/PerformancePatterns.Tests/Seq/SpanTokenizerTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Seq/SpanTokenizerBenchmark.cs) / [Results](benchmarks/results/SEQ-01-SpanTokenizer.md)
 
-**Measured (Ryzen 9 5900X / net8-10):** Versus `string.Split`, 0.30-0.34x with 4 tokens (about 3x faster) and 0.62-0.70x with 64 tokens; allocation goes from 216B-3,096B → **0B**. Even against `MemoryExtensions.Split` on .NET 9+ it is 7-26% faster with a smaller code size (548B vs 751B).
+**Measured (net10 / x86-64-v4):** Versus `string.Split`, 0.47x with 4 tokens — but **1.15x (slower) with 64 tokens**, where string.Split's vectorized scan wins; allocation goes from 216B-3,096B → **0B** in every case. Against `MemoryExtensions.Split` on .NET 9+ it is 4-13% faster with a smaller code size (707B vs 910B). Choose it for allocation elimination and short token counts, not as a blanket speed win.
 
 ---
 
@@ -1856,14 +1860,14 @@ public static void Write<T>(this Stream stream, in T value) where T : unmanaged
 
 **Use cases:** Binary file formats, fixed-length record I/O, custom protocols.
 
-**Measured (Ryzen 9 5900X / net10, 16 bytes x 1024 records):**
+**Measured (net10 / x86-64-v4, 16 bytes x 1024 records):**
 
 | Approach | Time | Ratio |
 |---|---:|---|
-| Write: `BinaryWriter` field by field | 18,294 ns | 1.00 |
-| **Write: bulk `MemoryMarshal.AsBytes`** | **181.6 ns** | **0.010 (about 100x)** |
-| Read: `BinaryReader` field by field | 8,172 ns | 1.00 |
-| **Read: `ReadExactly` + bulk reinterpretation** | **193.8 ns** | **0.024 (about 42x)** |
+| Write: `BinaryWriter` field by field | 10,199 ns | 1.00 |
+| **Write: bulk `MemoryMarshal.AsBytes`** | **154.0 ns** | **0.015 (about 66x)** |
+| Read: `BinaryReader` field by field | 4,609 ns | 1.00 |
+| **Read: `ReadExactly` + bulk reinterpretation** | **93.8 ns** | **0.020 (about 49x)** |
 
 **The largest improvement in this catalog.** Field-by-field I/O passes through buffer bounds checks and formatting on every call, whereas bulk reinterpretation is a single memcpy. → [Results](benchmarks/results/SEQ-02-StructStreamIo.md)
 
@@ -1902,13 +1906,13 @@ foreach (var node in root.TraverseDepthFirst(static x => x.Children))
 
 **Implementation in this repo:** [BatchExtensions.cs](src/PerformancePatterns/Seq/BatchExtensions.cs) (Span version = ref struct enumerator that only slices; array version = returns ArraySegment) / [Tests](tests/PerformancePatterns.Tests/Seq/BatchTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Seq/BatchBenchmark.cs) / [Results](benchmarks/results/SEQ-03-Batch.md)
 
-**Measured (Ryzen 9 5900X / net10, 1024 elements in groups of 100):**
+**Measured (net10 / x86-64-v4, 1024 elements in groups of 100):**
 
 | Approach | Time | Ratio | Allocation | Code size |
 |---|---:|---|---:|---:|
-| `Enumerable.Chunk` (baseline) | 570 ns | 1.00 | 4,424 B | 1,769 B |
-| **Array Batch (ArraySegment)** | 444 ns | 0.80 | **0 B** | 141 B |
-| **Span Batch (slice)** | **342 ns** | **0.61** | **0 B** | 108 B |
+| `Enumerable.Chunk` (baseline) | 359 ns | 1.00 | 4,424 B | 1,769 B |
+| **Array Batch (ArraySegment)** | 266 ns | 0.74 | **0 B** | 141 B |
+| **Span Batch (slice)** | **227 ns** | **0.63** | **0 B** | 108 B |
 
 `Chunk` allocates a new array per chunk and copies into it. Batch just returns a view (slice / ArraySegment), so neither allocation nor copying happens.
 
@@ -1957,7 +1961,7 @@ private bool TryReadLine(out ReadOnlySpan<byte> line)
 
 **Related:** ASY-07 (System.IO.Pipelines) is the more full-featured option. Choose a hand-rolled ring when you want no extra dependency, a fixed size, and your own overflow discard policy.
 
-**Measured (Ryzen 9 5900X / net10, 16 lines of 2 KB received in 256 B chunks):** Rescanning the whole buffer every time plus compacting after every line takes 3.11 μs, against **1.80 μs (0.58x) for incremental search plus deferred compaction**. Both are zero-allocation; the difference comes from not rescanning already-scanned bytes and from moving data only when necessary instead of per line (the two-segment wraparound path was not measured; the figures come from a flat buffer). → [Results](benchmarks/results/SEQ-04-RingSplit.md)
+**Measured (net10 / x86-64-v4, 16 lines of 2 KB received in 256 B chunks):** Rescanning the whole buffer every time plus compacting after every line takes 1.70 μs, against **1.13 μs (0.67x) for incremental search plus deferred compaction**. Both are zero-allocation; the difference comes from not rescanning already-scanned bytes and from moving data only when necessary instead of per line (the two-segment wraparound path was not measured; the figures come from a flat buffer). → [Results](benchmarks/results/SEQ-04-RingSplit.md)
 
 **Caveats:** Decide the buffer-overflow policy explicitly (drop old data / throw / grow).
 
@@ -2021,15 +2025,15 @@ for (var i = 0; i < span.Length; i++)
 - Lookups are 2-4x faster than `Dictionary` (1024 entries). But **construction is 15-20x slower** and allocates far more — only for tables built once at startup and read forever
 - For some key sets the lookup advantage reverses as well (measured: 1.15-1.31x slower than Dictionary for 64 enum names). Measure with real data before adopting
 
-**Measured (Ryzen 9 5900X / net10, string keys, non-interned probes):**
+**Measured (net10 / x86-64-v4, string keys, non-interned probes):**
 
 | Aspect | 16 entries | 256 entries |
 |---|---|---|
-| Construction (Frozen / Dictionary) | **10.2x** (1,493 vs 147 ns) | **7.4x** (17,139 vs 2,323 ns) |
+| Construction (Frozen / Dictionary) | **10.6x** (847 vs 80 ns) | **8.2x** (10,510 vs 1,282 ns) |
 | Construction allocation | 4.25x | 4.25x |
-| Lookup (Frozen / Dictionary) | 1.05 (➖ measurement noise) | 1.04 (➖ measurement noise) |
+| Lookup (Frozen / Dictionary) | 1.00 (➖ measurement noise) | 0.98 (➖ measurement noise) |
 
-**Under these conditions (string keys, 16-256 entries) there is no measurable lookup gain, so the 7-10x construction cost is never amortized.** Adopt it only when a lookup win is measurable on real data. For name resolution over a known key set, COL-04 (sampled hash table, 0.56-0.84x versus Dictionary) is the surer bet. The general record on the rejection side is R-08. → [Results](benchmarks/results/COL-02-FrozenCondition.md)
+**Under these conditions (string keys, 16-256 entries) there is no measurable lookup gain, so the 8-11x construction cost is never amortized.** Adopt it only when a lookup win is measurable on real data. For name resolution over a known key set, COL-04 (sampled hash table, 0.60-0.62x versus Dictionary) is the surer bet. The general record on the rejection side is R-08. → [Results](benchmarks/results/COL-02-FrozenCondition.md)
 - For dictionaries keyed by `Type`, a purpose-built implementation (TYP-01 style type slots, or an open-addressed type hash map) is about 3x faster than FrozenDictionary
 - A `ReadOnlyDictionary` wrapper is reliably slower by the cost of the wrapper (to express immutability, expose `FrozenDictionary` or `IReadOnlyDictionary` instead)
 
@@ -2064,7 +2068,7 @@ public bool TryResolve(ReadOnlySpan<char> name, out int value)
 
 **Use cases:** Keyword resolution in parsers, protocol header resolution, every name-lookup API that takes a `ReadOnlySpan<char>`.
 
-**Measured (Ryzen 9 5900X / net10, included in the COL-04 measurements):** A span-key AlternateLookup takes about 1.1-1.3x the time of a direct string-key lookup (4 / 16 / 32 entries). Its value is **being able to look up without the `ToString()` allocation (plus copy) when a span is all you have**; for a known key set the sampled hash table (COL-04) is faster still, at 0.56-0.65x of AlternateLookup. → [Results](benchmarks/results/COL-04-SampledNameTable.md)
+**Measured (net10 / x86-64-v4, included in the COL-04 measurements):** A span-key AlternateLookup costs about the same as a direct string-key lookup (1.0x at 4 / 16 / 32 entries). Its value is **being able to look up without the `ToString()` allocation (plus copy) when a span is all you have**; for a known key set the sampled hash table (COL-04) is faster still, at 0.59-0.75x of AlternateLookup. → [Results](benchmarks/results/COL-04-SampledNameTable.md)
 
 **Caveats:** The comparer must implement `IAlternateEqualityComparer` (the default string comparer and `StringComparer.Ordinal(IgnoreCase)` already do). The same API exists on `FrozenDictionary` and `HashSet`.
 
@@ -2088,18 +2092,18 @@ public bool TryResolve(ReadOnlySpan<char> name, out int value)
 
 **Implementation in this repo:** [SampledNameTable.cs](src/PerformancePatterns/Col/SampledNameTable.cs) (BIT-01 hash + BIT-02 mask + Ordinal confirmation inside the bucket) / [Tests](tests/PerformancePatterns.Tests/Col/SampledNameTableTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Col/SampledNameTableBenchmark.cs) / [Results](benchmarks/results/COL-04-SampledNameTable.md)
 
-**Measured (Ryzen 9 5900X / net10, name resolution by element count):**
+**Measured (net10 / x86-64-v4, name resolution by element count):**
 
 | Implementation | 4 entries | 16 entries | 32 entries |
 |---|---|---|---|
 | `Dictionary` (string key, baseline) | 1.00 | 1.00 | 1.00 |
-| Linear search | **0.70** | 2.73 (❌) | 4.59 (❌) |
-| Sampled hash table | 0.84 | **0.78** | **0.77** |
+| Linear search | 0.62 | 1.77 (❌) | 3.23 (❌) |
+| Sampled hash table | **0.60** | **0.62** | **0.75** |
 | `Dictionary` AlternateLookup (span-key baseline) | 1.00 | 1.00 | 1.00 |
-| `FrozenDictionary` AlternateLookup | 1.33 (❌) | 0.69 | 0.89 |
-| **Sampled hash table (span key)** | **0.65** | **0.56** | **0.56** |
+| `FrozenDictionary` AlternateLookup | 1.03 | 0.90 | 0.89 |
+| **Sampled hash table (span key)** | **0.59** | **0.60** | **0.75** |
 
-The sampled hash table is consistently fast at every size, and on span-key comparisons it beats FrozenDictionary too. Linear search only wins up to about 4 entries. Its code size is smaller as well, 620-638 B against Dictionary (about 1KB) and Frozen (about 2KB).
+The sampled hash table is consistently fast at every size, and on span-key comparisons it beats FrozenDictionary too. Linear search matches it at 4 entries but degrades quickly beyond that. Its code size is smaller as well, 692-706 B against Dictionary (about 1.1KB) and Frozen (about 2.1KB).
 
 ---
 
@@ -2107,11 +2111,11 @@ The sampled hash table is consistently fast at every size, and on span-key compa
 
 **Goal:** Inside APIs that take `IEnumerable<T>`, check the runtime type and route `List<T>` (and `T[]` where useful) onto a Span path — the standard trick used inside LINQ.
 
-**Effect (measured, Ryzen 9 5900X / net10, sum of 1024 elements):**
+**Effect (measured, net10 / x86-64-v4, sum of 1024 elements):**
 
-- **List source: 0.56x (about 1.8x faster)** — the `List<T>` enumerator does not get faster through the interface, so this is the branch that matters
-- Array source: no gain (258.5 vs 272.4ns, with the branching version marginally slower) — the modern JIT already optimizes IEnumerable enumeration of arrays through profile-guided guarded devirtualization
-- Penalty for enumerator sources where the branches miss: none (829.0 vs 822.8ns)
+- **List source: 0.83x** (253.7 → 210.2ns) — the branch that matters, though guarded devirtualization has closed much of the gap
+- Array source: no gain (213.8 vs 209.8ns) — the modern JIT already optimizes IEnumerable enumeration of arrays through profile-guided guarded devirtualization
+- **Penalty for enumerator sources where the branches miss: 1.13x** (486.7 vs 552.0ns, non-overlapping CIs) — a lazy-iterator argument pays for the type tests it never uses, so adopt this where inputs are predominantly List/array
 
 **AOT:** ✅ No issues. AOT has no runtime-profile-driven devirtualization, so **it is worth more than under the JIT, array branch included**
 
@@ -2187,15 +2191,15 @@ existing.EnsureCapacity(count);
 
 **Related:** COL-05 (concrete-type dispatch) for detecting the input shape, COL-01 (SetCount + AsSpan) for writing elements.
 
-**Measured (Ryzen 9 5900X / net10):**
+**Measured (net10 / x86-64-v4):**
 
 ImmutableArray construction (16 elements):
 
 | Approach | Time | Allocation |
 |---|---:|---:|
-| **`ToImmutableArray()` from an array** | **7.2 ns** | 88 B |
-| Builder + `ToImmutable()` | 24.3 ns | 176 B |
-| Builder + `MoveToImmutable()` | 17.7 ns | 88 B |
+| **`ToImmutableArray()` from an array** | **4.0 ns** | 88 B |
+| Builder + `ToImmutable()` | 14.3 ns | 176 B |
+| Builder + `MoveToImmutable()` | 11.3 ns | 88 B |
 
 **When a contiguous region (array/Span) already exists, the bulk copy of `ToImmutableArray()` wins outright** (the Builder's per-element Add is the bottleneck). The Builder is the tool for when elements arrive one at a time, and in that case `MoveToImmutable` halves the allocation (176 B → 88 B).
 
@@ -2204,9 +2208,9 @@ List refill (16 elements / 256 elements):
 | Approach | 16 elements | 256 elements | Allocation |
 |---|---|---|---|
 | `new List()` (no capacity, baseline) | 1.00 | 1.00 | 216 B / 2,232 B |
-| `new List(capacity)` | 0.46 | 0.81 | about half |
-| Reuse (Clear + EnsureCapacity) | 0.52 | 0.85 | **0 B** |
-| **Reuse + SetCount + direct Span writes (COL-01)** | **0.21** | **0.27** | **0 B** |
+| `new List(capacity)` | 0.51 | 0.81 | about half |
+| Reuse (Clear + EnsureCapacity) | 0.63 | 0.70 | **0 B** |
+| **Reuse + SetCount + direct Span writes (COL-01)** | **0.19** | **0.26** | **0 B** |
 
 → [Results](benchmarks/results/COL-06-CollectionConvert.md)
 
@@ -2244,7 +2248,7 @@ private static ReadOnlySpan<byte> HexTable => "0123456789ABCDEF"u8;
 
 **Implementation in this repo:** [Utf8DateTimeFormatter.cs](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) / [Tests](tests/PerformancePatterns.Tests/Txt/Utf8DateTimeFormatterTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Txt/Utf8DateTimeFormatterBenchmark.cs) / [Results](benchmarks/results/TXT-01-Utf8DateTimeFormatter.md)
 
-**Measured (Ryzen 9 5900X / net8-10, yyyyMMddHHmmss):** 0.23-0.32x versus `ToString` + `Encoding.GetBytes` (3-4x faster), 56B → 0B, code size about 10KB → 0.9KB. `DateTime.TryFormat` + encoding matches `ToString` on time (it only improves allocation), which makes the table approach stand out.
+**Measured (net10 / x86-64-v4, yyyyMMddHHmmss):** 0.41x versus `ToString` + `Encoding.GetBytes` (about 2.5x faster), 56B → 0B, code size about 10KB → 0.9KB. `DateTime.TryFormat` + encoding is a modest 0.90x over `ToString`, and the table approach is still ~2.2x faster than it.
 
 ---
 
@@ -2270,7 +2274,7 @@ ValueStringBuilder (a ref struct with a stackalloc initial buffer that grows int
 
 **Implementation in this repo:** [ValueStringBuilder.cs](src/PerformancePatterns/Txt/ValueStringBuilder.cs) / [Tests](tests/PerformancePatterns.Tests/Txt/ValueStringBuilderTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Txt/ValueStringBuilderBenchmark.cs) / [Results](benchmarks/results/TXT-02-ValueStringBuilder.md)
 
-**Measured (Ryzen 9 5900X / net8-10, four concatenations of 24 characters):** Versus a `StringBuilder` with no capacity, ValueStringBuilder is 0.31-0.33x (about 3.2x faster) and allocation drops from 760B → 216B (the result string only). It is on par with the stackalloc interpolated handler and faster still than a capacity-specified `StringBuilder` (0.43-0.47x).
+**Measured (net10 / x86-64-v4, four concatenations of 24 characters):** Versus a `StringBuilder` with no capacity, ValueStringBuilder is 0.30x (about 3.4x faster) and allocation drops from 760B → 216B (the result string only). It is on par with the stackalloc interpolated handler and faster still than a capacity-specified `StringBuilder` (0.45x).
 
 **Use cases:** Log messages, key string generation, short assembly of SQL, paths and the like.
 
@@ -2297,7 +2301,7 @@ ValueStringBuilder (a ref struct with a stackalloc initial buffer that grows int
 - Make `TryXxx(out T result)` the canonical public API of a library and provide the throwing version (`Xxx`) as a wrapper over the Try version
 - Internally too, use the BCL's Try APIs (`int.TryParse`, `Utf8Parser.TryParse`, etc.) and keep try/catch out of control flow
 
-**Measured (Ryzen 9 5900X / net10, integer parsing with 10% invalid input):** Exception-based control flow costs 183.8 ns per call plus 48 B (**one exception ≒ 1.8 μs**), against **4.67 ns / 0 B (0.03x = about 39x) for TryParse**. Code size is 8,117 B vs 1,712 B as well (the EH scaffolding). → [Results](benchmarks/results/TXT-03-TryPattern.md)
+**Measured (net10 / x86-64-v4, integer parsing with 10% invalid input):** Exception-based control flow costs 132.5 ns per call plus 48 B (**one exception ≒ 1.3 μs**), against **2.89 ns / 0 B (0.02x = about 46x) for TryParse**. Code size is 8,348 B vs 1,705 B as well (the EH scaffolding). → [Results](benchmarks/results/TXT-03-TryPattern.md)
 
 ---
 
@@ -2305,10 +2309,10 @@ ValueStringBuilder (a ref struct with a stackalloc initial buffer that grows int
 
 **Goal:** Match known tokens in received bytes (HTTP methods, protocol keywords, etc.) on the byte sequence itself, without converting to string.
 
-**Effect (measured, Ryzen 9 5900X / net10, 64 matches of a 4-byte token):**
+**Effect (measured, net10 / x86-64-v4, 64 matches of a 4-byte token):**
 
-- **0.23x (4.3x faster) versus converting to string plus a switch, with allocation 2,048B → 0B** — the real win is avoiding the string conversion
-- A chain of `SequenceEqual("GET "u8)` and comparison against uint constants are **exactly the same speed** (115.4 vs 115.2ns). SequenceEqual on net10 is already well optimized for constant lengths, so the only benefit of the uint form is smaller code (226B → 166B)
+- **0.26x (3.8x faster) versus converting to string plus a switch, with allocation 2,048B → 0B** — the real win is avoiding the string conversion
+- A chain of `SequenceEqual("GET "u8)` and comparison against uint constants are **the same speed** (84.1 vs 82.6ns, CIs overlap). SequenceEqual on net10 is already well optimized for constant lengths, so the only benefit of the uint form is smaller code (226B → 166B)
 
 **AOT:** ✅ No issues
 
@@ -2336,10 +2340,10 @@ if (value == GetToken) { return HttpMethod.Get; }
 
 **Goal:** Build UTF-8 output by writing straight into a `Span<byte>` with the UTF-8 interpolated string handler (.NET 8+), rather than the two-step string interpolation followed by encoding.
 
-**Effect (measured, Ryzen 9 5900X / net10, formatting `id={int}&name={string}&ts={long}`):**
+**Effect (measured, net10 / x86-64-v4, formatting `id={int}&name={string}&ts={long}`):**
 
-- **0.54x (1.9x faster) versus string interpolation + `Encoding.UTF8.GetBytes`, with 104B → 0B**
-- Faster than char-based `MemoryExtensions.TryWrite` + encoding (0.60x) because no intermediate char representation is needed
+- **0.45x (2.2x faster) versus string interpolation + `Encoding.UTF8.GetBytes`, with 104B → 0B**
+- Faster than char-based `MemoryExtensions.TryWrite` + encoding (0.52x) because no intermediate char representation is needed
 
 **AOT:** ✅ No issues (interpolated handlers are a compile-time transformation)
 
@@ -2364,10 +2368,10 @@ if (Utf8.TryWrite(destination, $"id={id}&name={name}&ts={timestamp}", out var wr
 
 **Goal:** Replace the general Unicode-aware implementation with the ASCII-specialized one (.NET 8's `Ascii` class) for case-insensitive handling of tokens guaranteed to be ASCII (HTTP header names and the like).
 
-**Effect (measured, Ryzen 9 5900X / net10, case-insensitive comparison of 8 header name pairs):**
+**Effect (measured, net10 / x86-64-v4, case-insensitive comparison of 8 header name pairs):**
 
-- `Ascii.EqualsIgnoreCase` (byte sequence against byte sequence) is **0.62x** versus `string.Equals(OrdinalIgnoreCase)`. It compares bytes as they are, so the string conversion itself becomes unnecessary too (the effective gap is larger still)
-- A hand-written `| 0x20` normalized comparison is the fastest at 0.43x with a code size of 242B, but it carries the trap of falsely equating symbol pairs such as `@` and `` ` ``
+- `Ascii.EqualsIgnoreCase` (byte sequence against byte sequence) is **0.76x** versus `string.Equals(OrdinalIgnoreCase)`. It compares bytes as they are, so the string conversion itself becomes unnecessary too (the effective gap is larger still)
+- A hand-written `| 0x20` normalized comparison is the fastest at 0.59x, but it carries the trap of falsely equating symbol pairs such as `@` and `` ` ``
 
 **AOT:** ✅ No issues
 
@@ -2421,15 +2425,15 @@ public readonly struct Measure : ISpanFormattable
 
 **Related:** For fixed formats the table approach (TXT-01) is faster still. Combine with TXT-02 / TXT-05 for variable formats.
 
-**Measured (Ryzen 9 5900X / net10, assembling prefix:name:id):**
+**Measured (net10 / x86-64-v4, assembling prefix:name:id):**
 
 | Approach | Time | Ratio | Allocation |
 |---|---:|---|---:|
-| String interpolation (baseline) | 26.8 ns | 1.00 | 80 B |
-| `string.Concat` + `ToString` | 29.9 ns | 1.11 | 176 B |
-| `StringBuilder` (with capacity) | 27.7 ns | 1.03 | 280 B |
-| ValueStringBuilder (TXT-02) | 21.7 ns | 0.81 | 80 B |
-| **`string.Create`** | **15.3 ns** | **0.57** | **80 B** |
+| String interpolation (baseline) | 17.0 ns | 1.00 | 80 B |
+| `string.Concat` + `ToString` | 19.6 ns | 1.15 | 176 B |
+| `StringBuilder` (with capacity) | 15.6 ns | 0.92 | 280 B |
+| ValueStringBuilder (TXT-02) | 12.5 ns | 0.74 | 80 B |
+| **`string.Create`** | **9.4 ns** | **0.55** | **80 B** |
 
 The 80 B is the result string itself (the floor that cannot be reduced further). `string.Create` is the fastest, allocating only the single result. → [Results](benchmarks/results/TXT-07-StringCreate.md)
 
@@ -2460,15 +2464,15 @@ var index = span.IndexOfAny(Delimiters);
 
 **Use cases:** Delimiter detection in tokenizers, detecting characters that need escaping, validation (checking against an allowed character set).
 
-**Measured (Ryzen 9 5900X / net10, scanning 256 characters, versus `IndexOfAny(char[])`):**
+**Measured (net10 / x86-64-v4, scanning 256 characters, versus `IndexOfAny(char[])`):**
 
 | Candidates | Array overload | SearchValues | Ratio |
 |---:|---:|---:|---|
-| 3 | 7.13 ns | 6.67 ns | 0.94 |
-| 8 | 17.8 ns | 6.06 ns | **0.34** |
-| 32 | 34.7 ns | 6.15 ns | **0.18** |
+| 3 | 5.66 ns | 5.46 ns | 0.96 |
+| 8 | 13.9 ns | 4.61 ns | **0.33** |
+| 32 | 23.1 ns | 4.54 ns | **0.20** |
 
-SearchValues stays at about 6 ns **regardless of candidate count** (the array version degrades in proportion to it). Its code size is small too, 621 B vs about 3,600 B. → [Results](benchmarks/results/TXT-08-SearchValues.md)
+SearchValues stays at about 4.5-5.5 ns **regardless of candidate count** (the array version degrades in proportion to it). Its code size is small too, 623 B vs about 3,960 B. → [Results](benchmarks/results/TXT-08-SearchValues.md)
 
 **Caveats:** **For 2-3 candidates the dedicated overloads such as `IndexOfAny(char, char)` are faster** (measured; rejection list R-07). As the table above shows, SearchValues still beats the array overload even at 3 candidates, so use the dedicated overload whenever the count allows one and SearchValues otherwise — never the array overload.
 
@@ -2499,15 +2503,15 @@ var end = field.LastIndexOfAnyExcept(Filler);
 var trimmed = start < 0 ? [] : field[start..(end + 1)];
 ```
 
-**Measured (Ryzen 9 5900X / net10, 8-digit number → 12-character field / 32-character trim):**
+**Measured (net10 / x86-64-v4, 8-digit number → 12-character field / 32-character trim):**
 
 | Approach | Time | Ratio |
 |---|---:|---|
-| **`TryFormat` + `Fill`** | **5.32 ns** | 1.00 |
-| Hand-written LSB-first write → Reverse | 12.9 ns | 2.51 (❌) |
-| Hand-written right-align → forward shift | 24.6 ns | 4.79 (❌) |
-| Trim: hand-written loop | 8.73 ns | 1.00 |
-| **Trim: `IndexOfAnyExcept`** | **5.20 ns** | **0.60** |
+| **`TryFormat` + `Fill`** | **3.33 ns** | 1.00 |
+| Hand-written LSB-first write → Reverse | 10.7 ns | 3.21 (❌) |
+| Hand-written right-align → forward shift | 12.2 ns | 3.67 (❌) |
+| Trim: hand-written loop | 4.50 ns | 1.00 |
+| **Trim: `IndexOfAnyExcept`** | **3.80 ns** | **0.85** |
 
 **The hand-written digit-order tricks (right-align then shift, reverse-order writing) are counterproductive on net10** (rejected as R-16). They belong to the generation before `TryFormat` / `ISpanFormattable` existed; the BCL's digit formatting is optimized now, so they cannot beat it. → [Results](benchmarks/results/TXT-09-FixedFieldFormat.md)
 
@@ -2523,10 +2527,10 @@ var trimmed = start < 0 ? [] : field[start..(end + 1)];
 
 **Goal:** In methods that just return an inner Task / ValueTask without touching it, drop `async`/`await` and return it directly (async elision).
 
-**Effect (measured, Ryzen 9 5900X / net10, synchronously completing path):**
+**Effect (measured, net10 / x86-64-v4, synchronously completing path):**
 
 - Returning the Task directly: **0.16x (6.4x faster) + 73B → 0B** — the async wrapper re-wraps even an already cached completed Task into a freshly allocated Task every call
-- Same for ValueTask: 1.7ns for the direct return vs 6.7ns for the await wrapper (0.15x; both allocate 0)
+- Same for ValueTask: 0.83ns for the direct return vs 4.23ns for the await wrapper (0.13x vs 0.67x; both allocate 0)
 
 **AOT:** ✅ No issues
 
@@ -2550,11 +2554,11 @@ public Task<int> ReadAsync(byte[] buffer) => inner.ReadAsync(buffer);
 
 **Goal:** Hand data between threads with `Channel<T>` instead of a hand-rolled lock + queue + signal.
 
-**Effect (measured, Ryzen 9 5900X / net10, pumping 10,000 items):**
+**Effect (measured, net10 / x86-64-v4, pumping 10,000 items):**
 
-- An unbounded channel costs **about 45ns per item** (write + async read + completion signal included) with near-zero allocation
-- The `SingleReader`/`SingleWriter` options are measurement noise in this scenario (0.97x) — they optimize high contention, so do not expect much from them with a single producer and consumer
-- Bounded (capacity 128) is 2.0x — decide whether that is a fair price for backpressure (a guaranteed memory ceiling)
+- An unbounded channel costs **about 39ns per item** (write + async read + completion signal included) with near-zero allocation
+- The `SingleReader`/`SingleWriter` options give 0.89x in this scenario (non-overlapping CIs) — a modest but real gain even with a single producer and consumer; declare them whenever the topology is fixed
+- Bounded (capacity 128) is 1.63x — decide whether that is a fair price for backpressure (a guaranteed memory ceiling)
 
 **AOT:** ✅ No issues
 
@@ -2581,9 +2585,9 @@ var channel = Channel.CreateUnbounded<Work>(new UnboundedChannelOptions
 
 **Goal:** Connect stream reads and writes through a `Pipe` (PipeReader/PipeWriter) and let the infrastructure own buffer management, partial reads, and backpressure.
 
-**Effect (measured, Ryzen 9 5900X / net10, same-thread transfer of 16 x 4KB chunks):**
+**Effect (measured, net10 / x86-64-v4, same-thread transfer of 16 x 4KB chunks):**
 
-- Against a `MemoryStream` round trip, time is 1.63x (the cost of the synchronization machinery), but **allocation drops from 128.2KB to 1.6KB (1/80)** — the payoff of reusing pooled segments
+- Against a `MemoryStream` round trip, time is 2.2x (the cost of the synchronization machinery), but **allocation drops from 128.2KB to 1.8KB (1/70)** — the payoff of reusing pooled segments
 - Its real domain is streaming network/file I/O; it is not meant for shuffling small in-memory payloads
 
 **AOT:** ✅ No issues (NuGet package System.IO.Pipelines)
@@ -2598,10 +2602,10 @@ var channel = Channel.CreateUnbounded<Work>(new UnboundedChannelOptions
 
 **Goal:** Understand the per-item overhead of `await foreach` and avoid async streams for data that can be enumerated synchronously.
 
-**Effect (measured, Ryzen 9 5900X / net10, enumerating 1,024 synchronously completing items):**
+**Effect (measured, net10 / x86-64-v4, enumerating 1,024 synchronously completing items):**
 
-- Against 0.96ns/item for a synchronous `foreach`, `await foreach` costs **11.0ns/item (11.6x)** — the price of the state machine and the ValueTask machinery behind `MoveNextAsync`
-- In absolute terms it is only about 10ns, so it dilutes to nothing in streams whose per-item work is heavy (hundreds of ns and up)
+- Against 0.48ns/item for a synchronous `foreach`, `await foreach` costs **7.3ns/item (15.2x)** — the price of the state machine and the ValueTask machinery behind `MoveNextAsync`
+- In absolute terms it is only about 7ns, so it dilutes to nothing in streams whose per-item work is heavy (hundreds of ns and up)
 
 **AOT:** ✅ No issues
 
@@ -2648,14 +2652,14 @@ public ValueTask<Entry> GetAsync(string key, CancellationToken cancel)
 - It is a return type, not something to stash in a field and reuse
 - Hand-writing `IValueTaskSource` is hard to get right (build on `ManualResetValueTaskSourceCore<T>`). Only start **after you have measured a clear bottleneck**
 
-**Measured (Ryzen 9 5900X / net10, per synchronous completion):**
+**Measured (net10 / x86-64-v4, per synchronous completion):**
 
 | Approach | Time | Allocated |
 |---|---:|---:|
-| `Task.FromResult` (value outside the BCL cache) | 6.21 ns | 72 B |
-| **`new ValueTask<int>(value)`** | **1.93 ns** | **0 B** |
-| async method returning Task (completes synchronously) | 11.1 ns | 72 B |
-| **async method returning ValueTask (completes synchronously)** | **6.60 ns** | **0 B** |
+| `Task.FromResult` (value outside the BCL cache) | 2.87 ns | 72 B |
+| **`new ValueTask<int>(value)`** | **0.93 ns** | **0 B** |
+| async method returning Task (completes synchronously) | 6.45 ns | 72 B |
+| **async method returning ValueTask (completes synchronously)** | **4.23 ns** | **0 B** |
 
 Task keeps allocating 72 B on every synchronous completion; ValueTask allocates nothing. Pair it with async elision (ASY-01) and the forwarding layer cost disappears too. → [Results](benchmarks/results/ASY-05-ValueTask.md)
 
@@ -2705,7 +2709,7 @@ public void Notify()
 - Reuse the due-job list by calling `Clear()` each pass. Write continuations in the static + state form `ContinueWith(static (t, state) => ..., this, ...)` (DSP-04)
 - If the schedule can be expressed as a bit set, BIT-03 (TrailingZeroCount) gets the next candidate in O(1) — the standard trick in cron implementations
 
-**Measured (Ryzen 9 5900X / net10, primitive level):** Creating and disposing a `Timer` per job costs 41.0 ns + 120 B (including registration in the global timer queue), while the single-loop wake-up (TCS swap + `TrySetResult`) costs **11.2 ns + 88 B (0.27x)**. This compares registration and notification primitives only; whole-scheduler behavior under load is out of scope. → [Results](benchmarks/results/ASY-06-SchedulerPrimitive.md)
+**Measured (net10 / x86-64-v4, primitive level):** Creating and disposing a `Timer` per job costs 36.0 ns + 120 B (including registration in the global timer queue), while the single-loop wake-up (TCS swap + `TrySetResult`) costs **20.3 ns + 88 B (0.56x)**. This compares registration and notification primitives only; whole-scheduler behavior under load is out of scope. → [Results](benchmarks/results/ASY-06-SchedulerPrimitive.md)
 
 **Caveats:** If the main goal is producer/consumer handoff, ASY-02 (Channels) fits better.
 
@@ -2747,7 +2751,7 @@ protected override Task SerializeToStreamAsync(Stream stream, TransportContext? 
 
 **Related:** ASY-03 (Pipelines) for serious framing, SEQ-04 (ring buffer) for hand-managed fixed buffers.
 
-**Measured (Ryzen 9 5900X / net10, processing a 1 MB payload):** Buffering everything into a byte[] before processing costs 514.8 μs + **2,097,484 B (Gen0/1/2 collections = LOH pressure)**, while incremental processing over 16 KB ArrayPool chunks costs **273.1 μs + 72 B (0.53x, zero GC)**. Peak memory falls from the whole payload to one chunk, and cache locality makes it faster as well. → [Results](benchmarks/results/ASY-07-StreamBuffering.md)
+**Measured (net10 / x86-64-v4, processing a 1 MB payload):** Buffering everything into a byte[] before processing costs 395.5 μs + **2,097,484 B (Gen0/1/2 collections = LOH pressure)**, while incremental processing over 16 KB ArrayPool chunks costs **224.5 μs + 64 B (0.58x, zero GC)**. Peak memory falls from the whole payload to one chunk, and cache locality makes it faster as well. → [Results](benchmarks/results/ASY-07-StreamBuffering.md)
 
 **Caveats:** Incremental processing can leave a partially sent state on error, so design it together with your retry strategy.
 
@@ -2759,15 +2763,15 @@ protected override Task SerializeToStreamAsync(Stream stream, TransportContext? 
 
 **Goal:** Implement run-exactly-once control (guarding against repeated Dispose, idempotent initialization) with a single `Interlocked` instruction instead of a lock.
 
-**Effect (measured, Ryzen 9 5900X / net10, steady-state cost of the already-disposed path):**
+**Effect (measured, net10 / x86-64-v4, steady-state cost of the already-disposed path):**
 
 | Approach | Time | Code size | Exactly-once guarantee |
 |---|---|---|:---:|
-| Plain bool | 0.40 ns | 26 B | ❌ (single-threaded only) |
-| lock(System.Threading.Lock) | 4.73 ns | 2,612 B | ✅ |
-| **Interlocked.Exchange / CompareExchange** | **1.81 / 1.96 ns** | **33 / 56 B** | ✅ |
+| Plain bool | 0.18 ns | 26 B | ❌ (single-threaded only) |
+| lock(System.Threading.Lock) | 8.85 ns | 2,612 B | ✅ |
+| **Interlocked.Exchange / CompareExchange** | **3.90 / 3.98 ns** | **33 / 56 B** | ✅ |
 
-Comparing thread-safe exclusion against thread-safe exclusion, `Interlocked` is **2.4-2.6x faster than lock with roughly 1/50 the code size**.
+Comparing thread-safe exclusion against thread-safe exclusion, `Interlocked` is **2.2-2.3x faster than lock with roughly 1/50 the code size**.
 
 **AOT:** ✅ No issues
 
@@ -2816,13 +2820,13 @@ public static void EnsureInitialized()
 
 **Goal:** Avoid the cost of reading wall-clock time (`DateTime.UtcNow`) for cache TTLs, timeout checks, and elapsed-time measurement.
 
-**Effect (measured, Ryzen 9 5900X / net10):**
+**Effect (measured, net10 / x86-64-v4):**
 
 | API | Time | Ratio | Characteristics |
 |---|---|---|---|
-| `DateTime.UtcNow` / `DateTimeOffset.UtcNow` | 24.8 / 25.3 ns | 1.00 | Wall-clock time. Affected by system clock changes |
-| `Stopwatch.GetTimestamp` | 19.1 ns | 0.77 | High resolution and monotonic. Convert to TimeSpan with `Stopwatch.GetElapsedTime` |
-| `Environment.TickCount64` | **1.13 ns** | **0.05 (22x)** | Monotonic, millisecond units (resolution ~10-16ms) |
+| `DateTime.UtcNow` / `DateTimeOffset.UtcNow` | 21.5 / 21.7 ns | 1.00 | Wall-clock time. Affected by system clock changes |
+| `Stopwatch.GetTimestamp` | 16.0 ns | 0.75 | High resolution and monotonic. Convert to TimeSpan with `Stopwatch.GetElapsedTime` |
+| `Environment.TickCount64` | **1.08 ns** | **0.05 (20x)** | Monotonic, millisecond units (resolution ~10-16ms) |
 
 **AOT:** ✅ No issues
 
@@ -2834,32 +2838,6 @@ public static void EnsureInitialized()
 - Abstract behind `TimeProvider` (.NET 8+) where testability matters, and call the API directly only on hot paths
 
 **Use cases:** Cache expiry, rate limiters, retry and timeout management, lightweight metrics.
-
----
-
-### 🖥️ SYS-02: Faster P/Invoke (LibraryImport + SuppressGCTransition)
-
-**Goal:** Cut native call overhead and move to marshalling that is compatible with AOT and trimming.
-
-**Effect (measured, Ryzen 9 5900X / net10, calling GetTickCount64):**
-
-- For blittable calls `[LibraryImport]` matches `DllImport` (0.96x). Its value is not speed but **full AOT and trimming support through source-generated marshalling** (no runtime marshalling required)
-- `[SuppressGCTransition]` gives **0.57x (1.8x faster)** — skipping the GC transition (the preemptive/cooperative mode switch) brings it to 1.36ns, on par with a managed call (1.24ns)
-
-**AOT:** ✅ LibraryImport is the recommended AOT-ready form (aligned with the Source Generator policy in [aot-compatibility.md](docs/aot-compatibility.md))
-
-**Example:**
-
-```csharp
-[LibraryImport("kernel32.dll", EntryPoint = "GetTickCount64")]
-[DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-[SuppressGCTransition]
-private static partial ulong GetTickCount64();
-```
-
-**Use cases:** Tiny native APIs called at high frequency (reading clocks and counters, lightweight computation).
-
-**Caveats (the strict constraints of SuppressGCTransition):** Only for calls that are extremely short (up to a few hundred ns), never block, never call back into managed code, and never throw. Violating that obstructs the GC's suspension wait and causes process-wide GC delays or hangs. Never put it on a call that performs I/O.
 
 ---
 
@@ -2927,13 +2905,13 @@ if (reader.Read())
 | `SchemaOnly` | Fetches the schema without transferring rows | Useful for resolving column types up front |
 | `CloseConnection` | Closes the connection when the reader is disposed | Only for connections you opened yourself |
 
-**Measured (Ryzen 9 5900X / net10, in-memory reader of 3 columns x 1000 rows, per row):**
+**Measured (net10 / x86-64-v4, in-memory reader of 3 columns x 1000 rows, per row):**
 
 | Approach | Time/row | Ratio | Allocated/row | Code size |
 |---|---:|---|---:|---:|
-| `GetOrdinal` x 3 per row (baseline) | 11.3 ns | 1.00 | 0 B | 2,225 B |
-| **Cached-ordinal struct passed by `in`** | **1.42 ns** | **0.13** | 0 B | 537 B |
-| Cached ordinals + `GetValue` + cast | 7.18 ns | 0.64 | **48 B (❌ boxing)** | 1,200 B |
+| `GetOrdinal` x 3 per row (baseline) | 7.45 ns | 1.00 | 0 B | 2,219 B |
+| **Cached-ordinal struct passed by `in`** | **1.00 ns** | **0.13** | 0 B | 533 B |
+| Cached ordinals + `GetValue` + cast | 4.26 ns | 0.57 | **48 B (❌ boxing)** | 1,169 B |
 
 Simply hoisting ordinal resolution out of the row loop gives about 8x. Leaning on `GetValue` instead of the typed methods (`GetInt32` and friends) piles up value-type boxes every row (int + bool = 48 B). Provider virtual dispatch and I/O are excluded (the measurement isolates the difference in resolution strategy alone). → [Results](benchmarks/results/DAT-01-OrdinalResolve.md)
 
@@ -2974,19 +2952,19 @@ public static Func<T> CreateFactory<T>() where T : new()
 
 **Design guidance:** **Make a Source Generator (AOTS-01) the first choice for new development.** Reserve Emit for maintaining existing assets and for dynamic scenarios where the consumer cannot generate code, always paired with the fallback above.
 
-**Measured (Ryzen 9 5900X / net10, invoking a factory with 2 dependencies):**
+**Measured (net10 / x86-64-v4, invoking a factory with 2 dependencies):**
 
 | Target strategy | Time | Ratio |
 |---|---:|---|
-| C# closure lambda (reference point) | 6.23 ns | 1.00 |
-| **Holder field (direct `ldfld` read)** | **6.55 ns** | **1.06 (equivalent)** |
-| Closure array (`ldelem` + `castclass`) | 9.34 ns | 1.51 (❌) |
-| Chained child factories (Callvirt) | 14.6 ns | 2.37 (❌) |
-| Chained child factories (Call) | 14.2 ns | 2.29 (❌) |
+| C# closure lambda (reference point) | 3.77 ns | 1.00 |
+| **Holder field (direct `ldfld` read)** | **4.23 ns** | **1.12 (near parity)** |
+| Closure array (`ldelem` + `castclass`) | 4.61 ns | 1.22 (❌) |
+| Chained child factories (Callvirt) | 6.36 ns | 1.69 (❌) |
+| Chained child factories (Call) | 6.46 ns | 1.71 (❌) |
 
-A holder-field target reaches parity with a compiled closure (both end up in the same `ldfld` shape). The closure array pays 1.5x and the child-delegate chain 2.3x — measurement confirms the claim that **inlining and holder fields pay off**.
+A holder-field target comes close to a compiled closure (both end up in the same `ldfld` shape). The closure array pays 1.2x and the child-delegate chain 1.7x — measurement confirms the claim that **inlining and holder fields pay off**.
 
-The `Call` vs `Callvirt` substitution, on the other hand, measured 14.2 vs 14.6 ns with overlapping CIs, so per the decision policy we **compared the codegen under JitDisasm → 68 instructions, 229 bytes, byte-identical**. In a delegate Invoke the target field read (`mov rcx, [delegate+0x08]`) doubles as a hardware null check, so the JIT drops the `callvirt` check. This is therefore **not measurement noise but no difference — the substitution has no effect on net10 delegate Invoke** (recorded as R-17 in the rejected index). → [Results](benchmarks/results/GEN-01-EmitStrategy.md)
+The `Call` vs `Callvirt` substitution, on the other hand, measured 6.36 vs 6.46 ns with overlapping CIs, so per the decision policy we **compared the codegen under JitDisasm → 68 instructions, 229 bytes, byte-identical**. In a delegate Invoke the target field read (`mov rcx, [delegate+0x08]`) doubles as a hardware null check, so the JIT drops the `callvirt` check. This is therefore **not measurement noise but no difference — the substitution has no effect on net10 delegate Invoke** (recorded as R-17 in the rejected index). → [Results](benchmarks/results/GEN-01-EmitStrategy.md)
 
 **Caveats:** Generated code is easy to miss in ordinary tests, so always provide equivalence tests for the output.
 

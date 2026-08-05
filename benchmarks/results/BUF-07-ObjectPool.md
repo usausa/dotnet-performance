@@ -1,7 +1,7 @@
 # BUF-07: ObjectPool (ThreadStatic single-slot)
 
 - Verdict: adopted
-- 0.68x vs new StringBuilder per call; allocation 648 B -> 64 B (result string only, 0.10x)
+- 0.68x vs new StringBuilder per call (19.97 -> 13.51 ns); allocation 648 B -> 64 B (result string only, 0.10x)
 - Retained-capacity cap prevents pool bloat; single-slot ThreadStatic keeps thread safety trivially
 
 ```

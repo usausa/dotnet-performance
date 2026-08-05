@@ -1,9 +1,9 @@
 # BIT-02: Power-of-two mask vs modulo (1024 bucket-index calculations)
 
 - Verdict: adopted (for runtime-sized tables); const-size modulo needs no manual mask
-- Runtime-size modulo: 1,344.8 ns (div instruction) vs power-of-two mask 310.3 ns (0.23x)
-- Const-size modulo: 253.0 ns (0.19x) - the JIT already lowers 'hash % 64' with a constant power-of-two to AND form; manual masking is only needed when the size is a runtime value
-- Mask vs const-modulo: mins match (251 vs 253 ns); the mask row's higher mean comes from run variance
+- Runtime-size modulo: 1,203.5 ns (div instruction) vs power-of-two mask 215.3 ns (0.18x)
+- Const-size modulo: 213.3 ns (0.18x) - the JIT already lowers 'hash % 64' with a constant power-of-two to AND form; manual masking is only needed when the size is a runtime value
+- Mask and const-modulo are identical (both 51 B of code, same time)
 
 ```
 

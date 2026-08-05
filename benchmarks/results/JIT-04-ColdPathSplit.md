@@ -1,9 +1,9 @@
 # JIT-04: Cold-path split (isolated micro)
 
-- Verdict: conditional - in this isolated tight loop the split+AggressiveInlining form measured 1.09x SLOWER
-- FatMethod 1.253 us (569 B, not inlined) vs SplitColdPath 1.361 us (103 B hot path, force-inlined into the loop)
-- Interpretation: one call per Write is cheap; forced expansion enlarged the loop body (consistent with JIT-01's code-bloat caution)
-- The pattern's real value is enabling CALLER-side inlining and downstream optimizations (see BufferWriterSlim/ValueStringBuilder Grow); apply with measurement, not by default
+- Verdict: adopted (code-size win; time-neutral in this isolated micro)
+- FatMethod 635.1 ns (569 B, not inlined) vs SplitColdPath 631.1 ns (0.99x, 103 B hot path force-inlined into the loop) - equal time, 5.5x smaller hot code
+- One call per Write is cheap, so isolating the growth path does not show up as time here; the pattern's real value is enabling CALLER-side inlining and the optimizations beyond it (see BufferWriterSlim/ValueStringBuilder Grow)
+- Apply with measurement: forced expansion can still bloat a loop body when the hot path is large
 
 ```
 

@@ -1,8 +1,8 @@
 # SEQ-02: Struct stream I/O (1024 x 16-byte records)
 
 - Verdict: adopted (largest win in the catalog)
-- Write: field-by-field BinaryWriter 18,294 ns -> bulk MemoryMarshal.AsBytes 181.6 ns (0.010x = ~100x)
-- Read: field-by-field BinaryReader 8,172 ns -> bulk ReadExactly 193.8 ns (0.024x = ~42x)
+- Write: field-by-field BinaryWriter 10,199 ns -> bulk MemoryMarshal.AsBytes 154.0 ns (0.015x = ~66x)
+- Read: field-by-field BinaryReader 4,609 ns -> bulk ReadExactly 93.8 ns (0.020x = ~49x)
 - Requires Pack=1 (or verified padding-free layout) and fixed endianness; see pattern notes
 
 ```

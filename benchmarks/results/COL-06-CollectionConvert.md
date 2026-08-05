@@ -3,8 +3,8 @@
 ## ImmutableArray construction
 
 - Verdict: conditional
-- Contiguous source (array/span): ToImmutableArray wins outright (7.2 ns / 88 B at 16; builder paths 2.5-3.4x slower) - bulk copy beats per-element Add
-- Incremental build: MoveToImmutable vs ToImmutable = 17.7 ns/88 B vs 24.3 ns/176 B at 16 (halves allocation, saves the final copy); at 256 the time gap is within overlapping CIs (measurement-noise; codegen differs, 903 vs 2,035 B) while the allocation halving remains
+- Contiguous source (array/span): ToImmutableArray wins outright (4.0 ns / 88 B at 16; builder paths 2.9-3.6x slower) - bulk copy beats per-element Add
+- Incremental build: MoveToImmutable vs ToImmutable = 11.3 ns/88 B vs 14.3 ns/176 B at 16, 171 vs 203 ns at 256 (non-overlapping CIs) - halves allocation and saves the final copy at every size
 - Rule: know your source shape; only reach for Builder when elements arrive one by one, and size the builder exactly to use MoveToImmutable
 
 ```
@@ -32,8 +32,8 @@ LaunchCount=2  WarmupCount=10
 ## List reuse and fill strategy
 
 - Verdict: adopted
-- new List(capacity): 0.46x vs no-capacity at 16 elements; reuse with Clear+EnsureCapacity: zero allocation
-- Reuse + SetCount + AsSpan fill (COL-01): 0.21x (16) / 0.27x (256) with zero allocation - the fastest fill path
+- new List(capacity): 0.51x vs no-capacity at 16 elements; reuse with Clear+EnsureCapacity: zero allocation
+- Reuse + SetCount + AsSpan fill (COL-01): 0.19x (16) / 0.26x (256) with zero allocation - the fastest fill path
 
 ```
 

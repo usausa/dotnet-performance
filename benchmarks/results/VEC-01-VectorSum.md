@@ -1,9 +1,9 @@
 # VEC-01: Explicit SIMD (Vector<T> / Vector256)
 
-- Verdict: adopted - write width-agnostic SIMD (`Vector<T>`)
-- Vector\<T\>: 0.14x, Vector256: 0.22x vs scalar loop (118.3 vs 184.3 ns, non-overlapping CIs)
-- `Vector<int>.Count` follows the hardware (16 lanes on AVX-512) while `Vector256<int>` is pinned at 8 lanes, so the width-agnostic form does twice the work per iteration here; on AVX2-only cores both run 8 wide and the two forms are equivalent
-- Hardcode a width only when the algorithm needs specific lane semantics
+- Verdict: adopted - explicit SIMD is decisively faster than scalar; write it width-agnostic (`Vector<T>`)
+- Both SIMD forms beat the scalar loop by a wide margin: Vector\<T\> 0.14x, Vector256 0.22x - the policy "use SIMD for bulk aggregation" stands regardless of CPU
+- The ranking between the two forms is CPU-width dependent: `Vector<int>.Count` follows the hardware (16 lanes on AVX-512) while `Vector256<int>` is pinned at 8 lanes, so the width-agnostic form wins here (118.3 vs 184.3 ns, non-overlapping CIs); on AVX2-only cores both run 8 wide and can come out even
+- Width-agnostic code is the safe default across CPUs; hardcode a width only when the algorithm needs specific lane semantics
 - Enumerable.Sum is 0.31x with no code of your own (BCL is vectorized) - prefer BCL SIMD APIs first
 
 ```

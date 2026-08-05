@@ -1,8 +1,8 @@
 # R-02 (was MEM-02): GetArrayDataReference
 
 - Verdict: NO speed benefit on net10 - use only where a ref (not a Span) is structurally required
-- Sequential walk: ref form 595.7 ns vs plain for 457.4 ns (1.30x SLOWER - defeats auto-vectorization, same finding as MEM-01/R-02)
-- Random access with mask-guaranteed indices: 461.4 vs 466.2 ns (CIs overlap - the bounds check the ref form removes is free here)
+- Sequential walk: ref form 248.2 ns vs plain for 236.2 ns (1.05x slower - the indexed form auto-vectorizes, same finding as MEM-01/R-02)
+- Random access with mask-guaranteed indices: 245.2 vs 246.3 ns (CIs overlap - the bounds check the ref form removes is free here)
 - Code size is smaller (55 vs 67-72 B) but that is the only measured advantage
 
 ```

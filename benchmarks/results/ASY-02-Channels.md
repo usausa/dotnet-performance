@@ -1,9 +1,9 @@
 # ASY-02: System.Threading.Channels
 
 - Verdict: adopted
-- ~45 ns/item unbounded (producer/consumer pump, 10,000 items)
-- SingleReader/SingleWriter options: no measurable effect in this scenario (0.97x)
-- Bounded(128): 2.0x - the price of backpressure
+- ~39 ns/item unbounded (producer/consumer pump, 10,000 items)
+- SingleReader/SingleWriter options: 0.89x (non-overlapping CIs) - a modest real gain even single-producer/single-consumer
+- Bounded(128): 1.63x - the price of backpressure
 
 ```
 

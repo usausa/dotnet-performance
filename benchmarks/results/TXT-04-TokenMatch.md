@@ -1,8 +1,8 @@
 # TXT-04: Byte token matching without string allocation
 
 - Verdict: adopted
-- 0.23x vs string switch, 2,048 B -> 0 B
-- SequenceEqual(u8) chain and uint constant compare are equal in time (115.4 vs 115.2 ns)
+- 0.26x vs string switch, 2,048 B -> 0 B
+- SequenceEqual(u8) chain and uint constant compare are equal in time (84.1 vs 82.6 ns, CIs overlap)
 - uint constants only reduce code size (226 B -> 166 B); prefer SequenceEqual by default
 
 ```

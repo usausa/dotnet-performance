@@ -1,8 +1,8 @@
 # TYP-03: UnsafeAccessor vs reflection for private field access
 
 - Verdict: adopted
-- UnsafeAccessor 0.264 ns == public property 0.269 ns (code size 23 B both - compiles to a direct field load)
-- FieldInfo.GetValue: 9.33 ns + 24 B boxing per read (34.8x)
+- UnsafeAccessor 0.192 ns == public property 0.192 ns (code size 23 B both - compiles to a direct field load)
+- FieldInfo.GetValue: 4.77 ns + 24 B boxing per read (24.9x)
 
 ```
 

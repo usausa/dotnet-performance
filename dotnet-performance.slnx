@@ -11,6 +11,7 @@
     <File Path="dotnet-performance.sln.DotSettings" />
     <File Path="LICENSE" />
     <File Path="README.md" />
+    <File Path="README.ja.md" />
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/PerformancePatterns.Benchmarks/PerformancePatterns.Benchmarks.csproj" />

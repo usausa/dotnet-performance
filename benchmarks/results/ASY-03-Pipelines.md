@@ -1,8 +1,8 @@
 # ASY-03: System.IO.Pipelines
 
 - Verdict: adopted (conditional)
-- 1.63x vs MemoryStream for small same-thread transfer (4 KB x 16)
-- Allocation 128.2 KB -> 1.6 KB (1/80, pooled segments)
+- 2.2x vs MemoryStream for small same-thread transfer (4 KB x 16) - the synchronization machinery is the cost
+- Allocation 128.2 KB -> 1.8 KB (1/70, pooled segments)
 - Caution: sequential write-then-read deadlocks at PauseWriterThreshold (default 64 KB); reader must run concurrently
 
 ```

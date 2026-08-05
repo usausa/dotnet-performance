@@ -2,7 +2,7 @@
 
 - Verdict: adopted
 - Task direct return 0.16x, 73 B -> ~0 B (async wrapper re-wraps even a cached completed Task)
-- ValueTask direct return 0.15x vs await wrapper 0.58x (both 0 B)
+- ValueTask direct return 0.13x vs await wrapper 0.67x (both 0 B)
 - Apply only to pure forwards (single await, no try/using/lock across it)
 
 ```

@@ -1,8 +1,8 @@
 # TXT-07: string.Create vs interpolation vs builders
 
 - Verdict: adopted
-- string.Create: 0.57x vs interpolation, allocation = result string only (80 B)
-- ValueStringBuilder: 0.81x, same 80 B; StringBuilder(capacity): 1.03x with 3.5x allocation (280 B)
+- string.Create: 0.55x vs interpolation, allocation = result string only (80 B)
+- ValueStringBuilder: 0.74x, same 80 B; StringBuilder(capacity): 0.92x with 3.5x allocation (280 B)
 - Use string.Create when total length is computable up front; ValueStringBuilder otherwise
 
 ```

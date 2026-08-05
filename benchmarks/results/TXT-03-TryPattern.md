@@ -1,8 +1,8 @@
 # TXT-03: Try pattern vs exception control flow (10% invalid input)
 
 - Verdict: adopted
-- Exception flow 183.8 ns/op + 48 B vs TryParse 4.67 ns/op / 0 B (0.03x = ~39x); one thrown exception costs ~1.8 us
-- Code size 8,117 B vs 1,712 B (EH scaffolding)
+- Exception flow 132.5 ns/op + 48 B vs TryParse 2.89 ns/op / 0 B (0.02x = ~46x); one thrown exception costs ~1.3 us
+- Code size 8,348 B vs 1,705 B (EH scaffolding)
 
 ```
 

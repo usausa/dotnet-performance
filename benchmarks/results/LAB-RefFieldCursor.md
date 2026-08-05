@@ -1,8 +1,8 @@
 # LAB: ref-field cursor for iteration (rejected, R-12)
 
 - Verdict: rejected (for iteration use)
-- 1.21x vs plain span for-loop (249 ns baseline)
-- SpanReader per-element Read(): 2.06x - cursors are for field-granularity structured reads
+- 1.02x vs plain span for-loop (209.5 ns baseline) - no gain even where it does not hurt
+- SpanReader per-element Read(): 1.34x - cursors are for field-granularity structured reads
 
 ```
 

@@ -1,8 +1,8 @@
 # ASY-05: ValueTask vs Task on the synchronous completion path
 
 - Verdict: adopted
-- Task.FromResult: 6.21 ns + 72 B/call (value 12345 is outside the BCL Task cache) vs new ValueTask<int>: 1.93 ns / 0 B (0.31x)
-- async method sync path: Task 11.1 ns + 72 B vs ValueTask 6.60 ns / 0 B
+- Task.FromResult: 2.87 ns + 72 B/call (value 12345 is outside the BCL Task cache) vs new ValueTask<int>: 0.93 ns / 0 B (0.33x)
+- async method sync path: Task 6.45 ns + 72 B vs ValueTask 4.23 ns / 0 B
 - ValueTask removes the per-call Task allocation whenever completion is synchronous
 
 ```

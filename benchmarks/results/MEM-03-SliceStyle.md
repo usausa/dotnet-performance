@@ -1,8 +1,9 @@
 # MEM-03: Slice(offset, length) vs range operator
 
-- Verdict: measurement noise (time unresolvable; codegen differs slightly)
+- Verdict: measurement noise (time unresolvable; codegen differs)
 - 106.6 vs 107.0 ns for 256 slices, CIs overlap; code size 100 vs 103 B
-- No time basis for preferring Slice(offset, length) on this JIT/core - choose whichever reads better (on older cores a small real difference in favor of Slice was measurable, so the form is not harmful either)
+- JIT level (disassembly): the loops are NOT identical - the range operator computes the end offset up front and carries an extra register shuffle (`mov r8d,r8d` / `mov r8d,r9d`), 15 vs 14 instructions per iteration; the bounds check is the same in both
+- The extra moves are absorbed by a wide out-of-order core, so the difference sits below time resolution; Slice(offset, length) still generates the marginally tighter code, so preferring it in hot loops costs nothing - elsewhere choose readability
 
 ```
 

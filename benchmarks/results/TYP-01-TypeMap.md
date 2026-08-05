@@ -1,9 +1,9 @@
 # TYP-01: TypeMap / TypeSlot
 
 - Verdict: adopted (implemented)
-- Generic path (TypeSlot<T>.Index): 0.14 ns, 0.02x vs Dictionary<Type,T> (~54x faster), code 34 B
-- Runtime Type path: 14.0 ns, 1.93x vs Dictionary (dictionary lookup + array access) - use only when the type is not known statically
-- FrozenDictionary 1.22x (slower than Dictionary here, consistent with R-08)
+- Generic path (TypeSlot<T>.Index): 0.23 ns, 0.09x vs Dictionary<Type,T> (~11x faster), code 34 B
+- Runtime Type path: 10.4 ns, 4.22x vs Dictionary (dictionary lookup + array access) - use only when the type is not known statically
+- FrozenDictionary 1.25x (slower than Dictionary here, consistent with R-08)
 
 ```
 

@@ -1,8 +1,8 @@
 # TXT-08: SearchValues<char> vs IndexOfAny(char[])
 
 - Verdict: adopted
-- vs array overload: 0.94x (3 candidates) / 0.34x (8) / 0.18x (32); SearchValues time is flat (~6 ns) regardless of candidate count
-- Code size 621 B vs 3,589-3,601 B
+- vs array overload: 0.96x (3 candidates) / 0.33x (8) / 0.20x (32); SearchValues time is flat (~4.5-5.5 ns) regardless of candidate count
+- Code size 623-995 B vs 3,629-3,957 B
 - R-07 remains valid: for 2-3 candidates the dedicated IndexOfAny(a, b, c) overload is still the fastest option; SearchValues wins over the ARRAY overload
 
 ```

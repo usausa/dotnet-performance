@@ -1,8 +1,8 @@
 # JIT-03: typeof(T) branch specialization
 
 - Verdict: adopted (the branch is free)
-- Generic with typeof branch 250.5 ns vs handwritten int sum 299.7 ns - parity or better; code size 35 vs 32 B (near-identical, branch folded per instantiation)
-- The apparent 16% win is micro-variance (alignment), not a real advantage of the generic form; the claim verified is 'no cost', fallback path covered by Verify
+- Generic with typeof branch 212.4 ns vs handwritten int sum 213.7 ns - parity; code size 35 vs 32 B (near-identical, branch folded per instantiation)
+- The claim verified is 'no cost': the JIT folds typeof(T) == typeof(int) to a constant per instantiation; fallback path covered by Verify
 
 ```
 

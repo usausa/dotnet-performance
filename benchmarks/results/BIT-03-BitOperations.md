@@ -1,8 +1,8 @@
 # BIT-03: BitOperations scan / popcount
 
 - Verdict: adopted
-- Set-bit scan via TrailingZeroCount + (mask &= mask - 1): 0.13x
-- PopCount intrinsic vs manual loop: 0.01x
+- Set-bit scan via TrailingZeroCount + (mask &= mask - 1): 0.13x (1,056 -> 141 ns)
+- PopCount intrinsic vs manual loop: 0.01x (854 -> 12.8 ns)
 
 ```
 

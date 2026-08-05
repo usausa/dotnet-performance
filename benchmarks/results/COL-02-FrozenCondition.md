@@ -1,9 +1,9 @@
 # COL-02: FrozenDictionary adoption conditions (string keys)
 
 - Verdict: conditional - and for string keys at these sizes the condition is NOT met
-- Build: 10.2x slower at 16 entries (147 -> 1,493 ns), 7.4x at 256 (2,323 -> 17,139 ns); allocation 4.25x both
-- Lookup (non-interned probes): 1.05x at 16, 1.04x at 256 - CIs overlap, i.e. NO measurable lookup advantage
-- With no lookup win, the 7-10x build cost never amortizes: keep Dictionary for string keys, or use a domain-specific table (COL-04 sampled hash: 0.56-0.84x)
+- Build: 10.6x slower at 16 entries (80 -> 847 ns), 8.2x at 256 (1,282 -> 10,510 ns); allocation 4.25x both
+- Lookup (non-interned probes): 1.00x at 16, 0.98x at 256 - CIs overlap, i.e. NO measurable lookup advantage
+- With no lookup win, the 8-11x build cost never amortizes: keep Dictionary for string keys, or use a domain-specific table (COL-04 sampled hash: 0.60-0.62x)
 - Consistent with R-08 (unconditional Frozen adoption rejected)
 
 ```

@@ -1,10 +1,10 @@
 # GEN-01: Emit factory target strategies
 
 - Verdict: adopted (holder-field target + inline expansion); Call-vs-Callvirt: NO EFFECT (JIT-verified identical codegen)
-- Holder-field target: 6.55 ns == compiled C# closure lambda (6.23 ns) - same ldfld shape
-- Closure-array target (ldelem + castclass): 9.34 ns (1.51x vs lambda) - avoid object[] targets
-- Chained child factories: 14.2-14.6 ns (2.3x) - inline children into the parent IL instead
-- Call vs Callvirt on Func<object>.Invoke: 14.20 vs 14.65 ns (CIs overlap) -> JitDisasm comparison: 68 instructions / 229 bytes IDENTICAL. The delegate target-field load doubles as the null check, so the JIT drops callvirt's check. Verdict: no effect on net10 (not noise - verified at codegen level)
+- Holder-field target: 4.23 ns, near a compiled C# closure lambda (3.77 ns) - same ldfld shape
+- Closure-array target (ldelem + castclass): 4.61 ns (1.22x vs lambda) - avoid object[] targets
+- Chained child factories: 6.36-6.46 ns (1.7x) - inline children into the parent IL instead
+- Call vs Callvirt on Func<object>.Invoke: 6.46 vs 6.36 ns (CIs overlap) -> JitDisasm comparison: 68 instructions / 229 bytes IDENTICAL. The delegate target-field load doubles as the null check, so the JIT drops callvirt's check. Verdict: no effect on net10 (not noise - verified at codegen level)
 - JIT-only technique: Reflection.Emit throws on Native AOT (see docs/aot-compatibility.md AOTP-01)
 
 ```

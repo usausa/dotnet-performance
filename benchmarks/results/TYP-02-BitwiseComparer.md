@@ -1,9 +1,9 @@
 # TYP-02: BitwiseComparer vs default comparers (16-byte struct keys)
 
 - Verdict: adopted (for structs without usable IEquatable)
-- Dictionary lookup per key: default comparer on plain struct 25.7 ns + 96 B boxing per lookup (ObjectEqualityComparer path)
-- BitwiseComparer on the same plain struct: 11.8 ns / 0 B (0.46x, no boxing, no Equals to write)
-- Hand-written IEquatable is still fastest: 5.6 ns (0.22x) - implement it when you own the type; use BitwiseComparer for external types or to bypass custom Equals
+- Dictionary lookup per key: default comparer on plain struct 15.8 ns + 96 B boxing per lookup (ObjectEqualityComparer path)
+- BitwiseComparer on the same plain struct: 8.4 ns / 0 B (0.54x, no boxing, no Equals to write)
+- Hand-written IEquatable is still fastest: 3.7 ns (0.23x) - implement it when you own the type; use BitwiseComparer for external types or to bypass custom Equals
 
 ```
 

@@ -1,8 +1,8 @@
 # DSP-05: Pipeline pre-composition
 
 - Verdict: adopted
-- Compose-per-call: 42.6 ns + 264 B (3 middleware closures + delegates every call)
-- Pre-composed: 2.62 ns / 0 B (0.063x, ~16x faster); direct terminal call: 0.10 ns
+- Compose-per-call: 19.7 ns + 264 B (3 middleware closures + delegates every call)
+- Pre-composed: 1.27 ns / 0 B (0.064x, ~16x faster); direct terminal call: ~0 ns
 - Compose once at startup; bypass the chain entirely when it is empty
 
 ```

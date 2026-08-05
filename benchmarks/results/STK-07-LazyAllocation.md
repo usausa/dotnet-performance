@@ -3,8 +3,8 @@
 ## Lazy error list (10% failure rate vs all-valid)
 
 - Verdict: adopted (allocation semantics)
-- With failures present: lazy 69.2 ns == eager 67.2 ns (CIs overlap), both allocate the list (216 B)
-- All-valid path: lazy allocates NOTHING (0 B, 48.3 ns) while eager always pays 216 B - the win is structural, not speed
+- With failures present: lazy 46.1 ns vs eager 37.3 ns (1.24x - the null check plus branchy first-add has a small cost when the failure branch actually runs), both allocate the list (216 B)
+- All-valid path: lazy allocates NOTHING (0 B, 21.1 ns = 0.57x) while eager always pays 216 B - the win is structural, sized by how rare the failure path is
 
 ```
 

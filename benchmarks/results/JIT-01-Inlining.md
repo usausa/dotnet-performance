@@ -1,8 +1,8 @@
 # JIT-01: AggressiveInlining on a loop-containing helper
 
 - Verdict: attribute had no effect in this shape (default policy already inlined); NoInlining shows the stake
-- Default 1.451 us vs Aggressive 1.338 us (CIs overlap) - call-site codegen verified IDENTICAL (94 B both, Tier1 JitDisasm): net10 default policy inlines the loop-containing helper
-- NoInline 1.560 us: non-overlapping CIs vs Aggressive (+17%) - inlining itself matters; the attribute is insurance for shapes the heuristic declines
+- Default 0.943 us vs Aggressive 0.959 us (CIs overlap) - call-site codegen IDENTICAL (100 B both): net10 default policy inlines the loop-containing helper
+- NoInline 1.180 us: non-overlapping CIs vs default (+25%) - inlining itself matters; the attribute is insurance for shapes the heuristic declines
 
 ```
 

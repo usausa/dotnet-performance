@@ -4,7 +4,7 @@
 
 A record of techniques that measurement showed to be ineffective, counterproductive, or not worth the risk.
 "Why it is not adopted / why it does not improve anything" is documented at the same granularity as the patterns in [README](../README.md).
-Measurement environment: Ryzen 9 5900X / .NET 10 (generation-dependent items are noted individually).
+Measurement environment: .NET 10 / x86-64-v4 (Ryzen AI 9 HX 370; generation-dependent items are noted individually).
 
 ---
 
@@ -213,6 +213,16 @@ Manual walking also has a high defect rate (several real bugs were found during 
 ✅ **Do this instead:** write the readable `(value >= min) && (value <= max)`. The manual form can still matter for compound conditions the JIT cannot prove — measure before adopting it there.
 
 🔗 **Measurement record:** [LAB-RangeCheck.md](../benchmarks/results/LAB-RangeCheck.md)
+
+### R-19: "Faster P/Invoke" as a pattern (LibraryImport / SuppressGCTransition)
+
+🎯 **Intent:** treat `[LibraryImport]` and `[SuppressGCTransition]` as speed optimizations for native calls (formerly documented as SYS-02).
+
+📉 **Measured — why it is rejected:** `[LibraryImport]` is the standard way to declare P/Invoke since .NET 7, not an optimization — for a blittable signature it generates the same call as `DllImport` (1.13 vs 1.14 ns), so there is nothing to compare; adopt it as the default for its source-generated, AOT/trimming-safe marshalling. `[SuppressGCTransition]` measured **1.26x (slower)** — the plain transition already costs only ~0.06 ns over an equivalent managed call, leaving nothing for the attribute to skip. With no measurable speed win and strict correctness constraints (sub-microsecond, non-blocking, no callbacks, no exceptions; violations cause process-wide GC delays), it does not qualify as a general speed pattern.
+
+✅ **Do this instead:** declare P/Invoke with `[LibraryImport]` as a matter of course (AOT/trimming support, not speed). Apply `[SuppressGCTransition]` only to calls that satisfy its constraints AND show a measured win in the target environment; it also halves call-site code size (70 vs 163 B), which can matter for inlining.
+
+🔗 **Measurement record:** [SYS-02-PInvoke.md](../benchmarks/results/SYS-02-PInvoke.md)
 
 ---
 

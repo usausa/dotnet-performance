@@ -1,10 +1,10 @@
 # TXT-09: Fixed-field formatting idioms
 
 - Verdict: mixed (manual digit tricks rejected, vectorized trim adopted)
-- TryFormat + Fill: 5.32 ns (fastest) - BCL digit formatting is already optimal on net10
-- Manual LSB-write + Reverse: 12.9 ns (2.51x SLOWER) - rejected
-- Manual right-align + shift: 24.6 ns (4.79x SLOWER) - rejected; the digit-count-avoidance claim is obsolete because TryFormat handles it internally
-- Trim: IndexOfAnyExcept/LastIndexOfAnyExcept 5.20 ns vs manual loop 8.73 ns (0.60x) - adopted
+- TryFormat + Fill: 3.33 ns (fastest) - BCL digit formatting is already optimal on net10
+- Manual LSB-write + Reverse: 10.7 ns (3.21x SLOWER) - rejected
+- Manual right-align + shift: 12.2 ns (3.67x SLOWER) - rejected; the digit-count-avoidance claim is obsolete because TryFormat handles it internally
+- Trim: IndexOfAnyExcept/LastIndexOfAnyExcept 3.80 ns vs manual loop 4.50 ns (0.85x, non-overlapping CIs) - adopted
 
 ```
 

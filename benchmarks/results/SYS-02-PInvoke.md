@@ -1,6 +1,6 @@
 # SYS-02: P/Invoke (LibraryImport + SuppressGCTransition)
 
-- Verdict: LibraryImport adopted (AOT/trimming-safe marshalling); SuppressGCTransition only after measuring
+- Verdict: retired from the pattern catalog (rejected-patterns R-19) - LibraryImport is the standard declaration rather than an optimization; SuppressGCTransition shows no measurable win
 - LibraryImport: same speed as DllImport for a blittable call (1.13 vs 1.14 ns); its value is source-generated, AOT-safe marshalling
 - SuppressGCTransition measures 1.26x (slower) here: the plain transition already costs only ~0.06 ns over an equivalent managed call, so there is nothing left for the attribute to skip. On environments where the GC transition is expensive it can still pay - measure, do not assume
 - Code size halves with the attribute (70 vs 163 B)

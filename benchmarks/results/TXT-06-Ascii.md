@@ -1,8 +1,8 @@
 # TXT-06: Ascii class comparison
 
 - Verdict: adopted
-- Ascii.EqualsIgnoreCase (bytes) 0.62x vs string.Equals(OrdinalIgnoreCase)
-- Manual (b | 0x20) compare 0.43x, but collides on symbol pairs ('@' vs backquote) - closed token sets only
+- Ascii.EqualsIgnoreCase (bytes) 0.76x vs string.Equals(OrdinalIgnoreCase)
+- Manual (b | 0x20) compare 0.59x, but collides on symbol pairs ('@' vs backquote) - closed token sets only
 
 ```
 

@@ -1,7 +1,7 @@
 # R-18 (was BIT-01): Unsigned single-comparison range check
 
 - Verdict: no effect on net10 (JIT already fuses the two-comparison form)
-- 548.5 vs 553.7 ns (CIs overlap), Code Size 60 B both
+- 210.9 vs 211.7 ns (CIs overlap), Code Size 60 B both
 - Tier1 JitDisasm: both forms compile to the same unsigned trick - the only difference is 'sub r8d, 100' vs 'add r8d, -100' (identical semantics/size)
 - Keep the manual form only for compound conditions the JIT cannot prove; for plain min/max checks write the readable two-comparison form
 

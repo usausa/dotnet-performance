@@ -1,8 +1,8 @@
 # ASY-07: Full buffering vs streaming chunks (1 MB payload)
 
 - Verdict: adopted
-- Full buffer then process: 514.8 us + 2,097,484 B with Gen0/1/2 collections (LOH pressure)
-- ArrayPool 16 KB chunks: 273.1 us + 72 B (0.53x, zero effective allocation, no GC)
+- Full buffer then process: 395.5 us + 2,097,484 B with Gen0/1/2 collections (LOH pressure)
+- ArrayPool 16 KB chunks: 224.5 us + 64 B (0.58x, zero effective allocation, no GC)
 - Peak memory drops from payload size to chunk size; throughput also improves via cache locality
 
 ```

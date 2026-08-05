@@ -1,8 +1,8 @@
 # ASY-06: Scheduler primitives (Timer per job vs single-loop TCS wakeup)
 
 - Verdict: adopted (primitive-level evidence)
-- Timer create+dispose per job: 41.0 ns + 120 B (includes global timer-queue registration)
-- TCS swap + TrySetResult notify: 11.2 ns + 88 B (0.27x)
+- Timer create+dispose per job: 36.0 ns + 120 B (includes global timer-queue registration)
+- TCS swap + TrySetResult notify: 20.3 ns + 88 B (0.56x)
 - Measures registration/notification primitives only; end-to-end scheduler behavior under load is not covered
 
 ```

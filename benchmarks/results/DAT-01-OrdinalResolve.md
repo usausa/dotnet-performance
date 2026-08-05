@@ -1,8 +1,8 @@
 # DAT-01: Column resolution strategies (per-row cost, 3 columns)
 
 - Verdict: adopted
-- GetOrdinal per row: 11.3 ns/row -> cached ordinals struct + in: 1.42 ns/row (0.13x, ~8x faster), code size 2,225 B -> 537 B
-- GetValue + cast instead of typed getters: 7.18 ns/row + 48 B/row boxing (int + bool) - use GetInt32/GetString/GetBoolean
+- GetOrdinal per row: 7.45 ns/row -> cached ordinals struct + in: 1.00 ns/row (0.13x, ~7x faster), code size 2,219 B -> 533 B
+- GetValue + cast instead of typed getters: 4.26 ns/row + 48 B/row boxing (int + bool) - use GetInt32/GetString/GetBoolean
 - In-memory sealed reader stand-in; real-provider virtual dispatch and I/O are out of scope (deltas isolate the resolution strategy)
 
 ```

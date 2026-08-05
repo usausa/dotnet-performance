@@ -1,7 +1,7 @@
 # ASY-04: IAsyncEnumerable cost
 
 - Verdict: adopted (cost awareness)
-- await foreach over sync-completing items: 11.6x per item (0.96 -> 11.0 ns)
+- await foreach over sync-completing items: 15.2x per item (0.48 -> 7.3 ns)
 - Use IAsyncEnumerable only when element production is truly asynchronous
 
 ```

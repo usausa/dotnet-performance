@@ -1,8 +1,8 @@
 # MEM-01: SkipLocalsInit (stackalloc zero-init cost)
 
 - Verdict: adopted
-- stackalloc byte[4096] zero-init costs ~31 ns; [SkipLocalsInit] drops the call to 3.1-3.3 ns (0.09x, ~11x faster)
-- Code size 610 B -> 177 B (the memset path disappears)
+- stackalloc byte[4096] zero-init costs ~17 ns; [SkipLocalsInit] drops the call to 1.6 ns (0.09x, ~11x faster)
+- Code size 604 B -> 177 B (the memset path disappears)
 - Note: the stackalloc size is fixed at 4096 in both Size params (only the slice length varies), so the init cost is identical across rows - it scales with the stackalloc size, not the used length
 
 ```

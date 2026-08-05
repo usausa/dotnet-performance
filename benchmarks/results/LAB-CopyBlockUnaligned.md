@@ -1,9 +1,9 @@
 # LAB: Unsafe.CopyBlockUnaligned (rejected, R-14)
 
 - Verdict: rejected
-- Variable length: 0.98-1.03x vs Span.CopyTo (same Memmove)
-- Constant 16 B: 0.83x, code 61 B vs 106 B - marginal
-- Array.Copy is slowest with 1.7 KB code
+- Variable length: 0.81-1.01x vs Span.CopyTo (both reach the same Memmove; the sub-ns gap at 16 B is call-shape overhead)
+- Constant 16 B: 0.81x, code 61 B vs 106 B - marginal, and rejected on safety grounds
+- Array.Copy is slowest (1.22-1.59x) with 1.7 KB code
 
 ## CopyVariableBenchmark
 

@@ -1,7 +1,7 @@
 # STK-09: params ReadOnlySpan<T> vs params T[]
 
 - Verdict: adopted
-- 0.29x with 3 args, allocation 48 B -> 0 B; same call-site syntax
+- 0.25x with 3 args (4.46 -> 1.10 ns), allocation 48 B -> 0 B; same call-site syntax
 
 ```
 

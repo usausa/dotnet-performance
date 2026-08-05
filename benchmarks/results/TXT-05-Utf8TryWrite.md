@@ -1,8 +1,8 @@
 # TXT-05: Utf8.TryWrite
 
 - Verdict: adopted
-- 0.54x vs string interpolation + Encoding.UTF8.GetBytes, 104 B -> 0 B
-- Faster than char-based TryWrite + encode (0.60x)
+- 0.45x vs string interpolation + Encoding.UTF8.GetBytes, 104 B -> 0 B
+- Faster than char-based TryWrite + encode (0.52x)
 
 ```
 

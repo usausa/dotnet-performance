@@ -92,7 +92,7 @@ Debug.Assert(string.IsInterned(probe) is null || !ReferenceEquals(string.IsInter
 DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 ```
 
-実例: GEN-01 の「デリゲート Invoke を `Call` で呼ぶ」置換は計測 14.2 vs 14.6 ns の誤差だったが、JitDisasm 比較で **68 命令・229 バイトが完全一致**したため「差なし」と確定した(ターゲットフィールドの読み出しが null チェックを兼ねるため、`callvirt` のチェックが JIT で消える)。
+実例: GEN-01 の「デリゲート Invoke を `Call` で呼ぶ」置換は計測 6.36 vs 6.46 ns の誤差だったが、JitDisasm 比較で **68 命令・229 バイトが完全一致**したため「差なし」と確定した(ターゲットフィールドの読み出しが null チェックを兼ねるため、`callvirt` のチェックが JIT で消える)。
 
 ---
 
@@ -112,23 +112,23 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 
 | 対象 | 計測 | 生成コード確認 | 判定 |
 |---|---|---|---|
-| GEN-01 デリゲート Invoke の `Call` / `Callvirt` 置換 | 14.2 vs 14.6 ns、信頼区間重複 | JitDisasm 比較で **68 命令・229 バイト完全一致** | ❌ **差なし**(ターゲットフィールド読み出しが null チェックを兼ね、callvirt のチェックが JIT で消える) |
-| BUF-03 成長パス(4 KB)の時間 | 2,395 vs 2,651 ns、信頼区間重複 | コードサイズは 1,016 vs 4,681 B で**別物** | ➖ **誤差**(時間軸)。採否は割り当て軸(8,056 B → 0 B)で判断し採用 |
-| BUF-04 ラッパー vs 素の Rent/Return の時間 | 2.8 vs 3.0 μs、信頼区間重複 | — | ➖ **誤差**(時間軸)。ラッパーコストは計測分解能以下。採否は安全性・割り当て軸で判断し採用 |
-| COL-06 `ToImmutable` vs `MoveToImmutable`(256 要素)の時間 | 288 vs 279 ns、信頼区間重複 | コードサイズ 2,035 vs 903 B で**別物** | ➖ **誤差**(この条件の時間軸のみ)。16 要素では実差(24.3 vs 17.7 ns)、割り当ては常に半減 |
-| STK-08 InlineArray vs stackalloc | 4.93 vs 4.71 ns、**信頼区間非重複** | コードサイズ 112 vs 134 B | **実差**(誤差ではない)。stackalloc が僅かに速く、InlineArray の価値は「構造体フィールドに置ける」こと |
-| R-18 手書き符号なし範囲チェック | 548.5 vs 553.7 ns、信頼区間重複 | Tier1 で**実質同一**(`sub r8d,100` vs `add r8d,-100` の符号化違いのみ、45 B) | ❌ **差なし**(net10 の JIT は 2 比較形を自動で符号なし 1 比較へ融合する) |
-| JIT-01 AggressiveInlining 属性(ループ持ちヘルパー) | 1.451 vs 1.338 μs、信頼区間重複 | 呼び出し側 Tier1 コード**完全一致**(94 B) | ❌ **差なし**(既定ポリシーが既にインライン化。NoInlining のみ +17% の実差 = インライン化自体の価値は実証) |
-| STK-07 `new int[0]` vs `Array.Empty` | 0.28 vs 0.31 ns、信頼区間重複 | **別物**(ヘルパー呼び出し 27 B vs 共有参照ロード 11 B) | ➖ **誤差**(時間軸)。net10 では両者とも割り当てゼロ(ランタイムが空配列を共有化)。コードサイズと可搬性で `[]` を既定に |
-| DSP-01 インターフェース参照越しの sealed 有無 | 536.8 vs 509.1 ns、信頼区間重複 | コードサイズ 84 B で一致(一次確認) | ➖ **誤差**。効くのは具象 sealed 型で保持する形(0.44 倍の実差) |
-| COL-02 Frozen の検索(string キー 16 / 256 件) | 1.05 / 1.04 倍、信頼区間重複 | — | ➖ **誤差**。検索利得がないため 7〜10 倍の構築コストが償却されず不採用条件に該当 |
-| R-02 範囲保証済みランダムアクセスの ref 化 | 461.4 vs 466.2 ns、信頼区間重複 | コードサイズ 55 vs 72 B | ➖ **誤差**。境界チェック除去の利得は実質ゼロ(逐次走査では 1.30 倍の実害) |
+| GEN-01 デリゲート Invoke の `Call` / `Callvirt` 置換 | 6.36 vs 6.46 ns、信頼区間重複 | JitDisasm 比較で **68 命令・229 バイト完全一致** | ❌ **差なし**(ターゲットフィールド読み出しが null チェックを兼ね、callvirt のチェックが JIT で消える) |
+| BUF-03 成長パス(4 KB)の時間 | 1,283 vs 1,427 ns、**信頼区間非重複** | コードサイズは 4,638 vs 997 B で別物 | **現在は実差**(0.90 倍)。旧ベースラインでは誤差だった。採否はいずれにせよ割り当て軸(8,056 B → 0 B)で採用 |
+| BUF-04 ラッパー vs 素の Rent/Return の時間 | 1.63 vs 1.65 μs、範囲重複 | — | ➖ **誤差**(時間軸)。ラッパーコストは計測分解能以下。採否は安全性・割り当て軸で判断し採用 |
+| COL-06 `ToImmutable` vs `MoveToImmutable`(256 要素)の時間 | 203 vs 171 ns、**信頼区間非重複** | コードサイズ 2,035 vs 891 B で別物 | **現在は実差**(MoveToImmutable が速い)。16 要素でも実差(14.3 vs 11.3 ns)、割り当ては常に半減 |
+| STK-08 InlineArray vs stackalloc | 2.92 vs 2.87 ns、信頼区間重複 | コードサイズ 112 vs 134 B で**別物** | ➖ **誤差**(時間軸)。InlineArray の価値は「構造体フィールドに置ける」ことで、コードは僅かに小さい |
+| R-18 手書き符号なし範囲チェック | 210.9 vs 211.7 ns、信頼区間重複 | Tier1 で**実質同一**(`sub r8d,100` vs `add r8d,-100` の符号化違いのみ、60 B) | ❌ **差なし**(net10 の JIT は 2 比較形を自動で符号なし 1 比較へ融合する) |
+| JIT-01 AggressiveInlining 属性(ループ持ちヘルパー) | 0.943 vs 0.959 μs、信頼区間重複 | 呼び出し側コード**完全一致**(100 B) | ❌ **差なし**(既定ポリシーが既にインライン化。NoInlining のみ +25% の実差 = インライン化自体の価値は実証) |
+| STK-07 `new int[0]` vs `Array.Empty` | 0.137 vs 0.140 ns、信頼区間重複 | **同一コード**(どちらも 12 B の共有参照ロード) | ❌ **差なし**(net10 では両者とも割り当てゼロかつ同一コード。`[]` はスタイルとしての既定) |
+| DSP-01 インターフェース参照越しの sealed 有無 | 220.7 vs 221.9 ns、信頼区間重複 | コードサイズ 84 B で一致(一次確認) | ➖ **誤差**。具象 sealed 型保持は時間 約 2% + コードサイズ 27 vs 84 B(実利はコードサイズ/AOT 側) |
+| COL-02 Frozen の検索(string キー 16 / 256 件) | 1.00 / 0.98 倍、信頼区間重複 | — | ➖ **誤差**。検索利得がないため 8〜11 倍の構築コストが償却されず不採用条件に該当 |
+| R-02 範囲保証済みランダムアクセスの ref 化 | 245.2 vs 246.3 ns、信頼区間重複 | コードサイズ 55 vs 72 B | ➖ **誤差**。境界チェック除去の利得は実質ゼロ(逐次走査では自動ベクトル化を阻害して 1.05 倍の実害) |
 | R-02 サンプリングアクセス(Span 3 位置)の手動 ref | 時間は分解能以下 | **別物**(索引形は境界チェック 1 本残存 = RNGCHKFAIL 経路、128 vs 115 B・56 vs 49 命令) | ➖ **誤差**。構成的に範囲保証されるホットパス(SampledNameTable.CalculateHash)では手動形を維持 |
 | R-01 typeof の static readonly キャッシュ | 完全に同値 | Tier1 で**同一の即値ロードに一致**(11 B。昇格前はキャッシュ側に初期化チェックが残り 48 B) | ❌ **差なし**(コールドパスではキャッシュ側が不利ですらある) |
 | R-04 ループ構文 for / while | 完全に同値 | **命令列一致**(28 B) | ❌ **差なし**(「正規化」が成り立つのはこの 2 形式) |
 | R-04 do-while / 降順 for | 完全に同値 | **別物**(do はループ内境界チェック残存 63 B、降順はクローン 85 B) | ➖ **誤差**。既定は for / while |
 | R-10 インスタンス readonly フィールド | 0.006〜0.016 ns で測定不能 | 読み出しは**オフセット以外同一**(4 B) | ❌ **差なし**(インスタンス readonly は JIT 最適化に寄与しない) |
-| R-14 可変長コピーの CopyBlockUnaligned 置換 | 0.98〜1.03 倍、信頼区間重複 | 呼び出し形は異なるが**同じ Memmove に到達** | ➖ **誤差**。定数長 16 B では実差(0.83 倍)があるが安全性で不採用 |
+| R-14 可変長コピーの CopyBlockUnaligned 置換 | 512 B 以上で 0.92〜1.01 倍、信頼区間重複 | 呼び出し形は異なるが**同じ Memmove に到達** | ➖ **誤差**(大サイズ)。16 B では実差(0.81 倍、呼び出し形のオーバーヘッド差)があるが安全性で不採用 |
 
 | 批次 | 候補 | 概要 / 検証の問い | 関連 | 状態 |
 |:---:|---|---|---|:---:|
@@ -150,7 +150,7 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ④ | BitOperations 活用 | TrailingZeroCount / PopCount / Log2 によるスキャン・計算のループ除去 | BIT-02 | ✅ 収録([BIT-03](../README.ja.md#-bit-03-bitoperations-によるビット走査計数)、走査 7.6 倍・PopCount 67 倍) |
 | ⑤ | SIMD 実装例(Vector128/256) | 合計・検索・変換の明示的 SIMD 化。スカラー・`Vector<T>`・組み込み関数の比較 | JIT-02 / BIT | ✅ 収録([VEC-01](../README.ja.md#-vec-01-明示的-simdvectort--vector256)、Vector256 8.9 倍。BCL 済み API 優先の指針付き) |
 | ⑤ | ref フィールドによる ref struct 設計(C# 11) | カーソルを Span + index でなく ref T で保持する設計のコスト比較 | STK-01 | ❌ 反復用途は不採用一覧へ(for 比 1.21 倍で利得なし) |
-| ⑤ | P/Invoke 高速化 | \[LibraryImport\] + Span 渡し + \[SuppressGCTransition\](短時間ネイティブ呼び出しの GC 遷移省略)の効果と制約 | BUF-05 | ✅ 収録([SYS-02](../README.ja.md#️-sys-02-pinvoke-高速化libraryimport--suppressgctransition)、SuppressGC 1.8 倍・LibraryImport は AOT 対応が価値) |
+| ⑤ | P/Invoke 高速化 | \[LibraryImport\] + Span 渡し + \[SuppressGCTransition\](短時間ネイティブ呼び出しの GC 遷移省略)の効果と制約 | BUF-05 | ❌ 不採用リストへ移動(R-19。LibraryImport は標準の宣言方法であって最適化ではない。SuppressGCTransition は計測で利得なし) |
 | ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | ✅ 収録([ASY-02](../README.ja.md#-asy-02-systemthreadingchannels-による生産者消費者)、~45ns/要素・Bounded は 2 倍) |
 | ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 | ✅ 条件付き収録([ASY-03](../README.ja.md#-asy-03-systemiopipelines)、小データは 1.63 倍・アロケーション 1/80。64KB デッドロック注意) |
 | ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-03 | ✅ 収録([ASY-04](../README.ja.md#-asy-04-iasyncenumerable-のコスト認知と使い分け)、要素あたり 11.6 倍のコスト認知) |

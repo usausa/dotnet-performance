@@ -1,8 +1,8 @@
 # R-02 (was MEM-01): Dual-span walk - indexed vs pre-sliced vs manual ref
 
-- Verdict: REVERSED on net10 for vectorizable bodies - manual ref walk is 1.46x SLOWER
-- Indexed 367.7 ns == PreSliced 368.6 ns (0.36 ns/elem: the JIT auto-vectorizes the indexed dual-span loop)
-- RefWalk 537.7 ns (1.46x): Unsafe.Add form defeats auto-vectorization despite smallest code (88 B)
+- Verdict: REVERSED on net10 for vectorizable bodies - manual ref walk is 1.25x SLOWER
+- Indexed 239.8 ns == PreSliced 239.3 ns (0.23 ns/elem: the JIT auto-vectorizes the indexed dual-span loop)
+- RefWalk 299.1 ns (1.25x): Unsafe.Add form defeats auto-vectorization despite smallest code (88 B)
 - Manual ref walking remains for non-vectorizable per-element work and sampling access (e.g. SampledNameTable); for plain element-wise loops write the indexed form
 
 ```

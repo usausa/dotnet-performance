@@ -1,7 +1,7 @@
 # BUF-02: IBufferWriter (PooledBufferWriter)
 
 - Verdict: adopted (implemented)
-- ArrayBufferWriter 0.56x / PooledBufferWriter 0.63x vs MemoryStream + ToArray
+- PooledBufferWriter 0.57x / ArrayBufferWriter 0.68x vs MemoryStream + ToArray - the pooled writer is the fastest of the three
 - PooledBufferWriter allocation: 2,976 B -> 32 B (writer instance only)
 
 ```

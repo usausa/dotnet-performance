@@ -1,8 +1,8 @@
 # DSP-04: Static lambda + TState vs capturing lambda
 
 - Verdict: adopted
-- Capturing a per-iteration local: 11.2 ns + 88 B per call (closure + delegate)
-- static lambda + TState: 4.66 ns / 0 B (0.42x) - the compiler caches the delegate
+- Capturing a per-iteration local: 7.09 ns + 88 B per call (closure + delegate)
+- static lambda + TState: 2.96 ns / 0 B (0.42x) - the compiler caches the delegate
 
 ```
 

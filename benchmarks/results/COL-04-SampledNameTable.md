@@ -1,10 +1,10 @@
 # BIT-01 / COL-04: SampledNameTable
 
 - Verdict: adopted (implemented)
-- string key: 0.84x (4 names) / 0.78x (16) / 0.77x (32) vs Dictionary
-- span key: 0.65x (4) / 0.56x (16) / 0.56x (32) vs Dictionary AlternateLookup; beats FrozenDictionary AlternateLookup at every size
-- Linear scan wins at 4 names (0.70x) but degrades fast: 2.73x at 16, 4.59x at 32
-- Code size 620-638 B vs 1,043-1,073 B (Dictionary) / 2,001-2,481 B (Frozen)
+- string key: 0.60x (4 names) / 0.62x (16) / 0.75x (32) vs Dictionary
+- span key: 0.59x (4) / 0.60x (16) / 0.75x (32) vs Dictionary AlternateLookup; beats FrozenDictionary AlternateLookup at every size
+- Linear scan is on par at 4 names (0.62x, same as the table) but degrades fast: 1.77x at 16, 3.23x at 32
+- Code size 692-706 B vs 1,081-1,110 B (Dictionary) / 2,126-2,177 B (Frozen)
 
 ## String key
 

@@ -1,10 +1,10 @@
 # BIT-04: XxHash3 vs string.GetHashCode vs FNV-1a
 
 - Verdict: adopted
-- XxHash3: 0.34x (8 chars) / 0.25x (64) / 0.11x (512) vs string.GetHashCode
-- MemoryMarshal.AsBytes cast path is never slower than fixed, and measurably faster at 8 and 512 chars (non-overlapping CIs; no pinning overhead) - zero-cost reinterpretation confirmed
-- Hand-rolled FNV-1a is SLOWER than string.GetHashCode from 64 chars (1.25x) - do not hand-roll
-- Sampling hash (BIT-01) stays ~0.9 ns at any length (0.003x at 512) but only works for known key sets
+- XxHash3: 0.26x (8 chars) / 0.21x (64) / 0.09x (512) vs string.GetHashCode
+- MemoryMarshal.AsBytes cast path is equivalent to fixed (no pinning required, so prefer the cast) - zero-cost reinterpretation confirmed
+- Hand-rolled FNV-1a is SLOWER than string.GetHashCode from 64 chars (1.05x at 64, 1.53x at 512) - do not hand-roll
+- Sampling hash (BIT-01) stays ~0.23 ns at any length (0.001x at 512) but only works for known key sets
 
 ```
 

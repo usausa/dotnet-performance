@@ -1,7 +1,7 @@
 # SEQ-04: Incremental delimiter search + deferred compaction
 
 - Verdict: adopted
-- 0.58x vs naive full-rescan + per-line compaction (2 KB lines fed in 256 B chunks, 32 KB total)
+- 0.67x vs naive full-rescan + per-line compaction (2 KB lines fed in 256 B chunks, 32 KB total; 1.70 -> 1.13 us)
 - Both zero-alloc; the win comes from not re-scanning already-searched bytes and moving data once instead of per line
 - Ring wrap-around (two-segment IndexOf) not exercised; measured in flat-buffer form
 
