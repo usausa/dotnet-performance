@@ -1,9 +1,9 @@
 # LAB: Unsafe.CopyBlockUnaligned (rejected, R-14)
 
-- Verdict: rejected - revival check (constant 8 / 16 / 64 B) confirms the rejection
+- Verdict: rejected
 - Variable length: 0.81-1.01x vs Span.CopyTo (both reach the same Memmove; the sub-ns gap at 16 B is call-shape overhead)
-- Constant sizes: 8 B 0.89x and 16 B 0.94x pairwise, but the CIs overlap (and the 16 B gap was 0.81x in a previous run - the difference sits at the edge of resolution and is not reproducible); **at 64 B CopyBlockUnaligned is 1.07x SLOWER** (2.52 vs 2.36 ns, non-overlapping CIs)
-- The only stable advantage is code size (52-64 B vs 96-102 B); a borderline sub-0.05 ns win that dies by 64 B does not justify losing the type/bounds safety
+- Constant sizes: 8 B 0.89x and 16 B 0.94x, but the CIs overlap - the sub-0.05 ns gap is at the limit of resolution; **at 64 B CopyBlockUnaligned is 1.07x SLOWER** (2.52 vs 2.36 ns, non-overlapping CIs)
+- The only advantage that holds is code size (52-64 B vs 96-102 B); an unresolvable win at small constants that reverses by 64 B does not justify losing the type/bounds safety
 - Array.Copy is slowest (1.22-1.59x) with 1.7 KB code
 
 ## CopyVariableBenchmark

@@ -113,9 +113,9 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | 対象 | 計測 | 生成コード確認 | 判定 |
 |---|---|---|---|
 | GEN-01 デリゲート Invoke の `Call` / `Callvirt` 置換 | 6.36 vs 6.46 ns、信頼区間重複 | JitDisasm 比較で **68 命令・229 バイト完全一致** | ❌ **差なし**(ターゲットフィールド読み出しが null チェックを兼ね、callvirt のチェックが JIT で消える) |
-| BUF-03 成長パス(4 KB)の時間 | 1,283 vs 1,427 ns、**信頼区間非重複** | コードサイズは 4,638 vs 997 B で別物 | **現在は実差**(0.90 倍)。旧ベースラインでは誤差だった。採否はいずれにせよ割り当て軸(8,056 B → 0 B)で採用 |
+| BUF-03 成長パス(4 KB)の時間 | 1,283 vs 1,427 ns、**信頼区間非重複** | コードサイズは 4,638 vs 997 B で別物 | **実差**(0.90 倍)。割り当て軸(8,056 B → 0 B)でも採用 |
 | BUF-04 ラッパー vs 素の Rent/Return の時間 | 1.63 vs 1.65 μs、範囲重複 | — | ➖ **誤差**(時間軸)。ラッパーコストは計測分解能以下。採否は安全性・割り当て軸で判断し採用 |
-| COL-06 `ToImmutable` vs `MoveToImmutable`(256 要素)の時間 | 203 vs 171 ns、**信頼区間非重複** | コードサイズ 2,035 vs 891 B で別物 | **現在は実差**(MoveToImmutable が速い)。16 要素でも実差(14.3 vs 11.3 ns)、割り当ては常に半減 |
+| COL-06 `ToImmutable` vs `MoveToImmutable`(256 要素)の時間 | 203 vs 171 ns、**信頼区間非重複** | コードサイズ 2,035 vs 891 B で別物 | **実差**(MoveToImmutable が速い)。16 要素でも実差(14.3 vs 11.3 ns)、割り当ては常に半減 |
 | STK-08 InlineArray vs stackalloc | 2.92 vs 2.87 ns、信頼区間重複 | コードサイズ 112 vs 134 B で**別物** | ➖ **誤差**(時間軸)。InlineArray の価値は「構造体フィールドに置ける」ことで、コードは僅かに小さい |
 | R-18 手書き符号なし範囲チェック | 210.9 vs 211.7 ns、信頼区間重複 | Tier1 で**実質同一**(`sub r8d,100` vs `add r8d,-100` の符号化違いのみ、60 B) | ❌ **差なし**(net10 の JIT は 2 比較形を自動で符号なし 1 比較へ融合する) |
 | JIT-01 AggressiveInlining 属性(ループ持ちヘルパー) | 0.943 vs 0.959 μs、信頼区間重複 | 呼び出し側コード**完全一致**(100 B) | ❌ **差なし**(既定ポリシーが既にインライン化。NoInlining のみ +25% の実差 = インライン化自体の価値は実証) |
@@ -128,8 +128,7 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | R-04 ループ構文 for / while | 完全に同値 | **命令列一致**(28 B) | ❌ **差なし**(「正規化」が成り立つのはこの 2 形式) |
 | R-04 do-while / 降順 for | 完全に同値 | **別物**(do はループ内境界チェック残存 63 B、降順はクローン 85 B) | ➖ **誤差**。既定は for / while |
 | R-10 インスタンス readonly フィールド | 0.006〜0.016 ns で測定不能 | 読み出しは**オフセット以外同一**(4 B) | ❌ **差なし**(インスタンス readonly は JIT 最適化に寄与しない) |
-| R-14 可変長コピーの CopyBlockUnaligned 置換 | 512 B 以上で 0.92〜1.01 倍、信頼区間重複 | 呼び出し形は異なるが**同じ Memmove に到達** | ➖ **誤差**(大サイズ)。16 B では実差(0.81 倍、呼び出し形のオーバーヘッド差)があるが安全性で不採用 |
-| R-14 復活検証: 定数長コピー(8 / 16 / 64 B) | 8 B 0.89 倍 / 16 B 0.94 倍で信頼区間重複(別の実行では 0.81 倍 — 再現しない)。64 B は**1.07 倍(遅い)**、信頼区間非重複 | コードサイズ 52〜64 B vs 96〜102 B で**別物** | ❌ **復活せず**。小定数での 0.05 ns 未満の差は分解能の限界にあり、64 B で逆転する。コードサイズだけでは安全性の放棄に見合わない |
+| R-14 コピーの CopyBlockUnaligned 置換 | 可変長 512 B 以上で 0.92〜1.01 倍、定数長 8 B 0.89 倍 / 16 B 0.94 倍 — いずれも信頼区間重複。定数 64 B では**1.07 倍(遅い)**、信頼区間非重複 | 呼び出し形は異なる(52〜64 B vs 96〜102 B)が、両者とも**同じ Memmove に到達** | ➖ **誤差**(信頼区間が重なる範囲)。64 B で符号が逆転する。残る利点はコードサイズのみで、安全性の放棄に見合わない |
 
 | 批次 | 候補 | 概要 / 検証の問い | 関連 | 状態 |
 |:---:|---|---|---|:---:|
@@ -153,9 +152,6 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ⑤ | ref フィールドによる ref struct 設計(C# 11) | カーソルを Span + index でなく ref T で保持する設計のコスト比較 | STK-01 | ❌ 反復用途は不採用一覧へ(for 比 1.21 倍で利得なし) |
 | ⑤ | P/Invoke 高速化 | \[LibraryImport\] + Span 渡し + \[SuppressGCTransition\](短時間ネイティブ呼び出しの GC 遷移省略)の効果と制約 | BUF-05 | ❌ 不採用リストへ移動(R-19。LibraryImport は標準の宣言方法であって最適化ではない。SuppressGCTransition は計測で利得なし) |
 | ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | ✅ 収録([ASY-02](../README.ja.md#-asy-02-systemthreadingchannels-による生産者消費者)、~45ns/要素・Bounded は 2 倍) |
-| ⑥ | MEM-04 サイズ依存性の再検証 | in vs 値渡しを 16 / 128 / 256 バイトでも計測 — 呼び出しコストを超えてコピーが表面化するサイズはあるか | MEM-04 | ✅ 再検証完了: 64 B 以上で in が勝つ(0.32〜0.48 倍)、16 B でも実差(0.84 倍)。値渡しはアラインメント依存で実行間に揺れ、in は一定(約 1.2 ns) |
-| ⑥ | R-14 復活検証(定数長コピー) | CopyBlockUnaligned vs Span.CopyTo を定数 8 / 16 / 64 B で計測 — 長さ保証つき生成コード向けに、実差はどのサイズまで残るか | LAB-CopyBlockUnaligned | ❌ 復活せず: 8〜16 B の差は 0.05 ns 未満・信頼区間重複で再現せず、64 B では 1.07 倍(遅い) |
-| ⑥ | R-08 復活検証(大きな Frozen 表) | FrozenDictionary の構築/検索を string キー 1024 件でも計測 — 構築コストを償却できる規模で検索側が勝ち始めるか | COL-02 | ❌ 復活せず: 1024 件で検索が 1.19 倍(遅い、信頼区間非重複)+ 構築 5.3 倍 — 不採用がむしろ強化 |
 | ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 | ✅ 条件付き収録([ASY-03](../README.ja.md#-asy-03-systemiopipelines)、小データは 1.63 倍・アロケーション 1/80。64KB デッドロック注意) |
 | ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-03 | ✅ 収録([ASY-04](../README.ja.md#-asy-04-iasyncenumerable-のコスト認知と使い分け)、要素あたり 11.6 倍のコスト認知) |
 

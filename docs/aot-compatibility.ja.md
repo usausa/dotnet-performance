@@ -302,7 +302,7 @@ public static Func<T> CreateFactory<[DynamicallyAccessedMembers(
 - `IsDynamicCodeCompiled`: 生成した動的コードがコンパイルされるか(インタープリタ実行環境でも false)。**Emit 高速パスの判定にはこちらを使う**(インタープリタで Emit を走らせると逆に遅くなるため)
 - トリマーは `IsDynamicCodeSupported` の分岐を AOT ビルド時に定数畳み込みし、到達不能な Emit パスを削除できる
 
-**二重パスが本当に必要かの判断(実測):** GEN-01 の測定では、Emit の最良形(Holder フィールドターゲット 6.55 ns)はコンパイル済みコード(6.23 ns)と同等であり、**Source Generator の直書き生成コードは Emit 側と同等性能を AOT 安全に出せる**([GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md) / [generated-code-patterns.md](generated-code-patterns.md))。二重パスを組む価値があるのは「ビルド時に生成できない動的シナリオ」(利用者コードに触れない実行時型合成など)に限られる。
+**二重パスが本当に必要かの判断(実測):** GEN-01 の測定では、Emit の最良形(Holder フィールドターゲット 4.23 ns)はコンパイル済みコード(3.77 ns)に肉薄しており、**Source Generator の直書き生成コードは Emit 側と同等性能を AOT 安全に出せる**([GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md) / [generated-code-patterns.md](generated-code-patterns.md))。二重パスを組む価値があるのは「ビルド時に生成できない動的シナリオ」(利用者コードに触れない実行時型合成など)に限られる。
 
 ### AOTS-09: rd.xml / TrimmerRootDescriptor(暫定対応)
 

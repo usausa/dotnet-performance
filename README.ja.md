@@ -43,7 +43,7 @@
 |---|---|---|:---:|:---:|
 | [MEM-01](#-mem-01-skiplocalsinit) | SkipLocalsInit | ローカル変数ゼロ初期化のスキップ | ✅ | [検証済](benchmarks/results/MEM-01-SkipLocalsInit.md) |
 | [MEM-02](#-mem-02-struct-要素配列--ref-アクセスデータ指向レイアウト) | struct 要素配列 + ref アクセス | 要素ごとのヒープ確保と間接参照の排除 | ✅ | [実装](src/PerformancePatterns/Typ/TypeMap.cs) |
-| [MEM-03](#-mem-03-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より高速なスライス | ✅ | [検証済](benchmarks/results/MEM-03-SliceStyle.md) |
+| [MEM-03](#-mem-03-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より引き締まったスライスのコード生成 | ✅ | [検証済](benchmarks/results/MEM-03-SliceStyle.md) |
 | [MEM-04](#-mem-04-構造体引数の-in--ref-渡し戦略) | 構造体引数の in / ref 渡し | 大きな構造体の値コピー回避 | ✅ | [検証済](benchmarks/results/MEM-04-StructPass.md) |
 | [STK-01](#-stk-01-ref-structスタック専用型) | ref struct(スタック専用型) | ヒープエスケープの型レベル禁止 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-spant--readonlyspant-によるゼロコピーアクセス) | Span\<T\> / ReadOnlySpan\<T\> | ゼロコピーの型付きビュー | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
@@ -980,7 +980,7 @@ public ref struct SpanTokenizer<T> where T : IEquatable<T>
 
 **ユースケース:** コレクション、サーチ、スプリッタなどの汎用アルゴリズム実装。
 
-**実測結果(TYP-02 の測定より):** 16 バイト構造体キーの辞書ルックアップで、`IEquatable<T>` 実装 struct の既定比較子は **5.6 ns / 割り当てゼロ**(未実装 struct は 25.7 ns + 96 B/回のボックス化)。制約による脱仮想化・ボックス化回避の効果そのもの → [TYP-02-BitwiseComparer.md](benchmarks/results/TYP-02-BitwiseComparer.md)
+**実測結果(TYP-02 の測定より):** 16 バイト構造体キーの辞書ルックアップで、`IEquatable<T>` 実装 struct の既定比較子は **3.7 ns / 割り当てゼロ**(未実装 struct は 15.8 ns + 96 B/回のボックス化 = 4.3 倍)。制約による脱仮想化・ボックス化回避の効果そのもの → [TYP-02-BitwiseComparer.md](benchmarks/results/TYP-02-BitwiseComparer.md)
 
 ---
 
@@ -3018,7 +3018,7 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | 小さなヘルパーへの `AggressiveInlining` 付与 | 既定ポリシー(PGO)がループ持ちでもインライン化 | 呼び出し側 Tier1 コード一致(94 B) | [JIT-01](benchmarks/results/JIT-01-Inlining.md) |
 | `new T[0]` を `Array.Empty<T>()` へ置換 | 空配列を共有化し割り当てゼロに(コードサイズは `[]` が小) | BDN 割り当てゼロ実測 | [STK-07](benchmarks/results/STK-07-LazyAllocation.md) |
 | 単一 Span ループの `GetReference` + `Unsafe.Add` 化 | 標準 for で境界チェックを完全除去 | 手動化は 1.07〜1.13 倍遅 | [R-02](docs/rejected-patterns.md) |
-| **複数 Span** の単純ループの手動 ref 走査 | 索引形を自動ベクトル化(0.36 ns/要素) | 手動化はベクトル化を阻害し 1.46 倍遅 | [R-02](benchmarks/results/LAB-DualSpanWalk.md) |
+| **複数 Span** の単純ループの手動 ref 走査 | 索引形を自動ベクトル化(0.23 ns/要素) | 手動化はベクトル化を阻害し 1.25 倍遅 | [R-02](benchmarks/results/LAB-DualSpanWalk.md) |
 | 配列走査の `GetArrayDataReference` + `Unsafe.Add` 化 | 索引形で境界チェック除去 + 自動ベクトル化 | 逐次で 1.30 倍遅、ランダムでも差なし | [R-02](benchmarks/results/LAB-ArrayDataReference.md) |
 | 速度目的の関数ポインタ `delegate*` 化 | デリゲートは PGO が推測脱仮想化 + インライン化 | 関数ポインタは calli で投機不可、6.04 倍遅 | [DSP-02](benchmarks/results/DSP-02-CallAbstraction.md) |
 | `typeof(X)` の static readonly キャッシュ | Tier1 で凍結 RuntimeType ポインタの即値へ定数化 | 生成コード完全一致(11 B) | [R-01](docs/rejected-patterns.md) |

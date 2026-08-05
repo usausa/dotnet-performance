@@ -96,7 +96,7 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 🎯 **Intent:** Replace every read-only dictionary with `FrozenDictionary` to speed up lookups.
 
-📉 **Measured — why it is rejected:** Construction costs 5–20x that of Dictionary. Lookups can invert too, depending on the key set (measured 1.15–1.31x slower for 64 enum names). In some small-scale name resolution measurements it was never once the fastest. A revival check at larger scale (1024 string keys) strengthened the rejection: **Frozen lookup measured 1.19x slower than Dictionary** (non-overlapping CIs) on top of a 5.3x build cost — scaling up does not rescue the trade-off.
+📉 **Measured — why it is rejected:** Construction costs 5–20x that of Dictionary, and the lookup never wins back the difference. For string keys it is 1.07x at 16 entries, level at 256, and **1.19x slower at 1024** (non-overlapping CIs) — scale makes the lookup side worse, not better. Lookups also invert depending on the key set (1.15–1.31x slower for 64 enum names), and in small-scale name resolution it was never once the fastest.
 
 ✅ **Do this instead:** Adopt only when it is "built once at startup and read from then on" *and* you have confirmed a lookup win on real data (COL-02). For Type keys, the dedicated implementation (TYP-01) is about 3x faster.
 
@@ -162,7 +162,7 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 🎯 **Intent:** Speed up copies by replacing them with `Unsafe.CopyBlockUnaligned`.
 
-📉 **Measured — why it is rejected:** At variable lengths it lands at 0.81–1.01x with mostly overlapping CIs (➖ measurement noise — the generated code at the call site differs, but both reach the same Memmove). A revival check across constant lengths (8 / 16 / 64 B, the shapes the JIT can unroll) settled it: the 8–16 B edge is under 0.05 ns with overlapping CIs and does not reproduce across runs, and **at 64 B CopyBlockUnaligned is 1.07x slower** (non-overlapping CIs). The only stable advantage is code size (52–64 B vs 96–102 B), which does not justify giving up safety (no bounds checks, no type information). `Array.Copy` is the slowest and bloats code size (1.7KB).
+📉 **Measured — why it is rejected:** At variable lengths it lands at 0.81–1.01x with mostly overlapping CIs (➖ measurement noise — the generated code at the call site differs, but both reach the same Memmove). At the constant lengths the JIT can unroll, the 8–16 B edge is under 0.05 ns with overlapping CIs, and **at 64 B CopyBlockUnaligned is 1.07x slower** (non-overlapping CIs) — the advantage does not survive as the size grows. The only thing that holds is code size (52–64 B vs 96–102 B), which does not justify giving up safety (no bounds checks, no type information). `Array.Copy` is the slowest and bloats code size (1.7KB).
 
 ✅ **Do this instead:** Default to `Span.CopyTo` (combined with the explicit slicing of MEM-03).
 
@@ -216,11 +216,11 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 ### R-19: "Faster P/Invoke" as a pattern (LibraryImport / SuppressGCTransition)
 
-🎯 **Intent:** treat `[LibraryImport]` and `[SuppressGCTransition]` as speed optimizations for native calls (formerly documented as SYS-02).
+🎯 **Intent:** treat `[LibraryImport]` and `[SuppressGCTransition]` as speed optimizations for native calls.
 
 📉 **Measured — why it is rejected:** `[LibraryImport]` is the standard way to declare P/Invoke since .NET 7, not an optimization — for a blittable signature it generates the same call as `DllImport` (1.13 vs 1.14 ns), so there is nothing to compare; adopt it as the default for its source-generated, AOT/trimming-safe marshalling. `[SuppressGCTransition]` measured **1.26x (slower)** — the plain transition already costs only ~0.06 ns over an equivalent managed call, leaving nothing for the attribute to skip. With no measurable speed win and strict correctness constraints (sub-microsecond, non-blocking, no callbacks, no exceptions; violations cause process-wide GC delays), it does not qualify as a general speed pattern.
 
-✅ **Do this instead:** declare P/Invoke with `[LibraryImport]` as a matter of course (AOT/trimming support, not speed). Apply `[SuppressGCTransition]` only to calls that satisfy its constraints AND show a measured win in the target environment; it also halves call-site code size (70 vs 163 B), which can matter for inlining. (The benchmark and its result record were retired together with the pattern; the figures above are the final measurement.)
+✅ **Do this instead:** declare P/Invoke with `[LibraryImport]` as a matter of course (AOT/trimming support, not speed). Apply `[SuppressGCTransition]` only to calls that satisfy its constraints AND show a measured win in the target environment; it also halves call-site code size (70 vs 163 B), which can matter for inlining.
 
 ---
 

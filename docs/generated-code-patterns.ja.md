@@ -81,7 +81,7 @@ internal static class OrderJson
 
 **なぜ速いか:** 読み出しは定数ロードのみ。`ReadOnlySpan<byte>` プロパティ + u8 リテラルはアセンブリのデータ領域を直接指すため確保ゼロ。
 
-**実測の裏付け:** 毎回組み立て 116 ns + 760 B → 辞書キャッシュ 4.8 ns → **ジェネリック static 読み 0.09 ns / コードサイズ 6 B**。生成コードは最速の形(static 読み)をさらに const へ倒せる → [TYP-06-StaticArtifact.md](../benchmarks/results/TYP-06-StaticArtifact.md)
+**実測の裏付け:** 毎回組み立て 57.0 ns + 760 B → 辞書キャッシュ 2.7 ns → **ジェネリック static 読み 〜0 ns(計測分解能以下)/ コードサイズ 6 B**。生成コードは最速の形(static 読み)をさらに const へ倒せる → [TYP-06-StaticArtifact.md](../benchmarks/results/TYP-06-StaticArtifact.md)
 
 **注意:** ジェネリック型引数に依存する成果物は `static class Cache<T>` 形(TYP-04 / TYP-06)で生成する。型初期化子で例外を出さない設計にする。
 
@@ -126,7 +126,7 @@ public static Order Map(DbDataReader reader, in OrderOrdinals ordinals) => new()
 
 **なぜ速いか:** 列解決がリーダー 1 本につき 1 回になり、行ループは struct フィールド読み + 型別 getter 直呼びだけになる。
 
-**実測の裏付け:** 毎行 `GetOrdinal` 11.3 ns/行 → **序数 struct + `in` 渡し 1.42 ns/行(0.13 倍)**、コードサイズ 2,225 → 537 B。`GetValue` + キャストを生成すると 7.18 ns/行 + **48 B/行のボックス化** → [DAT-01-OrdinalResolve.md](../benchmarks/results/DAT-01-OrdinalResolve.md)
+**実測の裏付け:** 毎行 `GetOrdinal` 7.45 ns/行 → **序数 struct + `in` 渡し 1.00 ns/行(0.13 倍)**、コードサイズ 2,219 → 533 B。`GetValue` + キャストを生成すると 4.26 ns/行 + **48 B/行のボックス化** → [DAT-01-OrdinalResolve.md](../benchmarks/results/DAT-01-OrdinalResolve.md)
 
 **注意:** 欠落列を許すなら -1 のままにして Map 側で分岐を生成(`GetOrdinal` は例外を投げるため使わない)。enum 列は基底型で読んでキャストするコードを生成する。
 
@@ -155,7 +155,7 @@ public static Service Create() => new(
 
 **なぜ速いか:** 呼び出し連鎖・castclass・デリゲート間接がすべて消え、JIT がコンストラクタをインライン化できる直呼びになる。
 
-**実測の裏付け:** GEN-01(Emit 側の同一シナリオ)で、子ファクトリ連鎖は直書き比 **2.3 倍**、closure 配列ターゲットは 1.5 倍のペナルティ。直書き相当(DirectLambda)は 6.23 ns → [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md)。生成コードは Emit の最良形(Holder フィールド 6.55 ns)と同等の形を、AOT 安全に出力できる。
+**実測の裏付け:** GEN-01(Emit 側の同一シナリオ)で、子ファクトリ連鎖は直書き比 **1.7 倍**、closure 配列ターゲットは 1.2 倍のペナルティ。直書き相当(DirectLambda)は 3.77 ns → [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md)。生成コードは Emit の最良形(Holder フィールド 4.23 ns)と同等の形を、AOT 安全に出力できる。
 
 **注意:** ライフタイム(シングルトン / 都度生成)は生成時に確定して形で表現する(シングルトン = static readonly、都度 = `new` 直書き)。実行時 `Type` からの解決が必要な入口だけ `Dictionary<Type, Func<object>>` を生成し、中身は上記の直書きファクトリを指す(TYP-01 の実行時 Type 経路が素の辞書より遅い実測に注意 — 型が静的に分かる呼び出しをジェネリック API で受けるのが先)。
 

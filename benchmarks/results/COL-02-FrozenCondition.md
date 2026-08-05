@@ -3,7 +3,7 @@
 - Verdict: conditional - and for string keys the condition is NOT met at any measured size (16 / 256 / 1024)
 - Build: 10.0x slower at 16 entries (82 -> 817 ns), 8.5x at 256 (1,309 -> 11,091 ns), 5.3x at 1024 (6.2 -> 32.5 us, allocation 122 KB)
 - Lookup (non-interned probes): 1.07x at 16, 0.97x at 256 (CIs overlap = no measurable advantage); **1.19x SLOWER at 1024** (5,970 vs 5,031 ns, non-overlapping CIs)
-- The revival check at 1024 strengthened the rejection: scaling up does not help - the lookup side gets measurably worse, not better
+- Scale does not rescue the trade-off: the larger the table, the worse the lookup side gets relative to Dictionary
 - With no lookup win anywhere, the 5-10x build cost never amortizes: keep Dictionary for string keys, or use a domain-specific table (COL-04 sampled hash: 0.60-0.62x)
 - Consistent with R-08 (unconditional Frozen adoption rejected)
 

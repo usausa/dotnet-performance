@@ -43,7 +43,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 |---|---|---|:---:|:---:|
 | [MEM-01](#-mem-01-skiplocalsinit) | SkipLocalsInit | Skip zero-initialization of locals | ✅ | [Verified](benchmarks/results/MEM-01-SkipLocalsInit.md) |
 | [MEM-02](#-mem-02-struct-element-array--ref-access-data-oriented-layout) | struct element array + ref access | Eliminate per-element heap allocation and indirection | ✅ | [Implemented](src/PerformancePatterns/Typ/TypeMap.cs) |
-| [MEM-03](#-mem-03-explicit-slicing-with-sliceoffset-length) | Explicit Slice(offset, length) | Slicing faster than the range operator | ✅ | [Verified](benchmarks/results/MEM-03-SliceStyle.md) |
+| [MEM-03](#-mem-03-explicit-slicing-with-sliceoffset-length) | Explicit Slice(offset, length) | Tighter slicing codegen than the range operator | ✅ | [Verified](benchmarks/results/MEM-03-SliceStyle.md) |
 | [MEM-04](#-mem-04-passing-struct-arguments-by-in--ref) | Passing struct arguments by in / ref | Avoid value copies of large structs | ✅ | [Verified](benchmarks/results/MEM-04-StructPass.md) |
 | [STK-01](#-stk-01-ref-struct-stack-only-type) | ref struct (stack-only type) | Ban heap escape at the type level | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-zero-copy-access-with-spant--readonlyspant) | Span\<T\> / ReadOnlySpan\<T\> | Zero-copy typed view | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
@@ -980,7 +980,7 @@ public ref struct SpanTokenizer<T> where T : IEquatable<T>
 
 **Use cases:** General-purpose algorithms such as collections, searches, and splitters.
 
-**Measured (from the TYP-02 run):** For dictionary lookups on a 16-byte struct key, the default comparer over a struct that implements `IEquatable<T>` costs **5.6 ns / zero allocation** (a struct without it costs 25.7 ns + 96 B of boxing per lookup). That is precisely the payoff of constraint-driven devirtualization and boxing avoidance → [TYP-02-BitwiseComparer.md](benchmarks/results/TYP-02-BitwiseComparer.md)
+**Measured (from the TYP-02 run):** For dictionary lookups on a 16-byte struct key, the default comparer over a struct that implements `IEquatable<T>` costs **3.7 ns / zero allocation** (a struct without it costs 15.8 ns + 96 B of boxing per lookup — 4.3x). That is precisely the payoff of constraint-driven devirtualization and boxing avoidance → [TYP-02-BitwiseComparer.md](benchmarks/results/TYP-02-BitwiseComparer.md)
 
 ---
 
@@ -3018,7 +3018,7 @@ A list of hand-written optimizations that were once effective (or were held to b
 | Putting `AggressiveInlining` on small helpers | The default policy (PGO) inlines them even with a loop inside | Identical Tier1 code at the call site (94 B) | [JIT-01](benchmarks/results/JIT-01-Inlining.md) |
 | Replacing `new T[0]` with `Array.Empty<T>()` | Empty arrays are shared, so allocation is zero (`[]` has the smaller code size) | BDN measured zero allocation | [STK-07](benchmarks/results/STK-07-LazyAllocation.md) |
 | Rewriting a single-Span loop with `GetReference` + `Unsafe.Add` | A plain for loop eliminates bounds checks entirely | The manual form is 1.07-1.13x slower | [R-02](docs/rejected-patterns.md) |
-| Manual ref walking in a simple loop over **multiple Spans** | The indexed form auto-vectorizes (0.36 ns/item) | The manual form blocks vectorization and is 1.46x slower | [R-02](benchmarks/results/LAB-DualSpanWalk.md) |
+| Manual ref walking in a simple loop over **multiple Spans** | The indexed form auto-vectorizes (0.23 ns/item) | The manual form blocks vectorization and is 1.25x slower | [R-02](benchmarks/results/LAB-DualSpanWalk.md) |
 | Rewriting array traversal with `GetArrayDataReference` + `Unsafe.Add` | The indexed form gets bounds checks removed and auto-vectorized | 1.30x slower sequentially, no difference even with random access | [R-02](benchmarks/results/LAB-ArrayDataReference.md) |
 | Switching to `delegate*` function pointers for speed | PGO speculatively devirtualizes and inlines delegates | Function pointers go through calli, defeating speculation: 6.04x slower | [DSP-02](benchmarks/results/DSP-02-CallAbstraction.md) |
 | static readonly caching of `typeof(X)` | Tier1 constant-folds it into an immediate frozen RuntimeType pointer | Byte-identical codegen (11 B) | [R-01](docs/rejected-patterns.md) |

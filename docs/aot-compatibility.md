@@ -302,7 +302,7 @@ public static Func<T> CreateFactory<[DynamicallyAccessedMembers(
 - `IsDynamicCodeCompiled`: whether the generated dynamic code actually gets compiled (also false in interpreted environments). **Use this one to gate the Emit fast path** — running Emit under the interpreter makes things slower, not faster
 - The trimmer can constant-fold the `IsDynamicCodeSupported` branch in an AOT build and drop the unreachable Emit path
 
-**Do you actually need dual paths? (measured):** in the GEN-01 measurements, the best Emit shape (holder field target, 6.55 ns) is on par with compiled code (6.23 ns), which means **straight-line code from a Source Generator reaches Emit-level performance while staying AOT safe** ([GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md) / [generated-code-patterns.md](generated-code-patterns.md)). Dual paths only pay off for dynamic scenarios that cannot be generated at build time, such as composing types at runtime without touching consumer code.
+**Do you actually need dual paths? (measured):** in the GEN-01 measurements, the best Emit shape (holder field target, 4.23 ns) is close to compiled code (3.77 ns), which means **straight-line code from a Source Generator reaches Emit-level performance while staying AOT safe** ([GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md) / [generated-code-patterns.md](generated-code-patterns.md)). Dual paths only pay off for dynamic scenarios that cannot be generated at build time, such as composing types at runtime without touching consumer code.
 
 ### AOTS-09: rd.xml / TrimmerRootDescriptor (stopgap)
 

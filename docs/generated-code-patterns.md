@@ -81,7 +81,7 @@ internal static class OrderJson
 
 **Why it is faster:** Reading is nothing but a constant load. A `ReadOnlySpan<byte>` property backed by a u8 literal points straight into the assembly's data section, so allocation is zero.
 
-**Measured evidence:** Assembling every time costs 116 ns + 760 B → dictionary cache 4.8 ns → **generic static read 0.09 ns / 6 B of code**. Generated code can push the fastest form (the static read) one step further, down to a const → [TYP-06-StaticArtifact.md](../benchmarks/results/TYP-06-StaticArtifact.md)
+**Measured evidence:** Assembling every time costs 57.0 ns + 760 B → dictionary cache 2.7 ns → **generic static read ~0 ns (below measurement resolution) / 6 B of code**. Generated code can push the fastest form (the static read) one step further, down to a const → [TYP-06-StaticArtifact.md](../benchmarks/results/TYP-06-StaticArtifact.md)
 
 **Caveats:** Artifacts that depend on generic type arguments should be generated in the `static class Cache<T>` form (TYP-04 / TYP-06). Design the type initializer so it never throws.
 
@@ -126,7 +126,7 @@ public static Order Map(DbDataReader reader, in OrderOrdinals ordinals) => new()
 
 **Why it is faster:** Column resolution happens once per reader, and the row loop becomes nothing but struct field reads and direct calls to typed getters.
 
-**Measured evidence:** `GetOrdinal` per row is 11.3 ns/row → **ordinal struct passed by `in`, 1.42 ns/row (0.13x)**, code size 2,225 → 537 B. Generating `GetValue` + cast instead costs 7.18 ns/row plus **48 B/row of boxing** → [DAT-01-OrdinalResolve.md](../benchmarks/results/DAT-01-OrdinalResolve.md)
+**Measured evidence:** `GetOrdinal` per row is 7.45 ns/row → **ordinal struct passed by `in`, 1.00 ns/row (0.13x)**, code size 2,219 → 533 B. Generating `GetValue` + cast instead costs 4.26 ns/row plus **48 B/row of boxing** → [DAT-01-OrdinalResolve.md](../benchmarks/results/DAT-01-OrdinalResolve.md)
 
 **Caveats:** If missing columns are allowed, leave the ordinal at -1 and generate a branch on the Map side (do not use `GetOrdinal`, which throws). For enum columns, generate code that reads the underlying type and casts.
 
@@ -155,7 +155,7 @@ public static Service Create() => new(
 
 **Why it is faster:** The call chains, castclass, and delegate indirection all disappear, leaving direct calls whose constructors the JIT can inline.
 
-**Measured evidence:** In GEN-01 (the same scenario on the Emit side), a child factory chain costs **2.3x** versus direct code, and a closure-array target 1.5x. The direct-code equivalent (DirectLambda) is 6.23 ns → [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md). Generated code can emit a shape equivalent to Emit's best form (Holder field, 6.55 ns), AOT-safely.
+**Measured evidence:** In GEN-01 (the same scenario on the Emit side), a child factory chain costs **1.7x** versus direct code, and a closure-array target 1.2x. The direct-code equivalent (DirectLambda) is 3.77 ns → [GEN-01-EmitStrategy.md](../benchmarks/results/GEN-01-EmitStrategy.md). Generated code can emit a shape equivalent to Emit's best form (Holder field, 4.23 ns), AOT-safely.
 
 **Caveats:** Settle lifetimes (singleton / per-call) at generation time and express them in the shape (singleton = static readonly, per-call = direct `new`). Generate a `Dictionary<Type, Func<object>>` only for the entry points that genuinely need resolution from a runtime `Type`, with its values pointing at the direct factories above (note the measurement showing TYP-01's runtime Type path is slower than a plain dictionary — routing statically known calls through a generic API comes first).
 

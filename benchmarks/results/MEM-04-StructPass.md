@@ -1,8 +1,8 @@
 # MEM-04: Struct argument passing (by value vs in)
 
-- Verdict: adopted (re-verified across 8-256 bytes) - the size-dependent win is real from 64 bytes up
+- Verdict: adopted - the win grows with struct size and is decisive from 64 bytes up
 - in vs by-value (non-inlined call): 8 B 1.01x / 16 B **0.84x** / 32 B 0.94x / 64 B **0.34x** / 128 B **0.48x** / 256 B **0.32x**
-- **in is flat (~1.1-1.25 ns) at every size**; the by-value side grows with size AND is alignment-sensitive - Size128ByValue is bimodal across launches (1.5-3.5 ns, RatioSD 0.78), and Size64ByValue measured 1.24 ns in one run and 3.22 ns in another. Predictability is itself an argument for in
+- **in is flat (~1.1-1.25 ns) at every size**; the by-value side grows with size and is alignment-sensitive - Size128ByValue is bimodal across launches (1.5-3.5 ns, RatioSD 0.78). Predictability is itself an argument for in
 - The defensive copy remains the hazard: in + non-readonly member 1.85 ns = 1.51x of in + readonly member, code size 219 B vs 112 B
 - All variants allocation-free; in also trims code size at every size (51-84 B vs 49-161 B)
 - Guidance: pass readonly structs of 16 B+ by in; from 64 B it is a 2-3x win, and below that it never costs anything
