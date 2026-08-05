@@ -1,7 +1,7 @@
 # TYP-05: Unsafe.As vs castclass vs is-pattern (type-guaranteed reference)
 
 - Verdict: adopted (where the invariant is structurally guaranteed)
-- castclass 718.4 ns (high variance) / is-pattern 551.5 ns (0.82x) / Unsafe.As 344.7 ns (0.51x)
+- castclass 335.5 ns / is-pattern 324.7 ns (0.97x) / Unsafe.As 212.8 ns (0.63x)
 - Code size 274 / 57 / 33 B - the cast helper and its EH path dominate the castclass form
 - Safety: no type check at all; a wrong type is silent corruption. Restrict to registries where the value's type is established at registration
 

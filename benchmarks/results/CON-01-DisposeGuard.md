@@ -1,8 +1,8 @@
 # CON-01: Interlocked one-shot guard (dispose / init)
 
 - Verdict: adopted
-- Thread-safe exactly-once guards: Interlocked 1.81-1.96 ns vs lock (System.Threading.Lock) 4.73 ns (2.4-2.6x), code 33-56 B vs 2,612 B
-- Plain bool 0.40 ns is fastest but not thread-safe - sufficient for single-threaded types
+- Thread-safe exactly-once guards: Interlocked 3.90-3.98 ns vs lock (System.Threading.Lock) 8.85 ns (2.2-2.3x), code 33-56 B vs 2,612 B
+- Plain/volatile bool 0.18 ns is fastest but not thread-safe - sufficient for single-threaded types
 
 ```
 

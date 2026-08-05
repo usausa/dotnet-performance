@@ -1,9 +1,9 @@
 # DSP-03: Handler array vs multicast delegate
 
 - Verdict: adopted (implemented)
-- 1 subscriber: 2.87x (multicast wins - keep a single delegate for that case)
-- 2 subscribers: 0.61x / 4: 0.36x / 8: 0.42x (array wins from 2 subscribers up)
-- Multicast cost grows steeply with subscriber count (0.84 -> 5.71 -> 11.70 -> 18.85 ns), array stays flat (2.38 -> 7.85 ns)
+- 1 subscriber: multicast 0.12 ns vs array 0.68 ns (multicast wins - keep a single delegate for that case)
+- 2 subscribers: 0.32x / 4: 0.31x / 8: 0.32x (array wins from 2 subscribers up)
+- Multicast cost grows steeply with subscriber count (3.49 -> 6.05 -> 11.00 ns), the array loop stays flat and allocation-free (1.11 -> 3.47 ns)
 
 ```
 

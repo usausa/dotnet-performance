@@ -1,8 +1,7 @@
 # JIT-05: RuntimeHelpers.IsReferenceOrContainsReferences branch
 
 - Verdict: adopted
-- Clear skipped for int[1024]: 19.0 ns -> 0.008 ns (code 510 B -> 28 B)
-- The skip path is now indistinguishable from an empty loop (0.19 ns on the previous Ryzen 9 5900X baseline): the JIT folds the intrinsic to a constant and the whole branch disappears
+- Clear skipped for int[1024]: 19.0 ns -> 0.008 ns (code 510 B -> 28 B) - the JIT folds the intrinsic to a constant, and the branch plus the clear vanish entirely
 - Zero measured overhead when clear is still required (string[]: 101.5 vs 102.4 ns, same code size)
 
 ```

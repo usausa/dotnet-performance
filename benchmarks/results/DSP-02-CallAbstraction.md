@@ -1,9 +1,9 @@
 # DSP-02: Call abstraction overhead (1024 calls, net10)
 
-- Verdict: function pointers are NOT the fast option on net10 - and on x86-64-v4 the ordinary abstractions became nearly free
+- Verdict: hold the concrete sealed type where possible; function pointers are NOT the fast option on net10
 - DirectSealed 215.8 ns (1.00, 27 B - inlined) | ViaAbstract 223.6 ns (1.04) | ViaInterface 224.3 ns (1.04) | ViaDelegate 254.6 ns (1.18) | ViaFunctionPointer 1,250.7 ns (5.80x SLOWEST)
-- **Interface and abstract dispatch collapsed to ~4%** (2.07x / 1.75x on the previous Ryzen 9 5900X baseline). Paying for an abstraction is close to free on this hardware; the delegate's 1.18x is now the largest of the ordinary options
-- Why the function pointer loses: calli cannot be inlined and PGO cannot speculate on it, while a delegate's Invoke gets guarded devirtualization + inlining of the target. This gap did NOT close - it is 5.8x and remains the one real cliff in this table
+- Interface and abstract dispatch cost only ~4% here - a monomorphic virtual call predicts and speculates well; the delegate's 1.18x is the largest of the ordinary options
+- Why the function pointer loses: calli cannot be inlined and PGO cannot speculate on it, while a delegate's Invoke gets guarded devirtualization + inlining of the target - the one real cliff in this table
 - Delegate ~= abstract ~= interface: the old 'delegates are heavier than interfaces' rule does not hold
 - Function pointers remain for interop/AOT boundaries and megamorphic targets where PGO speculation would fail anyway - not as a general speed tool
 

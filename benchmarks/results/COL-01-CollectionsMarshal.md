@@ -1,10 +1,9 @@
 # COL-01: CollectionsMarshal
 
-- Verdict: adopted (verified) - still worth it, but the margins are smaller than on the previous baseline
-- AsSpan iteration 0.85x vs List foreach (was 0.52x on Ryzen 9 5900X): List's own foreach gained 1.97x from the newer core while the span walk gained only 1.20x, so most of the gap closed. Note `for` over List is now the slowest form at 1.07x
-- GetValueRefOrAddDefault read-modify-write 0.64x vs double lookup (unchanged - hashing dominates and both paths pay it once vs twice)
-- SetCount + span bulk build 0.21x (16) / 0.41x (1024) vs Add loop, allocation still halved. At 1024 the win shrank from 0.22x because the Add loop itself sped up 2.4x
-- Takeaway unchanged in direction, but AsSpan iteration is no longer a 2x lever - reach for it in hot loops, not as a blanket rewrite
+- Verdict: adopted (verified)
+- AsSpan iteration 0.85x vs List foreach (a for loop over List is the slowest form at 1.07x) - a hot-loop optimization, not a blanket rewrite
+- GetValueRefOrAddDefault read-modify-write 0.64x vs double lookup (one hash computation instead of two)
+- SetCount + span bulk build 0.21x (16) / 0.41x (1024) vs Add loop, allocation halved
 
 ## ListIterationBenchmark
 
