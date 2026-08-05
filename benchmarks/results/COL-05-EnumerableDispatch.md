@@ -4,7 +4,7 @@
 - List source 0.83x via the CollectionsMarshal.AsSpan branch (253.7 -> 210.2 ns)
 - Array source: no gain on net10 with dynamic PGO (guarded devirtualization already specializes the enumerator; 213.8 vs 209.8 ns) - on AOT the array branch remains valuable
 - The iterator fallback pays 1.13x (486.7 -> 552.0 ns, non-overlapping CIs): a lazy-iterator argument pays for the type tests it never uses
-- Net: worth it when inputs are predominantly List/array; skip it when lazy iterators are common
+- Net: the applicable range is narrow - adopt on hot APIs whose inputs are predominantly List, or under AOT; skip it on general-purpose IEnumerable parameters
 
 ```
 

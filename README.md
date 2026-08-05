@@ -39,13 +39,13 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 
 ## 📋 Pattern index (summary)
 
-> 🔬 marks patterns whose documented conclusion is not supported by the current measurements (net10 / x86-64-v4): the direction of the comparison or the recommendation itself changed, and the pattern text needs revision.
+> 🔬 marks patterns awaiting re-verification: the benchmark has been extended and the conclusion will be settled by the next measurement run.
 
 | ID | Pattern | Goal | AOT | Example |
 |---|---|---|:---:|:---:|
 | [MEM-01](#-mem-01-skiplocalsinit) | SkipLocalsInit | Skip zero-initialization of locals | ✅ | [Verified](benchmarks/results/MEM-01-SkipLocalsInit.md) |
 | [MEM-02](#-mem-02-struct-element-array--ref-access-data-oriented-layout) | struct element array + ref access | Eliminate per-element heap allocation and indirection | ✅ | [Implemented](src/PerformancePatterns/Typ/TypeMap.cs) |
-| 🔬 [MEM-03](#-mem-03-explicit-slicing-with-sliceoffset-length) | Explicit Slice(offset, length) | Slicing faster than the range operator | ✅ | [Verified](benchmarks/results/MEM-03-SliceStyle.md) |
+| [MEM-03](#-mem-03-explicit-slicing-with-sliceoffset-length) | Explicit Slice(offset, length) | Slicing faster than the range operator | ✅ | [Verified](benchmarks/results/MEM-03-SliceStyle.md) |
 | 🔬 [MEM-04](#-mem-04-passing-struct-arguments-by-in--ref) | Passing struct arguments by in / ref | Avoid value copies of large structs | ✅ | [Verified](benchmarks/results/MEM-04-StructPass.md) |
 | [STK-01](#-stk-01-ref-struct-stack-only-type) | ref struct (stack-only type) | Ban heap escape at the type level | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-zero-copy-access-with-spant--readonlyspant) | Span\<T\> / ReadOnlySpan\<T\> | Zero-copy typed view | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
@@ -68,7 +68,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [JIT-03](#️-jit-03-generic-specialization-via-typeoft-branches) | typeof(T) branch specialization | Remove branches from generic conversion | ✅ | [Verified](benchmarks/results/JIT-03-TypeofBranch.md) |
 | [JIT-04](#️-jit-04-cold-path-separation-throw-helpers--noinlining-on-grow) | Cold-path separation | Promote inlining of the hot path | ✅ | [Implemented](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
 | [JIT-05](#️-jit-05-skipping-work-with-isreferenceorcontainsreferences) | IsReferenceOrContainsReferences branch | Skip cleanup for reference-free types | ✅ | [Verified](benchmarks/results/JIT-05-ReferenceContainsBranch.md) |
-| 🔬 [DSP-01](#-dsp-01-devirtualization-via-sealed) | Devirtualization via sealed | Turn virtual calls into direct calls | ✅ | [Verified](benchmarks/results/DSP-01-SealedDevirt.md) |
+| [DSP-01](#-dsp-01-devirtualization-via-sealed) | Devirtualization via sealed | Turn virtual calls into direct calls | ✅ | [Verified](benchmarks/results/DSP-01-SealedDevirt.md) |
 | [DSP-02](#-dsp-02-choosing-a-call-abstraction) | Choosing a call abstraction | When to use delegate / interface / function pointer | ✅ | [Verified](benchmarks/results/DSP-02-CallAbstraction.md) |
 | [DSP-03](#-dsp-03-immutable-handler-arrays-avoiding-multicast-delegates) | Immutable array of handlers | Avoid multicast delegate degradation | ✅ | [Implemented](src/PerformancePatterns/Dsp/HandlerList.cs) |
 | [DSP-04](#-dsp-04-static-lambdas-everywhere-threading-tstate-through) | static lambdas throughout | Make no-capture the default and pass state via TState | ✅ | [Verified](benchmarks/results/DSP-04-StaticLambda.md) |
@@ -83,8 +83,8 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [BIT-02](#-bit-02-power-of-two-sizing-plus-masking-to-replace-modulo) | Power-of-two size + mask | Turn modulo (division) into a bitwise AND | ✅ | [Verified](benchmarks/results/BIT-02-PowerOfTwoMask.md) |
 | [BIT-03](#-bit-03-bit-scanning-and-counting-with-bitoperations) | BitOperations | Hardware instructions for bit scanning and counting | ✅ | [Verified](benchmarks/results/BIT-03-BitOperations.md) |
 | [BIT-04](#-bit-04-general-purpose-hashing-with-xxhash3) | XxHash3 | Faster non-cryptographic hashing | ✅ | [Verified](benchmarks/results/BIT-04-XxHash3.md) |
-| 🔬 [VEC-01](#-vec-01-explicit-simd-vectort--vector256) | Explicit SIMD | Bulk processing with Vector\<T\> / Vector256 | ✅ | [Verified](benchmarks/results/VEC-01-VectorSum.md) |
-| 🔬 [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | General-purpose span splitting (zero allocation) | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
+| [VEC-01](#-vec-01-explicit-simd-vectort--vector256) | Explicit SIMD | Bulk processing with Vector\<T\> / Vector256 | ✅ | [Verified](benchmarks/results/VEC-01-VectorSum.md) |
+| [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | General-purpose span splitting (zero allocation) | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-02](#-seq-02-struct-io-over-stream) | Struct I/O over Stream | Direct binary read/write of structs | ✅ | [Verified](benchmarks/results/SEQ-02-StructStreamIo.md) |
 | [SEQ-03](#-seq-03-lazy-sequence-processing-batch--segment--traverse) | Batch / Segment / Traverse | Low-allocation sequence processing | ✅ | [Implemented](src/PerformancePatterns/Seq/BatchExtensions.cs) |
 | [SEQ-04](#-seq-04-ring-buffer-with-incremental-delimiter-search) | Ring buffer + incremental search | Splitting a streaming receive | ✅ | [Verified](benchmarks/results/SEQ-04-RingSplit.md) |
@@ -92,7 +92,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [COL-02](#️-col-02-conditional-adoption-of-frozendictionary) | Conditional use of FrozenDictionary | Faster lookup for immutable dictionaries | ✅ | [Verified](benchmarks/results/COL-02-FrozenCondition.md) |
 | [COL-03](#️-col-03-span-key-lookups-with-getalternatelookup) | GetAlternateLookup | Dictionary lookup with a Span key | ✅ | [Verified](benchmarks/results/COL-04-SampledNameTable.md) |
 | [COL-04](#️-col-04-choosing-a-lookup-strategy-for-small-element-counts) | Small-set lookup strategy | Choose the implementation by size and shape | ✅ | [Implemented](src/PerformancePatterns/Col/SampledNameTable.cs) |
-| 🔬 [COL-05](#️-col-05-concrete-type-dispatch-for-ienumerable-parameters) | IEnumerable concrete-type dispatch | Route List/array inputs onto a Span path | ✅ | [Verified](benchmarks/results/COL-05-EnumerableDispatch.md) |
+| [COL-05](#️-col-05-concrete-type-dispatch-for-ienumerable-parameters) | IEnumerable concrete-type dispatch | Route List/array inputs onto a Span path | ✅ | [Verified](benchmarks/results/COL-05-EnumerableDispatch.md) |
 | [COL-06](#️-col-06-shape-specialized-collection-conversion) | Shape-specialized collection conversion | Optimize the allocation and copy strategy for the destination | ✅ | [Verified](benchmarks/results/COL-06-CollectionConvert.md) |
 | [TXT-01](#-txt-01-formatting-and-conversion-with-lookup-tables) | Lookup-table formatting | Table-driven fixed-format formatting | ✅ | [Implemented](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#-txt-02-stackalloc-first-string-building) | stackalloc-first string building | Low-allocation alternative to StringBuilder | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
@@ -1124,7 +1124,7 @@ public sealed class BinaryFormatter : IFormatter { ... }
 | Interface reference (sealed impl) | 221.9 ns | 1.01 (➖ measurement noise; identical code size of 84 B) |
 | **Concrete sealed-type reference** | 215.2 ns | **0.98** (27 B, direct call + inlining) |
 
-**On net10, calls through an interface reference did not get faster from sealed** (identical codegen size), and a well-predicted monomorphic interface call costs almost nothing on this class of hardware — even holding the concrete sealed type buys only ~2% of time. What the concrete type does deliver is **code size (27 B vs 84 B) and inlining headroom**, which is where the payoff sits under AOT or without dynamic PGO. sealed itself is free, so making it the default stands unchanged. → [Results](benchmarks/results/DSP-01-SealedDevirt.md)
+**On net10, calls through an interface reference did not get faster from sealed** (identical codegen size). The disassembly shows why: on the interface path, **PGO's guarded devirtualization already inlines the body behind a per-iteration type guard** (`cmp [rcx], MT` + inlined add), and that guard predicts perfectly — so the only thing the concrete sealed reference removes is the guard itself, worth ~2% (and a hoisted null check replaces the per-iteration field reload). What the concrete type does deliver is **code size (27 B vs 84 B, a 6-instruction tight loop) and inlining headroom**. Under AOT or without dynamic PGO there is no guarded devirtualization, so the interface path pays a real virtual stub call per iteration — that is where the concrete/sealed form matters most. sealed itself is free, so making it the default stands unchanged. → [Results](benchmarks/results/DSP-01-SealedDevirt.md)
 
 **Design guidance:** Make sealed the default for every library implementation class except those that deliberately allow inheritance by design (the BCL follows the same policy).
 
@@ -1773,22 +1773,23 @@ Explicit SIMD beats the scalar loop by a wide margin on any SIMD-capable CPU —
 **Example:**
 
 ```csharp
-ref var start = ref MemoryMarshal.GetArrayDataReference(values);
-var acc = Vector256<int>.Zero;
+// Width-agnostic: Vector<int>.Count follows the hardware (8 lanes on AVX2, 16 on AVX-512)
+var span = values.AsSpan();
+var acc = Vector<int>.Zero;
 var i = 0;
-for (; i <= values.Length - Vector256<int>.Count; i += Vector256<int>.Count)
+for (; i <= span.Length - Vector<int>.Count; i += Vector<int>.Count)
 {
-    acc += Vector256.LoadUnsafe(ref start, (nuint)i);
+    acc += new Vector<int>(span.Slice(i, Vector<int>.Count));
 }
 
-var total = Vector256.Sum(acc);
-for (; i < values.Length; i++)
+var total = Vector.Sum(acc);
+for (; i < span.Length; i++)
 {
-    total += Unsafe.Add(ref start, i); // handle the remainder with scalar code
+    total += span[i]; // handle the remainder with scalar code
 }
 ```
 
-**Design guidance (important):** First look for a vectorized BCL API (`Enumerable.Sum`, `IndexOf`/`SequenceEqual`, `SearchValues`, `Ascii`, `TensorPrimitives`) — over 4x versus scalar without writing anything. Reserve hand-written SIMD for work with no matching BCL API, and evaluate `Vector<T>` (portable) before `Vector128/256` (more control).
+**Design guidance (important):** First look for a vectorized BCL API (`Enumerable.Sum`, `IndexOf`/`SequenceEqual`, `SearchValues`, `Ascii`, `TensorPrimitives`) — over 4x versus scalar without writing anything. Reserve hand-written SIMD for work with no matching BCL API, and write it width-agnostic with `Vector<T>`; drop to `Vector128/256` only when the algorithm needs specific lane semantics (fixed-width shuffles and the like).
 
 **Use cases:** Checksums and aggregation, custom encode/decode, bulk numeric conversion.
 
@@ -1821,7 +1822,7 @@ foreach (var token in new SpanTokenizer<char>(line.AsSpan(), ','))
 
 **Use cases:** CSV parsing, protocol header splitting, command argument parsing.
 
-**Related:** A combined application of STK-01 (ref struct) + STK-03 (struct iterator) + JIT-02 (IEquatable constraint). `MemoryExtensions.Split` on .NET 9+ offers the same kind of functionality, so pick according to requirements.
+**Related / positioning vs the BCL:** A combined application of STK-01 (ref struct) + STK-03 (struct iterator) + JIT-02 (IEquatable constraint). **On .NET 9+, `MemoryExtensions.Split` provides functionally equivalent zero-allocation splitting — if you target .NET 9+ only, use the BCL API.** What keeps this implementation in the catalog: it works on .NET 8 and earlier targets (multi-targeting libraries), and it measures 4-13% faster with smaller code (707 B vs 910 B) — a real but small edge. Treat it as a compatibility/reference pattern, not something the BCL lacks.
 
 **Implementation in this repo:** [SpanTokenizer.cs](src/PerformancePatterns/Seq/SpanTokenizer.cs) / [Tests](tests/PerformancePatterns.Tests/Seq/SpanTokenizerTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Seq/SpanTokenizerBenchmark.cs) / [Results](benchmarks/results/SEQ-01-SpanTokenizer.md)
 
@@ -2111,11 +2112,11 @@ The sampled hash table is consistently fast at every size, and on span-key compa
 
 **Goal:** Inside APIs that take `IEnumerable<T>`, check the runtime type and route `List<T>` (and `T[]` where useful) onto a Span path — the standard trick used inside LINQ.
 
-**Effect (measured, net10 / x86-64-v4, sum of 1024 elements):**
+**Effect (measured, net10 / x86-64-v4, sum of 1024 elements) — the applicable range is narrow; adopt only where it fits:**
 
-- **List source: 0.83x** (253.7 → 210.2ns) — the branch that matters, though guarded devirtualization has closed much of the gap
-- Array source: no gain (213.8 vs 209.8ns) — the modern JIT already optimizes IEnumerable enumeration of arrays through profile-guided guarded devirtualization
-- **Penalty for enumerator sources where the branches miss: 1.13x** (486.7 vs 552.0ns, non-overlapping CIs) — a lazy-iterator argument pays for the type tests it never uses, so adopt this where inputs are predominantly List/array
+- **Where it pays: `List<T>`-dominant inputs (0.83x via the CollectionsMarshal.AsSpan branch), and AOT builds** (no dynamic PGO, so both the List and the array branch do work the runtime cannot do for you)
+- Everywhere else it does not: array sources gain nothing under the JIT (213.8 vs 209.8ns — guarded devirtualization already specializes them), and **lazy-iterator sources pay 1.13x** (486.7 vs 552.0ns, non-overlapping CIs) for type tests they never use
+- Rule of thumb: apply on hot APIs whose callers you know pass Lists (or when targeting AOT); do not sprinkle it on general-purpose IEnumerable parameters
 
 **AOT:** ✅ No issues. AOT has no runtime-profile-driven devirtualization, so **it is worth more than under the JIT, array branch included**
 

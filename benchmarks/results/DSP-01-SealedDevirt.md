@@ -2,9 +2,10 @@
 
 - Verdict: conditional
 - Via interface reference, sealed vs open measures equal (220.7 vs 221.9 ns, CIs overlap, code size 84 B both)
-- Concrete sealed reference: 0.98x time (a real but ~2% difference), code 27 B vs 84 B - the payoff is the direct call's code size and inlining headroom, not wall-clock time; the indirect call itself predicts well on modern cores
-- The code-size/devirtualization win matters most under AOT or without dynamic PGO, where the runtime cannot despeculate the call site
-- sealed remains free - keep it as the default, but do not expect interface-typed call sites to get faster from sealing alone
+- Disassembly shows why: **PGO's guarded devirtualization already inlines the body behind a type guard on the interface path** - each iteration reloads the field and compares the method table (`cmp [rcx], MT`), and on match runs the inlined add; the guard predicts perfectly, so sealed adds nothing on top
+- Concrete sealed reference (27 B): **the guard disappears entirely** - no per-iteration MT compare or field reload, one hoisted null check before the loop, and the body collapses to a 6-instruction tight loop. The measured ~2% (0.98x) is exactly the cost of that per-iteration guard
+- Consequence: with dynamic PGO the interface path is nearly free; **under AOT or without PGO there is no guarded devirtualization, so the interface path pays a real virtual stub call per iteration and the concrete/sealed form matters much more**
+- sealed remains free - keep it as the default, but do not expect interface-typed call sites to get faster from sealing alone on a PGO-enabled runtime
 
 ```
 

@@ -152,6 +152,9 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ⑤ | ref フィールドによる ref struct 設計(C# 11) | カーソルを Span + index でなく ref T で保持する設計のコスト比較 | STK-01 | ❌ 反復用途は不採用一覧へ(for 比 1.21 倍で利得なし) |
 | ⑤ | P/Invoke 高速化 | \[LibraryImport\] + Span 渡し + \[SuppressGCTransition\](短時間ネイティブ呼び出しの GC 遷移省略)の効果と制約 | BUF-05 | ❌ 不採用リストへ移動(R-19。LibraryImport は標準の宣言方法であって最適化ではない。SuppressGCTransition は計測で利得なし) |
 | ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | ✅ 収録([ASY-02](../README.ja.md#-asy-02-systemthreadingchannels-による生産者消費者)、~45ns/要素・Bounded は 2 倍) |
+| ⑥ | MEM-04 サイズ依存性の再検証 | in vs 値渡しを 16 / 128 / 256 バイトでも計測 — 呼び出しコストを超えてコピーが表面化するサイズはあるか | MEM-04 | 🔬 次回計測待ち |
+| ⑥ | R-14 復活検証(定数長コピー) | CopyBlockUnaligned vs Span.CopyTo を定数 8 / 16 / 64 B で計測 — 長さ保証つき生成コード向けに、実差はどのサイズまで残るか | LAB-CopyBlockUnaligned | 🔬 次回計測待ち |
+| ⑥ | R-08 復活検証(大きな Frozen 表) | FrozenDictionary の構築/検索を string キー 1024 件でも計測 — 構築コストを償却できる規模で検索側が勝ち始めるか | COL-02 | 🔬 次回計測待ち |
 | ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 | ✅ 条件付き収録([ASY-03](../README.ja.md#-asy-03-systemiopipelines)、小データは 1.63 倍・アロケーション 1/80。64KB デッドロック注意) |
 | ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-03 | ✅ 収録([ASY-04](../README.ja.md#-asy-04-iasyncenumerable-のコスト認知と使い分け)、要素あたり 11.6 倍のコスト認知) |
 

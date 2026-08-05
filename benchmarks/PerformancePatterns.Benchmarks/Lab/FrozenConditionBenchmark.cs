@@ -12,7 +12,8 @@ public class FrozenBuildBenchmark
 {
     private KeyValuePair<string, int>[] pairs = default!;
 
-    [Params(16, 256)]
+    // 1024: R-08 revival check - does the lookup side start to win at larger sizes?
+    [Params(16, 256, 1024)]
     public int Count { get; set; }
 
     [GlobalSetup]
@@ -56,7 +57,8 @@ public class FrozenLookupBenchmark
 
     private string[] probes = default!;
 
-    [Params(16, 256)]
+    // 1024: R-08 revival check - does the lookup side start to win at larger sizes?
+    [Params(16, 256, 1024)]
     public int Count { get; set; }
 
     [GlobalSetup]

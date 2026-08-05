@@ -1,6 +1,6 @@
 # MEM-04: Struct argument passing (by value vs in)
 
-- Verdict: conditional
+- Verdict: conditional - RE-VERIFICATION PENDING: the benchmark now also covers 16 / 128 / 256-byte structs; the size-dependence conclusion will be settled by the next run
 - in vs by-value (non-inlined call): 8-byte 0.99x, 32-byte 0.81x (1.164 vs 1.444 ns, non-overlapping CIs), 64-byte 0.98x - only the 32-byte case shows a real time win; small and large copies alike are largely hidden behind the call itself
 - Everything except the mutable-member case sits in a 1.16-1.44 ns band - the non-inlined call overhead, not the copy, dominates
 - The real hazard is the defensive copy: in + non-readonly member 1.879 ns = 1.57x of in + readonly member, code size 219 B vs 109 B

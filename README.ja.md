@@ -39,13 +39,13 @@
 
 ## 📋 パターン一覧(サマリー)
 
-> 🔬 は、現在の計測(net10 / x86-64-v4)では文書化された結論が支持されない項目。比較の向きや推奨自体が変わっており、本文の見直しが必要。
+> 🔬 は再検証待ちの項目。ベンチマークを拡張済みで、次回の計測実行で結論を確定する。
 
 | ID | パターン | 目的 | AOT | 実装例 |
 |---|---|---|:---:|:---:|
 | [MEM-01](#-mem-01-skiplocalsinit) | SkipLocalsInit | ローカル変数ゼロ初期化のスキップ | ✅ | [検証済](benchmarks/results/MEM-01-SkipLocalsInit.md) |
 | [MEM-02](#-mem-02-struct-要素配列--ref-アクセスデータ指向レイアウト) | struct 要素配列 + ref アクセス | 要素ごとのヒープ確保と間接参照の排除 | ✅ | [実装](src/PerformancePatterns/Typ/TypeMap.cs) |
-| 🔬 [MEM-03](#-mem-03-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より高速なスライス | ✅ | [検証済](benchmarks/results/MEM-03-SliceStyle.md) |
+| [MEM-03](#-mem-03-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より高速なスライス | ✅ | [検証済](benchmarks/results/MEM-03-SliceStyle.md) |
 | 🔬 [MEM-04](#-mem-04-構造体引数の-in--ref-渡し戦略) | 構造体引数の in / ref 渡し | 大きな構造体の値コピー回避 | ✅ | [検証済](benchmarks/results/MEM-04-StructPass.md) |
 | [STK-01](#-stk-01-ref-structスタック専用型) | ref struct(スタック専用型) | ヒープエスケープの型レベル禁止 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-spant--readonlyspant-によるゼロコピーアクセス) | Span\<T\> / ReadOnlySpan\<T\> | ゼロコピーの型付きビュー | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
@@ -68,7 +68,7 @@
 | [JIT-03](#️-jit-03-typeoft-分岐によるジェネリック特殊化) | typeof(T) 分岐特殊化 | ジェネリック変換の分岐除去 | ✅ | [検証済](benchmarks/results/JIT-03-TypeofBranch.md) |
 | [JIT-04](#️-jit-04-コールドパス分離throw-ヘルパー--grow-の-noinlining) | コールドパス分離 | ホットパスのインライン化促進 | ✅ | [実装](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
 | [JIT-05](#️-jit-05-isreferenceorcontainsreferences-による処理スキップ) | IsReferenceOrContainsReferences 分岐 | 参照なし型の後始末スキップ | ✅ | [検証済](benchmarks/results/JIT-05-ReferenceContainsBranch.md) |
-| 🔬 [DSP-01](#-dsp-01-sealed-による-devirtualization) | sealed による devirtualization | 仮想呼び出しの直接化 | ✅ | [検証済](benchmarks/results/DSP-01-SealedDevirt.md) |
+| [DSP-01](#-dsp-01-sealed-による-devirtualization) | sealed による devirtualization | 仮想呼び出しの直接化 | ✅ | [検証済](benchmarks/results/DSP-01-SealedDevirt.md) |
 | [DSP-02](#-dsp-02-呼び出し抽象化の選択指針) | 呼び出し抽象化の選択指針 | delegate/interface/関数ポインタの使い分け | ✅ | [検証済](benchmarks/results/DSP-02-CallAbstraction.md) |
 | [DSP-03](#-dsp-03-ハンドラ列の不変配列化マルチキャストデリゲート回避) | ハンドラ列の不変配列化 | マルチキャストデリゲートの劣化回避 | ✅ | [実装](src/PerformancePatterns/Dsp/HandlerList.cs) |
 | [DSP-04](#-dsp-04-static-ラムダの徹底tstate-引き回し) | static ラムダの徹底 | キャプチャ禁止を既定にし状態は TState で渡す | ✅ | [検証済](benchmarks/results/DSP-04-StaticLambda.md) |
@@ -83,8 +83,8 @@
 | [BIT-02](#-bit-02-2-の累乗サイズ--マスクによる剰余置換) | 2 の累乗サイズ + マスク | 剰余(除算)のビット AND 化 | ✅ | [検証済](benchmarks/results/BIT-02-PowerOfTwoMask.md) |
 | [BIT-03](#-bit-03-bitoperations-によるビット走査計数) | BitOperations | ビット走査・計数のハードウェア命令化 | ✅ | [検証済](benchmarks/results/BIT-03-BitOperations.md) |
 | [BIT-04](#-bit-04-xxhash3-による汎用ハッシュ) | XxHash3 | 非暗号ハッシュの高速化 | ✅ | [検証済](benchmarks/results/BIT-04-XxHash3.md) |
-| 🔬 [VEC-01](#-vec-01-明示的-simdvectort--vector256) | 明示的 SIMD | Vector\<T\> / Vector256 による一括処理 | ✅ | [検証済](benchmarks/results/VEC-01-VectorSum.md) |
-| 🔬 [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
+| [VEC-01](#-vec-01-明示的-simdvectort--vector256) | 明示的 SIMD | Vector\<T\> / Vector256 による一括処理 | ✅ | [検証済](benchmarks/results/VEC-01-VectorSum.md) |
+| [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-02](#-seq-02-stream-構造体-io) | Stream 構造体 I/O | 構造体の直接バイナリ読み書き | ✅ | [検証済](benchmarks/results/SEQ-02-StructStreamIo.md) |
 | [SEQ-03](#-seq-03-遅延評価シーケンス処理batch--segment--traverse) | Batch / Segment / Traverse | 低アロケーションのシーケンス処理 | ✅ | [実装](src/PerformancePatterns/Seq/BatchExtensions.cs) |
 | [SEQ-04](#-seq-04-リングバッファ--増分デリミタ探索) | リングバッファ + 増分探索 | ストリーミング受信の分割 | ✅ | [検証済](benchmarks/results/SEQ-04-RingSplit.md) |
@@ -92,7 +92,7 @@
 | [COL-02](#️-col-02-frozendictionary-の条件付き採用) | FrozenDictionary 条件付き採用 | 不変辞書の検索高速化 | ✅ | [検証済](benchmarks/results/COL-02-FrozenCondition.md) |
 | [COL-03](#️-col-03-getalternatelookup-による-span-キー検索) | GetAlternateLookup | Span キーでの辞書検索 | ✅ | [検証済](benchmarks/results/COL-04-SampledNameTable.md) |
 | [COL-04](#️-col-04-少数要素ルックアップの戦略選択) | 少数要素ルックアップ戦略 | 規模・形状に応じた実装選択 | ✅ | [実装](src/PerformancePatterns/Col/SampledNameTable.cs) |
-| 🔬 [COL-05](#️-col-05-ienumerable-引数の具象型ディスパッチ) | IEnumerable 具象型ディスパッチ | List/配列入力の Span パス化 | ✅ | [検証済](benchmarks/results/COL-05-EnumerableDispatch.md) |
+| [COL-05](#️-col-05-ienumerable-引数の具象型ディスパッチ) | IEnumerable 具象型ディスパッチ | List/配列入力の Span パス化 | ✅ | [検証済](benchmarks/results/COL-05-EnumerableDispatch.md) |
 | [COL-06](#️-col-06-コレクション変換の形状特化) | コレクション変換の形状特化 | 生成先の確保・コピー戦略の最適化 | ✅ | [検証済](benchmarks/results/COL-06-CollectionConvert.md) |
 | [TXT-01](#-txt-01-ルックアップテーブルによる整形変換) | ルックアップテーブル整形 | 固定書式整形のテーブル化 | ✅ | [実装](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#-txt-02-文字列構築の-stackalloc-ファースト化) | 文字列構築の stackalloc ファースト | StringBuilder 代替の低アロケーション構築 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
@@ -1124,7 +1124,7 @@ public sealed class BinaryFormatter : IFormatter { ... }
 | インターフェース参照(sealed 実装) | 221.9 ns | 1.01(➖誤差、コードサイズ 84 B で同一) |
 | **具象 sealed 型の参照** | 215.2 ns | **0.98**(27 B、直接呼び出し + インライン化) |
 
-**net10 ではインターフェース参照越しの呼び出しは sealed でも速くならなかった**(生成コードサイズ一致)。分岐予測の効いた単相インターフェース呼び出し自体がほぼ無料で、具象 sealed 型で持っても時間は約 2% しか縮まない。具象型保持の実利は**コードサイズ(27 B vs 84 B)とインライン化の余地**にあり、AOT / 動的 PGO なし環境で効く。sealed 自体はコストゼロなので既定にする方針は不変。→ [測定結果](benchmarks/results/DSP-01-SealedDevirt.md)
+**net10 ではインターフェース参照越しの呼び出しは sealed でも速くならなかった**(生成コードサイズ一致)。逆アセンブルで機構が判明: インターフェース経路では **PGO のガード付き脱仮想化が既に本体をインライン化しており**、反復ごとにメソッドテーブル比較(`cmp [rcx], MT`)+ インライン化済み加算を実行する。このガードは完全に分岐予測が当たるため、具象 sealed 型保持で消えるのは**ガードそのもののみ = 約 2%**(フィールド再読込はループ外の null チェック 1 回に置き換わる)。具象型保持の実利は**コードサイズ(27 B vs 84 B、6 命令のタイトループ)とインライン化の余地**。AOT / 動的 PGO なし環境ではガード付き脱仮想化が存在せず、インターフェース経路は反復ごとに本物の仮想スタブ呼び出しを払うため、具象/sealed 保持の価値が大きく増す。sealed 自体はコストゼロなので既定にする方針は不変。→ [測定結果](benchmarks/results/DSP-01-SealedDevirt.md)
 
 **設計指針:** 継承を設計意図として明示的に許すクラス以外、ライブラリの実装クラスはすべて sealed を既定とする(BCL も同方針)。
 
@@ -1773,22 +1773,23 @@ XxHash3 は 8 文字時点で既に速く、長いほど差が開く。`MemoryMa
 **実装例:**
 
 ```csharp
-ref var start = ref MemoryMarshal.GetArrayDataReference(values);
-var acc = Vector256<int>.Zero;
+// 幅非依存: Vector<int>.Count はハードウェアに追従する(AVX2 で 8 レーン、AVX-512 で 16 レーン)
+var span = values.AsSpan();
+var acc = Vector<int>.Zero;
 var i = 0;
-for (; i <= values.Length - Vector256<int>.Count; i += Vector256<int>.Count)
+for (; i <= span.Length - Vector<int>.Count; i += Vector<int>.Count)
 {
-    acc += Vector256.LoadUnsafe(ref start, (nuint)i);
+    acc += new Vector<int>(span.Slice(i, Vector<int>.Count));
 }
 
-var total = Vector256.Sum(acc);
-for (; i < values.Length; i++)
+var total = Vector.Sum(acc);
+for (; i < span.Length; i++)
 {
-    total += Unsafe.Add(ref start, i); // 端数はスカラーで処理
+    total += span[i]; // 端数はスカラーで処理
 }
 ```
 
-**設計指針(重要):** まず BCL のベクトル化済み API(`Enumerable.Sum`、`IndexOf`/`SequenceEqual`、`SearchValues`、`Ascii`、`TensorPrimitives`)を探す — スカラー比 4 倍超が書かずに手に入る。自前 SIMD は「BCL に該当 API がない処理」に限定し、`Vector<T>`(可搬)→ `Vector128/256`(制御重視)の順で検討する。
+**設計指針(重要):** まず BCL のベクトル化済み API(`Enumerable.Sum`、`IndexOf`/`SequenceEqual`、`SearchValues`、`Ascii`、`TensorPrimitives`)を探す — スカラー比 4 倍超が書かずに手に入る。自前 SIMD は「BCL に該当 API がない処理」に限定し、**幅非依存の `Vector<T>` で書く**。`Vector128/256` へ落とすのは固定幅シャッフルなど特定レーン構成をアルゴリズムが要求する場合のみ。
 
 **ユースケース:** チェックサム・集計、独自エンコード/デコード、数値変換の一括適用。
 
@@ -1821,7 +1822,7 @@ foreach (var token in new SpanTokenizer<char>(line.AsSpan(), ','))
 
 **ユースケース:** CSV 解析、プロトコルヘッダ分割、コマンド引数パース。
 
-**関連:** STK-01(ref struct) + STK-03(struct iterator) + JIT-02(IEquatable 制約)の複合適用例。.NET 9+ の `MemoryExtensions.Split` も同種の機能を提供するため、要件に応じて使い分ける。
+**関連 / BCL との位置づけ:** STK-01(ref struct) + STK-03(struct iterator) + JIT-02(IEquatable 制約)の複合適用例。**.NET 9+ の `MemoryExtensions.Split` は機能的に同等のゼロアロケーション分割を提供する — .NET 9+ のみが対象なら BCL API を使えばよい。** 本実装がカタログに残る理由は、.NET 8 以前のターゲット(マルチターゲットのライブラリ)で使えること、および 4〜13% 高速・コードサイズ小(707B vs 910B)という小さいが実在する差。BCL にない機能ではなく、互換性/参考実装のパターンとして扱う。
 
 **リポジトリ内実装:** [SpanTokenizer.cs](src/PerformancePatterns/Seq/SpanTokenizer.cs) / [テスト](tests/PerformancePatterns.Tests/Seq/SpanTokenizerTest.cs) / [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Seq/SpanTokenizerBenchmark.cs) / [測定結果](benchmarks/results/SEQ-01-SpanTokenizer.md)
 
@@ -2111,11 +2112,11 @@ public bool TryResolve(ReadOnlySpan<char> name, out int value)
 
 **目的:** `IEnumerable<T>` を受ける API の内部で実行時型を判定し、`List<T>`(および必要に応じて `T[]`)を Span パスへ逃がす(LINQ 内部の定石)。
 
-**効果(実測、net10 / x86-64-v4、1024 要素の合計):**
+**効果(実測、net10 / x86-64-v4、1024 要素の合計)— 適用範囲は狭く、当てはまる場面に限って採用する:**
 
-- **List ソース: 0.83 倍**(253.7 → 210.2ns)— 分岐の本命。ただしガード付き devirtualization が差の大半を詰めている
-- 配列ソース: 利得なし(213.8 vs 209.8ns)— 現代 JIT はプロファイルに基づくガード付き devirtualization で配列の IEnumerable 列挙を既に最適化している
-- **分岐が外れる列挙子ソースへのペナルティ: 1.13 倍**(486.7 vs 552.0ns、信頼区間非重複)— 遅延イテレータ引数は使われない型テスト分を払うため、入力が List/配列主体の場面で採用する
+- **効く場面: `List<T>` 主体の入力(CollectionsMarshal.AsSpan 分岐で 0.83 倍)と AOT ビルド**(動的 PGO がなく、List 分岐も配列分岐もランタイムが肩代わりしてくれない)
+- それ以外では効かない: 配列ソースは JIT 下で利得なし(213.8 vs 209.8ns — ガード付き脱仮想化が既に特殊化)、**遅延イテレータソースは使われない型テスト分 1.13 倍を払う**(486.7 vs 552.0ns、信頼区間非重複)
+- 目安: 呼び出し元が List を渡すと分かっているホット API、または AOT 対象に適用する。汎用の IEnumerable 引数へ無差別に撒かない
 
 **AOT:** ✅ 問題なし。AOT には実行時プロファイル由来の devirtualization がないため、**配列分岐も含めて JIT 環境より価値が高い**
 

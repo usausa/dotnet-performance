@@ -75,7 +75,6 @@ public static class Program
                 typeof(BitOperationsBenchmark),
                 typeof(VectorSumBenchmark),
                 typeof(RefFieldCursorBenchmark),
-                typeof(PInvokeBenchmark),
                 typeof(ChannelsBenchmark),
                 typeof(PipelinesBenchmark),
                 typeof(AsyncEnumerableBenchmark),
@@ -206,7 +205,9 @@ public static class Program
         // The copy variants must produce the same result
         var copyConstant = new CopyConstantBenchmark();
         copyConstant.Setup();
-        if (copyConstant.SpanCopyTo16() != copyConstant.CopyBlockUnaligned16())
+        if ((copyConstant.SpanCopyTo8() != copyConstant.CopyBlockUnaligned8()) ||
+            (copyConstant.SpanCopyTo16() != copyConstant.CopyBlockUnaligned16()) ||
+            (copyConstant.SpanCopyTo64() != copyConstant.CopyBlockUnaligned64()))
         {
             throw new InvalidOperationException("Verify failed. CopyConstant");
         }
@@ -379,14 +380,6 @@ public static class Program
             (cursor.SumRefFieldCursor() != expectedCursor))
         {
             throw new InvalidOperationException("Verify failed. RefFieldCursor");
-        }
-
-        // Every P/Invoke approach must return a value (the tick value itself varies, so only check for non-zero)
-        var pinvoke = new PInvokeBenchmark();
-        if ((pinvoke.DllImportCall() == 0UL) || (pinvoke.LibraryImportCall() == 0UL) ||
-            (pinvoke.LibraryImportSuppressGC() == 0UL) || (pinvoke.ManagedTickCount64() == 0UL))
-        {
-            throw new InvalidOperationException("Verify failed. PInvoke");
         }
 
         // Channels / Pipe / IAsyncEnumerable must produce the same sum

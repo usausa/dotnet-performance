@@ -55,12 +55,13 @@ public class CopyVariableBenchmark
     }
 }
 
-// Constant length: the case where the JIT knows the length and can expand the copy into a sequence of movs
+// Constant length: the case where the JIT knows the length and can expand the copy into a sequence of movs.
+// R-14 revival check: how far up the constant sizes does CopyBlockUnaligned keep a real advantage (8 / 16 / 64 B)?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class CopyConstantBenchmark
 {
-    private const int Size = 16;
+    private const int BufferSize = 64;
 
     private byte[] source = default!;
 
@@ -69,8 +70,8 @@ public class CopyConstantBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        source = new byte[Size];
-        destination = new byte[Size];
+        source = new byte[BufferSize];
+        destination = new byte[BufferSize];
         for (var i = 0; i < source.Length; i++)
         {
             source[i] = (byte)(i + 1);
@@ -78,10 +79,27 @@ public class CopyConstantBenchmark
     }
 
     [Benchmark(Baseline = true)]
+    public byte SpanCopyTo8()
+    {
+        source.AsSpan(0, 8).CopyTo(destination);
+        return destination[7];
+    }
+
+    [Benchmark]
+    public byte CopyBlockUnaligned8()
+    {
+        Unsafe.CopyBlockUnaligned(
+            ref MemoryMarshal.GetArrayDataReference(destination),
+            ref MemoryMarshal.GetArrayDataReference(source),
+            8);
+        return destination[7];
+    }
+
+    [Benchmark]
     public byte SpanCopyTo16()
     {
-        source.AsSpan(0, Size).CopyTo(destination);
-        return destination[^1];
+        source.AsSpan(0, 16).CopyTo(destination);
+        return destination[15];
     }
 
     [Benchmark]
@@ -90,7 +108,24 @@ public class CopyConstantBenchmark
         Unsafe.CopyBlockUnaligned(
             ref MemoryMarshal.GetArrayDataReference(destination),
             ref MemoryMarshal.GetArrayDataReference(source),
-            Size);
-        return destination[^1];
+            16);
+        return destination[15];
+    }
+
+    [Benchmark]
+    public byte SpanCopyTo64()
+    {
+        source.AsSpan(0, 64).CopyTo(destination);
+        return destination[63];
+    }
+
+    [Benchmark]
+    public byte CopyBlockUnaligned64()
+    {
+        Unsafe.CopyBlockUnaligned(
+            ref MemoryMarshal.GetArrayDataReference(destination),
+            ref MemoryMarshal.GetArrayDataReference(source),
+            64);
+        return destination[63];
     }
 }
