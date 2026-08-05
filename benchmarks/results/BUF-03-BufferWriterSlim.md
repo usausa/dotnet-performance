@@ -1,8 +1,8 @@
 # BUF-03: BufferWriterSlim (stack-first sequential writer)
 
-- Verdict: adopted (allocation win; time parity)
-- 64 B payload (stack-only path): 42.6 ns / 0 B vs ArrayBufferWriter 43.4 ns / 312 B - same speed, zero allocation
-- 4096 B (growth path): 2,651 ns / 0 B vs ArrayBufferWriter 2,395 ns / 8,056 B - time CIs overlap (recorded as measurement-noise; codegen differs, 1,016 vs 4,681 B), allocation 8 KB -> 0
+- Verdict: adopted (zero allocation and now also the fastest)
+- 64 B payload (stack-only path): 19.0 ns / 0 B vs ArrayBufferWriter 25.2 ns / 312 B (0.76x)
+- 4096 B (growth path): 1,283 ns / 0 B vs ArrayBufferWriter 1,427 ns / 8,056 B (0.90x, non-overlapping CIs)
 - PooledBufferWriter (BUF-02, class) allocates only its own 32 B instance; choose Slim for sync scopes, Pooled when the writer must be stored or passed as IBufferWriter
 
 ```

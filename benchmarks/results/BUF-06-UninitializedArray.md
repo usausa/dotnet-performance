@@ -1,10 +1,9 @@
 # BUF-06: GC.AllocateUninitializedArray
 
 - Verdict: adopted (conditional)
-- 0.18x at 64 KB, 0.60x at 4 KB
-- ~1.0x at 256 B and 1 MB (LOH / GC dominated)
-- The 2048 B penalty is gone: 1.27x (worse) on the previous Ryzen 9 5900X baseline -> 0.94x here, so the lower edge of the useful range moved down
-- Use for 2 KB - hundreds of KB one-shot buffers; below that the allocation itself dominates and above ~1 MB the GC does
+- 0.18x at 64 KB, 0.60x at 4 KB, 0.94x at 2 KB
+- ~1.0x at 256 B and 1 MB (small allocations and LOH / GC dominate the cost either way)
+- Use for ~2 KB - hundreds of KB one-shot buffers; below that the allocation itself dominates and above ~1 MB the GC does
 
 ```
 

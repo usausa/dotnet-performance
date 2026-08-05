@@ -3,8 +3,7 @@
 - Verdict: adopted (implemented)
 - 0.41x vs ToString + Encoding.GetBytes, 56 B -> 0 B
 - Code size ~10 KB -> 0.9 KB
-- The margin narrowed from 0.32x on the previous Ryzen 9 5900X baseline: the BCL formatting path gained more from the newer core than the table walk did. The allocation and code-size wins are unchanged
-- DateTime.TryFormat + encode is now a real time win over ToString as well (0.90x, was 1.10x), so the allocation-only framing no longer holds - but the table is still 2.2x ahead of it
+- DateTime.TryFormat + encode: 0.90x - a small time win over ToString, but the table is still ~2.2x faster than it
 
 ```
 

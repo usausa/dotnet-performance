@@ -1,7 +1,7 @@
 # BUF-04: MemoryOwner (scoped pool ownership)
 
 - Verdict: adopted (safety at ~zero cost)
-- 4 KB fill+sum lifecycle: 2.5-3.0 us dominated by fill+sum; wrapper vs raw Rent/Return CIs overlap (recorded as measurement-noise) - wrapper cost is below measurement resolution
+- 4 KB fill+sum lifecycle: raw Rent/Return 1.633 us, MemoryOwner 1.649 us, TemporaryBuffer 1.640 us - ranges overlap, the wrapper cost is below measurement resolution
 - Allocation: new byte[] 4,120 B / raw pool 0 B / MemoryOwner 32 B (owner instance only) / TemporaryBuffer 0 B
 - Value = using-enforced return + exact-length Span/Memory + double-dispose guard (CON-01); prefer TemporaryBuffer (BUF-05) inside sync scopes, MemoryOwner across async boundaries
 

@@ -1,9 +1,9 @@
 # STK-05: Boxing vs cached boxes (-1/0/1 flag values)
 
-- Verdict: conditional (allocation vs time tradeoff)
-- Direct boxing: 5.98 ns + 24 B per op; cached-box switch: 7.66 ns / 0 B (1.29x SLOWER in time)
-- On net10 a heap box is cheap (pointer-bump alloc); the cache wins only where GC pressure matters more than nanoseconds (long-running, high-rate paths)
-- Escape analysis already stack-allocates non-escaping boxes (see pattern body: 0.004 ns) - cache only escaping, hot, known-value boxes
+- Verdict: adopted (wins on both axes here)
+- Direct boxing: 3.68 ns + 24 B per op; cached-box switch: 2.54 ns / 0 B (0.69x)
+- The three-way branch is cheaper than the pointer-bump allocation on this core; where allocation outpaces branching the time can flip, but the GC-pressure win holds regardless
+- Escape analysis already stack-allocates non-escaping boxes (see pattern body) - cache only escaping, hot, known-value boxes
 
 ```
 

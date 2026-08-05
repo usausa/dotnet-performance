@@ -1,9 +1,9 @@
 # MEM-02: Class-element array vs struct-element array (+ref access)
 
-- Verdict: adopted (ref access; structural memory win)
-- StructArrayRef 483.0 ns == ClassArray 493.5 ns (CIs overlap) in this sequential-allocation micro; StructArrayCopy 595.7 ns (1.21x - the 16-byte copy penalty ref access removes)
+- Verdict: adopted (structural memory win; time-neutral in this micro)
+- ClassArray 401.6 ns ~= StructArrayRef 412.9 ns ~= StructArrayCopy 414.7 ns (within ~3%; a 16-byte element copy is effectively free at this size)
 - The locality/GC win of structs does not show here because class elements were allocated sequentially (allocation order == access order); in aged heaps class arrays scatter
-- Structural: 1024 elements = 16 KB contiguous (struct) vs ~40 KB objects + 8 KB reference array (class)
+- Structural: 1024 elements = 16 KB contiguous (struct) vs ~40 KB objects + 8 KB reference array (class) - less memory, fewer GC-tracked references
 
 ```
 

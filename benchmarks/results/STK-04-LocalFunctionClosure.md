@@ -1,8 +1,8 @@
 # STK-04: Local function closure avoidance (delegate conversion)
 
 - Verdict: conditional (allocation claim holds; time depends on delegate shape)
-- Capturing local function: 11.45 ns + 88 B per call; static local function + state arg: 15.13 ns / 0 B (1.33x time)
-- For delegate-passing hot paths prefer the static LAMBDA + TState form (DSP-04: 4.66 ns / 0 B); static local functions shine for direct calls and iterator/validation splitting, not as cached delegates
+- Capturing local function: 7.00 ns + 88 B per call; static local function + state arg: 15.26 ns / 0 B (2.18x time)
+- For delegate-passing hot paths prefer the static LAMBDA + TState form (DSP-04, which caches the delegate); static local functions shine for direct calls (inlined) and iterator/validation splitting, not as cached delegates
 
 ```
 

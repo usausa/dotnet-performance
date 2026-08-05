@@ -1,11 +1,10 @@
 # SYS-02: P/Invoke (LibraryImport + SuppressGCTransition)
 
-- Verdict: LibraryImport adopted (for AOT, not speed); **SuppressGCTransition REVERSED and is rejected on this hardware**
-- LibraryImport: same speed as DllImport for a blittable call (0.99x); value is AOT/trimming-safe marshalling
-- **SuppressGCTransition is now 1.26x, i.e. SLOWER** (1.433 vs 1.139 ns, non-overlapping CIs). It measured 0.57x on the previous Ryzen 9 5900X baseline
-- The reason the win vanished: the plain P/Invoke transition itself became almost free here - DllImport 1.139 ns vs an equivalent managed call at 1.078 ns (0.95x, was 0.52x). With nothing left to skip, the attribute only adds its own cost
-- Code size still drops (70 B vs 163 B), so the attribute is not useless - but measure before applying it, do not assume the speedup
-- SuppressGCTransition constraints are unchanged: sub-microsecond, non-blocking, no callbacks, no exceptions
+- Verdict: LibraryImport adopted (AOT/trimming-safe marshalling); SuppressGCTransition only after measuring
+- LibraryImport: same speed as DllImport for a blittable call (1.13 vs 1.14 ns); its value is source-generated, AOT-safe marshalling
+- SuppressGCTransition measures 1.26x (slower) here: the plain transition already costs only ~0.06 ns over an equivalent managed call, so there is nothing left for the attribute to skip. On environments where the GC transition is expensive it can still pay - measure, do not assume
+- Code size halves with the attribute (70 vs 163 B)
+- SuppressGCTransition constraints: sub-microsecond, non-blocking, no callbacks, no exceptions
 
 ```
 
