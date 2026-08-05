@@ -8,17 +8,17 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                      | Mean     | Error     | StdDev    | Min      | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
-|---------------------------- |---------:|----------:|----------:|---------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
-| UnboundedDefault            | 44.82 ns |  2.072 ns |  3.101 ns | 41.26 ns |  50.83 ns |  49.96 ns |  1.00 |    0.09 |  25,092 B |       1 B |        1.00 |
-| UnboundedSingleReaderWriter | 43.46 ns |  3.260 ns |  4.879 ns | 37.09 ns |  51.38 ns |  49.83 ns |  0.97 |    0.13 |  23,182 B |       1 B |        1.00 |
-| Bounded                     | 89.71 ns | 10.657 ns | 15.284 ns | 71.20 ns | 117.68 ns | 109.56 ns |  2.01 |    0.36 |  23,550 B |         - |        0.00 |
+| Method                      | Mean     | Error    | StdDev   | Min      | Max      | P90      | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
+|---------------------------- |---------:|---------:|---------:|---------:|---------:|---------:|------:|--------:|-------:|----------:|----------:|------------:|
+| UnboundedDefault            | 38.78 ns | 0.271 ns | 0.389 ns | 38.18 ns | 39.66 ns | 39.22 ns |  1.00 |    0.01 | 0.0003 |  26,238 B |       3 B |        1.00 |
+| UnboundedSingleReaderWriter | 34.70 ns | 0.369 ns | 0.517 ns | 33.98 ns | 35.81 ns | 35.47 ns |  0.89 |    0.02 | 0.0002 |  21,237 B |       2 B |        0.67 |
+| Bounded                     | 63.02 ns | 0.619 ns | 0.868 ns | 61.17 ns | 64.74 ns | 64.28 ns |  1.63 |    0.03 |      - |  24,335 B |         - |        0.00 |

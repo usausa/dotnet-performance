@@ -8,16 +8,16 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method           | Mean      | Error     | StdDev    | Min      | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Gen1   | Allocated | Alloc Ratio |
-|----------------- |----------:|----------:|----------:|---------:|----------:|----------:|------:|--------:|----------:|-------:|-------:|----------:|------------:|
-| MemoryStreamPump |  6.752 μs | 0.5604 μs | 0.8387 μs | 5.732 μs |  8.912 μs |  7.895 μs |  1.01 |    0.17 |   2,733 B | 7.8125 | 1.9455 |  128.2 KB |        1.00 |
-| PipePump         | 10.857 μs | 0.8543 μs | 1.2252 μs | 9.344 μs | 14.407 μs | 12.454 μs |  1.63 |    0.26 |  25,837 B | 0.0916 |      - |    1.6 KB |        0.01 |
+| Method           | Mean     | Error     | StdDev    | Min      | Max       | P90      | Ratio | RatioSD | Code Size | Gen0    | Gen1   | Allocated | Alloc Ratio |
+|----------------- |---------:|----------:|----------:|---------:|----------:|---------:|------:|--------:|----------:|--------:|-------:|----------:|------------:|
+| MemoryStreamPump | 3.233 μs | 0.0658 μs | 0.0900 μs | 3.026 μs |  3.351 μs | 3.332 μs |  1.00 |    0.04 |   2,717 B | 15.6250 | 3.9024 |  128.2 KB |        1.00 |
+| PipePump         | 7.161 μs | 0.9357 μs | 1.3117 μs | 6.251 μs | 12.048 μs | 8.558 μs |  2.22 |    0.40 |  25,850 B |  0.2136 |      - |   1.83 KB |        0.01 |

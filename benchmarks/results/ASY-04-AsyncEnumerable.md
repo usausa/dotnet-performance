@@ -7,16 +7,16 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method       | Mean       | Error     | StdDev    | Min        | Max       | P90       | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
-|------------- |-----------:|----------:|----------:|-----------:|----------:|----------:|------:|--------:|-------:|----------:|----------:|------------:|
-| SyncForeach  |  0.9566 ns | 0.0777 ns | 0.1164 ns |  0.8130 ns |  1.154 ns |  1.117 ns |  1.01 |    0.17 | 0.0000 |     488 B |         - |          NA |
-| AsyncForeach | 10.9726 ns | 0.6274 ns | 0.9197 ns | 10.0267 ns | 13.478 ns | 12.084 ns | 11.63 |    1.65 |      - |   3,896 B |         - |          NA |
+| Method       | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
+|------------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
+| SyncForeach  | 0.4775 ns | 0.0014 ns | 0.0020 ns | 0.4739 ns | 0.4813 ns | 0.4799 ns |  1.00 |    0.01 |     488 B | 0.0000 |         - |          NA |
+| AsyncForeach | 7.2553 ns | 0.0167 ns | 0.0250 ns | 7.2124 ns | 7.2945 ns | 7.2887 ns | 15.20 |    0.08 |   3,896 B | 0.0000 |         - |          NA |

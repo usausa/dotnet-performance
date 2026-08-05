@@ -8,18 +8,18 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                 | Mean      | Error     | StdDev    | Median    | Min      | Max       | P90       | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
-|----------------------- |----------:|----------:|----------:|----------:|---------:|----------:|----------:|------:|--------:|-------:|----------:|----------:|------------:|
-| TaskAwaitForward       | 11.781 ns | 1.4599 ns | 2.1851 ns | 10.658 ns | 9.781 ns | 16.779 ns | 15.266 ns |  1.03 |    0.25 | 0.0043 |   2,041 B |      73 B |        1.00 |
-| TaskDirectForward      |  1.833 ns | 0.0504 ns | 0.0754 ns |  1.812 ns | 1.708 ns |  2.049 ns |  1.932 ns |  0.16 |    0.03 | 0.0000 |   1,248 B |       1 B |        0.01 |
-| ValueTaskAwaitForward  |  6.687 ns | 0.1363 ns | 0.2040 ns |  6.690 ns | 6.403 ns |  7.114 ns |  6.976 ns |  0.58 |    0.09 | 0.0000 |   3,746 B |       1 B |        0.01 |
-| ValueTaskDirectForward |  1.723 ns | 0.0244 ns | 0.0365 ns |  1.713 ns | 1.685 ns |  1.821 ns |  1.790 ns |  0.15 |    0.02 | 0.0000 |   2,228 B |       1 B |        0.01 |
+| Method                 | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
+|----------------------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|-------:|----------:|----------:|------------:|
+| TaskAwaitForward       | 6.3668 ns | 0.1941 ns | 0.2721 ns | 6.1188 ns | 7.2739 ns | 6.5284 ns |  1.00 |    0.06 | 0.0087 |   2,041 B |      73 B |        1.00 |
+| TaskDirectForward      | 0.9974 ns | 0.0322 ns | 0.0462 ns | 0.9715 ns | 1.1464 ns | 1.0639 ns |  0.16 |    0.01 | 0.0001 |   1,248 B |       1 B |        0.01 |
+| ValueTaskAwaitForward  | 4.2302 ns | 0.0575 ns | 0.0825 ns | 4.1295 ns | 4.3567 ns | 4.3309 ns |  0.67 |    0.03 | 0.0001 |   3,761 B |       1 B |        0.01 |
+| ValueTaskDirectForward | 0.8312 ns | 0.0119 ns | 0.0166 ns | 0.7965 ns | 0.8764 ns | 0.8514 ns |  0.13 |    0.01 | 0.0001 |   2,228 B |       1 B |        0.01 |
