@@ -10,24 +10,24 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                    | Count | Mean       | Error      | StdDev     | Min        | Max        | P90        | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
-|-------------------------- |------ |-----------:|-----------:|-----------:|-----------:|-----------:|-----------:|------:|--------:|-------:|----------:|----------:|------------:|
-| **ToImmutableArrayExtension** | **16**    |   **7.155 ns** |  **0.4101 ns** |  **0.6010 ns** |   **6.447 ns** |   **8.515 ns** |   **8.009 ns** |  **1.01** |    **0.11** | **0.0053** |     **718 B** |      **88 B** |        **1.00** |
-| BuilderToImmutable        | 16    |  24.286 ns |  0.3214 ns |  0.4711 ns |  23.588 ns |  25.571 ns |  24.798 ns |  3.42 |    0.27 | 0.0105 |   2,037 B |     176 B |        2.00 |
-| BuilderMoveToImmutable    | 16    |  17.700 ns |  0.2848 ns |  0.3992 ns |  17.104 ns |  18.751 ns |  18.174 ns |  2.49 |    0.20 | 0.0052 |     903 B |      88 B |        1.00 |
-|                           |       |            |            |            |            |            |            |       |         |        |           |           |             |
-| **ToImmutableArrayExtension** | **256**   |  **36.918 ns** |  **1.0331 ns** |  **1.5142 ns** |  **34.647 ns** |  **41.220 ns** |  **39.293 ns** |  **1.00** |    **0.06** | **0.0626** |     **712 B** |    **1048 B** |        **1.00** |
-| BuilderToImmutable        | 256   | 288.052 ns | 17.5496 ns | 25.1692 ns | 260.242 ns | 363.491 ns | 309.606 ns |  7.81 |    0.74 | 0.1249 |   2,035 B |    2096 B |        2.00 |
-| BuilderMoveToImmutable    | 256   | 278.516 ns | 32.2828 ns | 48.3193 ns | 224.647 ns | 364.398 ns | 347.476 ns |  7.56 |    1.32 | 0.0625 |     903 B |    1048 B |        1.00 |
+| Method                    | Count | Mean       | Error     | StdDev     | Min        | Max        | P90        | Ratio | RatioSD | Gen0   | Code Size | Gen1   | Allocated | Alloc Ratio |
+|-------------------------- |------ |-----------:|----------:|-----------:|-----------:|-----------:|-----------:|------:|--------:|-------:|----------:|-------:|----------:|------------:|
+| **ToImmutableArrayExtension** | **16**    |   **3.956 ns** | **0.0365 ns** |  **0.0500 ns** |   **3.842 ns** |   **4.054 ns** |   **4.016 ns** |  **1.00** |    **0.02** | **0.0105** |     **706 B** |      **-** |      **88 B** |        **1.00** |
+| BuilderToImmutable        | 16    |  14.338 ns | 0.2332 ns |  0.3490 ns |  13.893 ns |  15.301 ns |  14.836 ns |  3.63 |    0.10 | 0.0210 |   2,033 B |      - |     176 B |        2.00 |
+| BuilderMoveToImmutable    | 16    |  11.310 ns | 0.1517 ns |  0.2076 ns |  11.074 ns |  11.777 ns |  11.594 ns |  2.86 |    0.06 | 0.0105 |     891 B |      - |      88 B |        1.00 |
+|                           |       |            |           |            |            |            |            |       |         |        |           |        |           |             |
+| **ToImmutableArrayExtension** | **256**   |  **23.111 ns** | **0.3207 ns** |  **0.4599 ns** |  **22.484 ns** |  **24.695 ns** |  **23.613 ns** |  **1.00** |    **0.03** | **0.1253** |     **710 B** |      **-** |    **1048 B** |        **1.00** |
+| BuilderToImmutable        | 256   | 202.878 ns | 8.9281 ns | 12.8044 ns | 185.504 ns | 224.524 ns | 220.133 ns |  8.78 |    0.57 | 0.2506 |   2,035 B | 0.0005 |    2096 B |        2.00 |
+| BuilderMoveToImmutable    | 256   | 170.600 ns | 1.3788 ns |  1.9329 ns | 166.529 ns | 174.476 ns | 172.755 ns |  7.38 |    0.16 | 0.1252 |     891 B |      - |    1048 B |        1.00 |
 
 ## List reuse and fill strategy
 
@@ -38,23 +38,23 @@ LaunchCount=2  WarmupCount=10
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                | Count | Mean      | Error     | StdDev     | Min        | Max       | P90       | Ratio | RatioSD | Gen0   | Code Size | Gen1   | Allocated | Alloc Ratio |
-|---------------------- |------ |----------:|----------:|-----------:|-----------:|----------:|----------:|------:|--------:|-------:|----------:|-------:|----------:|------------:|
-| **NewListNoCapacity**     | **16**    |  **55.21 ns** |  **0.790 ns** |   **1.107 ns** |  **52.858 ns** |  **57.87 ns** |  **56.36 ns** |  **1.00** |    **0.03** | **0.0129** |   **1,923 B** |      **-** |     **216 B** |        **1.00** |
-| NewListWithCapacity   | 16    |  25.22 ns |  1.165 ns |   1.634 ns |  23.254 ns |  28.89 ns |  27.22 ns |  0.46 |    0.03 | 0.0072 |     200 B |      - |     120 B |        0.56 |
-| ReuseWithClear        | 16    |  28.51 ns |  0.527 ns |   0.789 ns |  27.126 ns |  30.36 ns |  29.39 ns |  0.52 |    0.02 |      - |     354 B |      - |         - |        0.00 |
-| ReuseWithSetCountSpan | 16    |  11.85 ns |  2.313 ns |   3.242 ns |   8.037 ns |  16.17 ns |  15.67 ns |  0.21 |    0.06 |      - |     360 B |      - |         - |        0.00 |
-|                       |       |           |           |            |            |           |           |       |         |        |           |        |           |             |
-| **NewListNoCapacity**     | **256**   | **506.04 ns** | **71.614 ns** | **104.971 ns** | **393.182 ns** | **675.51 ns** | **623.56 ns** |  **1.04** |    **0.30** | **0.1330** |   **1,903 B** | **0.0005** |    **2232 B** |        **1.00** |
-| NewListWithCapacity   | 256   | 395.20 ns | 17.433 ns |  26.093 ns | 347.003 ns | 442.42 ns | 426.04 ns |  0.81 |    0.17 | 0.0644 |     194 B |      - |    1080 B |        0.48 |
-| ReuseWithClear        | 256   | 412.79 ns | 15.470 ns |  22.676 ns | 346.031 ns | 434.58 ns | 431.76 ns |  0.85 |    0.18 |      - |     354 B |      - |         - |        0.00 |
-| ReuseWithSetCountSpan | 256   | 129.41 ns |  3.007 ns |   4.313 ns | 121.009 ns | 138.67 ns | 134.06 ns |  0.27 |    0.05 |      - |     360 B |      - |         - |        0.00 |
+| Method                | Count | Mean       | Error      | StdDev     | Median     | Min        | Max        | P90        | Ratio | RatioSD | Gen0   | Code Size | Gen1   | Allocated | Alloc Ratio |
+|---------------------- |------ |-----------:|-----------:|-----------:|-----------:|-----------:|-----------:|-----------:|------:|--------:|-------:|----------:|-------:|----------:|------------:|
+| **NewListNoCapacity**     | **16**    |  **30.449 ns** |  **1.0377 ns** |  **1.4204 ns** |  **30.429 ns** |  **28.326 ns** |  **33.909 ns** |  **32.355 ns** |  **1.00** |    **0.06** | **0.0258** |   **1,901 B** |      **-** |     **216 B** |        **1.00** |
+| NewListWithCapacity   | 16    |  15.578 ns |  0.1371 ns |  0.1830 ns |  15.604 ns |  15.019 ns |  15.946 ns |  15.696 ns |  0.51 |    0.02 | 0.0143 |     303 B |      - |     120 B |        0.56 |
+| ReuseWithClear        | 16    |  19.111 ns |  0.2780 ns |  0.4161 ns |  19.123 ns |  17.610 ns |  19.929 ns |  19.583 ns |  0.63 |    0.03 |      - |     463 B |      - |         - |        0.00 |
+| ReuseWithSetCountSpan | 16    |   5.681 ns |  0.0767 ns |  0.1024 ns |   5.654 ns |   5.602 ns |   6.076 ns |   5.721 ns |  0.19 |    0.01 |      - |     360 B |      - |         - |        0.00 |
+|                       |       |            |            |            |            |            |            |            |       |         |        |           |        |           |             |
+| **NewListNoCapacity**     | **256**   | **296.438 ns** | **23.9837 ns** | **34.3968 ns** | **269.638 ns** | **255.026 ns** | **337.229 ns** | **333.489 ns** |  **1.01** |    **0.16** | **0.2666** |   **1,891 B** | **0.0010** |    **2232 B** |        **1.00** |
+| NewListWithCapacity   | 256   | 237.432 ns |  1.7959 ns |  2.3975 ns | 237.868 ns | 228.213 ns | 241.572 ns | 239.297 ns |  0.81 |    0.09 | 0.1290 |     303 B |      - |    1080 B |        0.48 |
+| ReuseWithClear        | 256   | 204.001 ns |  2.1630 ns |  3.1021 ns | 203.247 ns | 200.688 ns | 212.034 ns | 208.527 ns |  0.70 |    0.08 |      - |     463 B |      - |         - |        0.00 |
+| ReuseWithSetCountSpan | 256   |  76.383 ns |  0.8630 ns |  1.1812 ns |  76.190 ns |  74.876 ns |  79.829 ns |  77.677 ns |  0.26 |    0.03 |      - |     360 B |      - |         - |        0.00 |

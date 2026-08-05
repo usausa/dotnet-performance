@@ -8,17 +8,17 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                       | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
-|----------------------------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
-| GetOrdinalPerRow             | 11.252 ns | 0.1609 ns | 0.2358 ns | 10.862 ns | 11.953 ns | 11.545 ns |  1.00 |    0.03 |   2,225 B |      - |         - |          NA |
-| CachedOrdinalsStruct         |  1.423 ns | 0.0097 ns | 0.0143 ns |  1.395 ns |  1.455 ns |  1.441 ns |  0.13 |    0.00 |     537 B |      - |         - |          NA |
-| CachedOrdinalsGetValueBoxing |  7.177 ns | 0.1596 ns | 0.2389 ns |  6.858 ns |  7.763 ns |  7.495 ns |  0.64 |    0.02 |   1,200 B | 0.0029 |      48 B |          NA |
+| Method                       | Mean      | Error     | StdDev    | Median   | Min       | Max      | P90      | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
+|----------------------------- |----------:|----------:|----------:|---------:|----------:|---------:|---------:|------:|--------:|-------:|----------:|----------:|------------:|
+| GetOrdinalPerRow             | 7.4462 ns | 0.0616 ns | 0.0864 ns | 7.421 ns | 7.3529 ns | 7.730 ns | 7.562 ns |  1.00 |    0.02 |      - |   2,219 B |         - |          NA |
+| CachedOrdinalsStruct         | 0.9983 ns | 0.0368 ns | 0.0491 ns | 1.027 ns | 0.9323 ns | 1.057 ns | 1.049 ns |  0.13 |    0.01 |      - |     533 B |         - |          NA |
+| CachedOrdinalsGetValueBoxing | 4.2622 ns | 0.0581 ns | 0.0852 ns | 4.282 ns | 3.9987 ns | 4.383 ns | 4.341 ns |  0.57 |    0.01 | 0.0057 |   1,169 B |      48 B |          NA |
