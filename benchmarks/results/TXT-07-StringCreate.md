@@ -8,19 +8,19 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                  | Mean     | Error    | StdDev   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
-|------------------------ |---------:|---------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|-------:|----------:|------------:|
-| Interpolation           | 26.82 ns | 0.347 ns | 0.497 ns | 25.80 ns | 27.76 ns | 27.54 ns |  1.00 |    0.03 |   4,154 B | 0.0048 |      80 B |        1.00 |
-| Concat                  | 29.86 ns | 0.256 ns | 0.368 ns | 28.83 ns | 30.48 ns | 30.20 ns |  1.11 |    0.02 |   1,835 B | 0.0105 |     176 B |        2.20 |
-| StringBuilderCapacity   | 27.66 ns | 0.387 ns | 0.555 ns | 26.28 ns | 28.72 ns | 28.35 ns |  1.03 |    0.03 |   2,339 B | 0.0167 |     280 B |        3.50 |
-| ValueStringBuilderBuild | 21.66 ns | 0.225 ns | 0.336 ns | 21.04 ns | 22.36 ns | 22.02 ns |  0.81 |    0.02 |   1,835 B | 0.0048 |      80 B |        1.00 |
-| StringCreate            | 15.30 ns | 0.448 ns | 0.670 ns | 14.45 ns | 16.59 ns | 16.32 ns |  0.57 |    0.03 |   2,374 B | 0.0048 |      80 B |        1.00 |
+| Method                  | Mean      | Error     | StdDev    | Min       | Max      | P90       | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
+|------------------------ |----------:|----------:|----------:|----------:|---------:|----------:|------:|--------:|-------:|----------:|----------:|------------:|
+| Interpolation           | 16.981 ns | 0.1398 ns | 0.1914 ns | 16.536 ns | 17.22 ns | 17.199 ns |  1.00 |    0.02 | 0.0095 |   4,138 B |      80 B |        1.00 |
+| Concat                  | 19.603 ns | 0.1506 ns | 0.2111 ns | 19.162 ns | 19.97 ns | 19.893 ns |  1.15 |    0.02 | 0.0210 |   1,823 B |     176 B |        2.20 |
+| StringBuilderCapacity   | 15.601 ns | 0.2071 ns | 0.2765 ns | 15.344 ns | 16.56 ns | 15.839 ns |  0.92 |    0.02 | 0.0335 |   2,327 B |     280 B |        3.50 |
+| ValueStringBuilderBuild | 12.496 ns | 0.1449 ns | 0.1984 ns | 12.179 ns | 12.90 ns | 12.803 ns |  0.74 |    0.01 | 0.0096 |   1,810 B |      80 B |        1.00 |
+| StringCreate            |  9.394 ns | 0.1525 ns | 0.2088 ns |  9.028 ns | 10.02 ns |  9.629 ns |  0.55 |    0.01 | 0.0096 |   2,359 B |      80 B |        1.00 |

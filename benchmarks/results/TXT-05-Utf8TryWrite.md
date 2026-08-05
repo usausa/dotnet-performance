@@ -7,17 +7,17 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                    | Mean     | Error    | StdDev   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
-|-------------------------- |---------:|---------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|-------:|----------:|------------:|
-| StringInterpolationEncode | 42.10 ns | 0.489 ns | 0.732 ns | 40.61 ns | 43.28 ns | 43.00 ns |  1.00 |    0.02 |   6,955 B | 0.0062 |     104 B |        1.00 |
-| CharTryWriteEncode        | 25.20 ns | 0.158 ns | 0.236 ns | 24.75 ns | 25.63 ns | 25.47 ns |  0.60 |    0.01 |   4,533 B |      - |         - |        0.00 |
-| Utf8TryWrite              | 22.71 ns | 0.175 ns | 0.262 ns | 22.34 ns | 23.38 ns | 23.04 ns |  0.54 |    0.01 |   4,490 B |      - |         - |        0.00 |
+| Method                    | Mean     | Error    | StdDev   | Median   | Min      | Max      | P90      | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
+|-------------------------- |---------:|---------:|---------:|---------:|---------:|---------:|---------:|------:|--------:|-------:|----------:|----------:|------------:|
+| StringInterpolationEncode | 31.69 ns | 3.433 ns | 5.032 ns | 27.22 ns | 26.66 ns | 37.12 ns | 36.88 ns |  1.02 |    0.23 | 0.0124 |   7,252 B |     104 B |        1.00 |
+| CharTryWriteEncode        | 16.23 ns | 0.963 ns | 1.442 ns | 15.57 ns | 15.43 ns | 21.07 ns | 18.31 ns |  0.52 |    0.09 |      - |   4,701 B |         - |        0.00 |
+| Utf8TryWrite              | 13.82 ns | 0.055 ns | 0.081 ns | 13.83 ns | 13.68 ns | 14.00 ns | 13.94 ns |  0.45 |    0.07 |      - |   4,787 B |         - |        0.00 |

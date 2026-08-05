@@ -9,19 +9,19 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
-|---------------------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
-| TryFormatThenFill     |  5.323 ns | 0.7847 ns | 1.1746 ns |  4.581 ns |  8.006 ns |  7.512 ns |  1.04 |    0.29 |     857 B |         - |          NA |
-| ManualLsbThenReverse  | 12.903 ns | 0.3905 ns | 0.5213 ns | 12.285 ns | 14.303 ns | 13.662 ns |  2.51 |    0.43 |     661 B |         - |          NA |
-| ManualRightAlignShift | 24.559 ns | 0.7811 ns | 1.1691 ns | 22.520 ns | 27.557 ns | 26.038 ns |  4.79 |    0.83 |     996 B |         - |          NA |
-| TrimManualLoop        |  8.733 ns | 0.3682 ns | 0.5281 ns |  7.831 ns |  9.639 ns |  9.516 ns |  1.70 |    0.30 |     138 B |         - |          NA |
-| TrimVectorized        |  5.204 ns | 0.4324 ns | 0.6472 ns |  4.361 ns |  6.050 ns |  5.915 ns |  1.01 |    0.21 |   1,455 B |         - |          NA |
+| Method                | Mean      | Error     | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|---------------------- |----------:|----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| TryFormatThenFill     |  3.333 ns | 0.0260 ns | 0.0365 ns |  3.330 ns |  3.269 ns |  3.403 ns |  3.375 ns |  1.00 |    0.02 |     852 B |         - |          NA |
+| ManualLsbThenReverse  | 10.690 ns | 0.0398 ns | 0.0517 ns | 10.680 ns | 10.611 ns | 10.855 ns | 10.740 ns |  3.21 |    0.04 |     754 B |         - |          NA |
+| ManualRightAlignShift | 12.246 ns | 0.2423 ns | 0.3317 ns | 12.125 ns | 12.012 ns | 13.572 ns | 12.549 ns |  3.67 |    0.11 |     979 B |         - |          NA |
+| TrimManualLoop        |  4.495 ns | 0.0727 ns | 0.1043 ns |  4.479 ns |  4.356 ns |  4.793 ns |  4.620 ns |  1.35 |    0.03 |     138 B |         - |          NA |
+| TrimVectorized        |  3.804 ns | 0.2214 ns | 0.3104 ns |  4.002 ns |  3.435 ns |  4.220 ns |  4.158 ns |  1.14 |    0.09 |   1,605 B |         - |          NA |

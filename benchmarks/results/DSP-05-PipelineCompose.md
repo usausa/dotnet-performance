@@ -8,17 +8,17 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method           | Mean       | Error     | StdDev    | Median     | Min        | Max        | P90        | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
-|----------------- |-----------:|----------:|----------:|-----------:|-----------:|-----------:|-----------:|------:|--------:|----------:|-------:|----------:|------------:|
-| ComposeEveryCall | 42.6082 ns | 4.6746 ns | 6.9967 ns | 42.4810 ns | 31.5560 ns | 53.4023 ns | 50.6225 ns | 1.027 |    0.24 |     842 B | 0.0157 |     264 B |        1.00 |
-| PreComposed      |  2.6183 ns | 0.3726 ns | 0.5576 ns |  2.4392 ns |  2.0173 ns |  3.4808 ns |  3.3778 ns | 0.063 |    0.02 |     330 B |      - |         - |        0.00 |
-| TerminalDirect   |  0.1022 ns | 0.1121 ns | 0.1678 ns |  0.0200 ns |  0.0000 ns |  0.5035 ns |  0.4299 ns | 0.002 |    0.00 |       6 B |      - |         - |        0.00 |
+| Method           | Mean       | Error     | StdDev    | Median     | Min        | Max        | P90        | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
+|----------------- |-----------:|----------:|----------:|-----------:|-----------:|-----------:|-----------:|------:|--------:|-------:|----------:|----------:|------------:|
+| ComposeEveryCall | 19.6591 ns | 0.3916 ns | 0.5360 ns | 19.8265 ns | 18.5229 ns | 21.0007 ns | 20.0116 ns | 1.001 |    0.04 | 0.0316 |     846 B |     264 B |        1.00 |
+| PreComposed      |  1.2668 ns | 0.0213 ns | 0.0312 ns |  1.2561 ns |  1.2284 ns |  1.3543 ns |  1.3015 ns | 0.064 |    0.00 |      - |     330 B |         - |        0.00 |
+| TerminalDirect   |  0.0028 ns | 0.0034 ns | 0.0047 ns |  0.0007 ns |  0.0000 ns |  0.0159 ns |  0.0100 ns | 0.000 |    0.00 |      - |       6 B |         - |        0.00 |
