@@ -8,18 +8,18 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                | Mean     | Error     | StdDev    | Min      | Max      | P90      | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
-|---------------------- |---------:|----------:|----------:|---------:|---------:|---------:|------:|--------:|-------:|----------:|----------:|------------:|
-| NewArray              | 2.490 μs | 0.3145 μs | 0.4708 μs | 2.097 μs | 3.439 μs | 3.370 μs |  1.03 |    0.25 | 0.2441 |      90 B |    4120 B |       1.000 |
-| ArrayPoolRaw          | 3.042 μs | 0.1845 μs | 0.2647 μs | 2.623 μs | 3.528 μs | 3.403 μs |  1.26 |    0.22 |      - |   2,564 B |         - |       0.000 |
-| MemoryOwnerAllocate   | 2.836 μs | 0.2792 μs | 0.4179 μs | 1.941 μs | 3.334 μs | 3.221 μs |  1.17 |    0.25 |      - |   2,643 B |      32 B |       0.008 |
-| TemporaryBufferPooled | 2.950 μs | 0.1267 μs | 0.1897 μs | 2.379 μs | 3.194 μs | 3.150 μs |  1.22 |    0.20 |      - |   2,544 B |         - |       0.000 |
+| Method                | Mean     | Error     | StdDev    | Min      | Max      | P90      | Ratio | Gen0   | Code Size | Allocated | Alloc Ratio |
+|---------------------- |---------:|----------:|----------:|---------:|---------:|---------:|------:|-------:|----------:|----------:|------------:|
+| NewArray              | 1.705 μs | 0.0128 μs | 0.0176 μs | 1.686 μs | 1.748 μs | 1.738 μs |  1.00 | 0.4921 |      90 B |    4120 B |       1.000 |
+| ArrayPoolRaw          | 1.633 μs | 0.0036 μs | 0.0050 μs | 1.624 μs | 1.641 μs | 1.639 μs |  0.96 |      - |   2,564 B |         - |       0.000 |
+| MemoryOwnerAllocate   | 1.649 μs | 0.0106 μs | 0.0149 μs | 1.628 μs | 1.684 μs | 1.672 μs |  0.97 | 0.0038 |   2,643 B |      32 B |       0.008 |
+| TemporaryBufferPooled | 1.640 μs | 0.0088 μs | 0.0120 μs | 1.623 μs | 1.672 μs | 1.659 μs |  0.96 |      - |   2,544 B |         - |       0.000 |

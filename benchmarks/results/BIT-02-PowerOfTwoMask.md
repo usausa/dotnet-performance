@@ -8,17 +8,17 @@
 ```
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8894/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.302
-  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.10 (10.0.10, 10.0.1026.32716), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method            | Mean       | Error    | StdDev   | Min        | Max        | P90        | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
-|------------------ |-----------:|---------:|---------:|-----------:|-----------:|-----------:|------:|--------:|----------:|----------:|------------:|
-| RuntimeSizeModulo | 1,344.8 ns | 17.52 ns | 26.22 ns | 1,308.8 ns | 1,394.5 ns | 1,374.1 ns |  1.00 |    0.03 |      57 B |         - |          NA |
-| PowerOfTwoMask    |   310.3 ns | 29.73 ns | 44.50 ns |   251.4 ns |   393.7 ns |   379.6 ns |  0.23 |    0.03 |      51 B |         - |          NA |
-| ConstSizeModulo   |   253.0 ns | 11.97 ns | 17.55 ns |   229.2 ns |   284.4 ns |   273.4 ns |  0.19 |    0.01 |      51 B |         - |          NA |
+| Method            | Mean       | Error   | StdDev  | Min        | Max        | P90        | Ratio | Code Size | Allocated | Alloc Ratio |
+|------------------ |-----------:|--------:|--------:|-----------:|-----------:|-----------:|------:|----------:|----------:|------------:|
+| RuntimeSizeModulo | 1,203.5 ns | 4.16 ns | 5.97 ns | 1,197.7 ns | 1,221.9 ns | 1,211.8 ns |  1.00 |      57 B |         - |          NA |
+| PowerOfTwoMask    |   215.3 ns | 4.07 ns | 5.70 ns |   211.2 ns |   231.5 ns |   225.2 ns |  0.18 |      51 B |         - |          NA |
+| ConstSizeModulo   |   213.3 ns | 0.80 ns | 1.14 ns |   212.0 ns |   216.1 ns |   215.2 ns |  0.18 |      51 B |         - |          NA |
