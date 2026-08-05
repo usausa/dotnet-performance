@@ -39,14 +39,12 @@
 
 ## 📋 パターン一覧(サマリー)
 
-> 🔬 は再検証待ちの項目。ベンチマークを拡張済みで、次回の計測実行で結論を確定する。
-
 | ID | パターン | 目的 | AOT | 実装例 |
 |---|---|---|:---:|:---:|
 | [MEM-01](#-mem-01-skiplocalsinit) | SkipLocalsInit | ローカル変数ゼロ初期化のスキップ | ✅ | [検証済](benchmarks/results/MEM-01-SkipLocalsInit.md) |
 | [MEM-02](#-mem-02-struct-要素配列--ref-アクセスデータ指向レイアウト) | struct 要素配列 + ref アクセス | 要素ごとのヒープ確保と間接参照の排除 | ✅ | [実装](src/PerformancePatterns/Typ/TypeMap.cs) |
 | [MEM-03](#-mem-03-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より高速なスライス | ✅ | [検証済](benchmarks/results/MEM-03-SliceStyle.md) |
-| 🔬 [MEM-04](#-mem-04-構造体引数の-in--ref-渡し戦略) | 構造体引数の in / ref 渡し | 大きな構造体の値コピー回避 | ✅ | [検証済](benchmarks/results/MEM-04-StructPass.md) |
+| [MEM-04](#-mem-04-構造体引数の-in--ref-渡し戦略) | 構造体引数の in / ref 渡し | 大きな構造体の値コピー回避 | ✅ | [検証済](benchmarks/results/MEM-04-StructPass.md) |
 | [STK-01](#-stk-01-ref-structスタック専用型) | ref struct(スタック専用型) | ヒープエスケープの型レベル禁止 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-spant--readonlyspant-によるゼロコピーアクセス) | Span\<T\> / ReadOnlySpan\<T\> | ゼロコピーの型付きビュー | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [STK-03](#-stk-03-struct-iterator-パターン) | struct iterator パターン | foreach の仮想呼び出し・ヒープ確保除去 | ✅ | [実装](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -258,13 +256,18 @@ public void Draw(in MutableContext context) => context.Value.Use();
 
 | 構造体サイズ | 値渡し | in 渡し | 比率 |
 |---:|---:|---:|---|
-| 8 バイト | 1.21 ns | 1.21 ns | 0.99 |
-| 32 バイト | 1.44 ns | 1.16 ns | **0.81** |
-| 64 バイト | 1.24 ns | 1.21 ns | 0.98 |
-| in + readonly メンバー | — | 1.20 ns | (基準) |
-| in + 非 readonly メンバー | — | 1.88 ns | **1.57(❌ 防御的コピー)** |
+| 8 バイト | 1.23 ns | 1.24 ns | 1.01 |
+| 16 バイト | 1.48 ns | 1.25 ns | **0.84** |
+| 32 バイト | 1.31 ns | 1.24 ns | 0.94 |
+| 64 バイト | 3.22 ns | 1.10 ns | **0.34** |
+| 128 バイト | 2.49 ns※ | 1.19 ns | **0.48** |
+| 256 バイト | 3.79 ns | 1.20 ns | **0.32** |
+| in + readonly メンバー | — | 1.19 ns | (基準) |
+| in + 非 readonly メンバー | — | 1.85 ns | **1.51(❌ 防御的コピー)** |
 
-時間面の実差が出るのは 32 バイトのみ — 64 バイトまでのコピーは非インライン呼び出し自体のコストにほぼ隠れるため、サイズ比例の利得は期待しない。`in` が遅くなることはなく、コードサイズも縮む(63/79 B vs 76/99 B)ので readonly 構造体の既定として安全。実害があるのは防御的コピーの罠の方: 非 readonly メンバーへの `in` 渡しは 1.57 倍遅く、コードサイズも 109 B → 219 B へ倍増する。→ [測定結果](benchmarks/results/MEM-04-StructPass.md)
+※ 128 バイトの値渡しは起動間で二峰性(1.5〜3.5 ns — コピーコストはアラインメント依存)
+
+**`in` はどのサイズでも一定(約 1.2 ns)、値渡しはサイズとともに増え、かつ実行間で揺れる**(64 バイトはある実行で 1.24 ns、別の実行で 3.22 ns)。64 バイト以上では決定的な差(0.32〜0.48 倍 = 2〜3 倍)で、16 バイトでも小さな実差が出る — 予測可能性自体も利得の一部。防御的コピーの罠は不変: 非 readonly メンバーへの `in` 渡しは 1.51 倍遅く、コードサイズも約2倍(112 B → 219 B)。→ [測定結果](benchmarks/results/MEM-04-StructPass.md)
 
 **注意:** 効果はサイズ・呼び出し頻度・JIT のインライン化状況で変わる。インライン化されるとコピー自体が消えることもあるため、適用前後で計測する。
 
@@ -2028,13 +2031,13 @@ for (var i = 0; i < span.Length; i++)
 
 **実測結果(net10 / x86-64-v4、string キー、非インターンのプローブ):**
 
-| 観点 | 16 件 | 256 件 |
-|---|---|---|
-| 構築(Frozen / Dictionary) | **10.6 倍**(847 vs 80 ns) | **8.2 倍**(10,510 vs 1,282 ns) |
-| 構築の割り当て | 4.25 倍 | 4.25 倍 |
-| 検索(Frozen / Dictionary) | 1.00(➖誤差) | 0.98(➖誤差) |
+| 観点 | 16 件 | 256 件 | 1024 件 |
+|---|---|---|---|
+| 構築(Frozen / Dictionary) | **10.0 倍**(817 vs 82 ns) | **8.5 倍**(11,091 vs 1,309 ns) | **5.3 倍**(32.5 vs 6.2 μs) |
+| 構築の割り当て | 4.25 倍 | 4.25 倍 | 3.95 倍(122 KB) |
+| 検索(Frozen / Dictionary) | 1.07 | 0.97(➖誤差) | **1.19(❌ 実差で遅い)** |
 
-**この条件(string キー・16〜256 件)では検索側に測定可能な利得がなく、8〜11 倍の構築コストが償却されない。** 採用は「実データで検索勝ちを実測できた場合」に限る。既知キー集合の名前解決なら COL-04(サンプリングハッシュ表、Dictionary 比 0.60〜0.62 倍)の方が確実。不採用側の一般記録は R-08。→ [測定結果](benchmarks/results/COL-02-FrozenCondition.md)
+**string キーではどのサイズでも検索側に測定可能な利得がなく、1024 件では Frozen の検索が実差で遅い。** 規模を上げてもトレードオフは改善せず、5〜10 倍の構築コストは償却されない。採用は「実データで検索勝ちを実測できた場合」に限る。既知キー集合の名前解決なら COL-04(サンプリングハッシュ表、Dictionary 比 0.60〜0.62 倍)の方が確実。不採用側の一般記録は R-08。→ [測定結果](benchmarks/results/COL-02-FrozenCondition.md)
 - `Type` キーの辞書では専用実装(TYP-01 系の型スロット、またはオープンアドレスの型ハッシュマップ)が FrozenDictionary の約 3 倍速い
 - `ReadOnlyDictionary` ラッパーはラップ分だけ確実に遅くなる(不変性の表明には `FrozenDictionary` か `IReadOnlyDictionary` 公開を使う)
 

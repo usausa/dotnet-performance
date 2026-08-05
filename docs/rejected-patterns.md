@@ -96,7 +96,7 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 🎯 **Intent:** Replace every read-only dictionary with `FrozenDictionary` to speed up lookups.
 
-📉 **Measured — why it is rejected:** Construction costs 15–20x that of Dictionary. Lookups can invert too, depending on the key set (measured 1.15–1.31x slower for 64 enum names). In some small-scale name resolution measurements it was never once the fastest.
+📉 **Measured — why it is rejected:** Construction costs 5–20x that of Dictionary. Lookups can invert too, depending on the key set (measured 1.15–1.31x slower for 64 enum names). In some small-scale name resolution measurements it was never once the fastest. A revival check at larger scale (1024 string keys) strengthened the rejection: **Frozen lookup measured 1.19x slower than Dictionary** (non-overlapping CIs) on top of a 5.3x build cost — scaling up does not rescue the trade-off.
 
 ✅ **Do this instead:** Adopt only when it is "built once at startup and read from then on" *and* you have confirmed a lookup win on real data (COL-02). For Type keys, the dedicated implementation (TYP-01) is about 3x faster.
 
@@ -150,9 +150,9 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 🎯 **Intent:** Use a resident `GC.AllocateArray(pinned: true)` buffer to avoid the cost of pinning with fixed on every call.
 
-📉 **Measured — why it is rejected:** Pinning with fixed each time is essentially free in practice (0.74ns), and using the POH pointer directly (0.85ns) is no faster. POH allocation itself costs 17.5x a normal allocation and induces Gen2 GCs.
+📉 **Measured — why it is rejected:** The rejection rests on allocation cost: POH allocation is 19.3x a normal allocation (961 vs 49.9 ns) and induces Gen1/Gen2 collections, so never allocate POH per operation. On current hardware the pre-pinned POH pointer IS measurably faster than fixed (0.015 vs 0.118 ns, code 33 vs 56 B — a real difference), but at ~0.1 ns per pin it only surfaces in pin-per-iteration hot loops, which does not justify the pattern for general use.
 
-✅ **Do this instead:** Just use `fixed`. Reserve POH for avoiding GC relocation and fragmentation of long-lived I/O buffers, allocated once at startup (BUF-06 caveat).
+✅ **Do this instead:** Just use `fixed`. Reserve POH for avoiding GC relocation and fragmentation of long-lived I/O buffers, allocated once at startup (BUF-06 caveat) — in that shape the ~0.1 ns/pin saving comes along for free anyway.
 
 🔗 **Measurement record:** [LAB-PinnedArray.md](../benchmarks/results/LAB-PinnedArray.md)
 
@@ -162,7 +162,7 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 🎯 **Intent:** Speed up copies by replacing them with `Unsafe.CopyBlockUnaligned`.
 
-📉 **Measured — why it is rejected:** At variable lengths it lands at 0.98–1.03x with overlapping CIs (➖ measurement noise — the generated code at the call site differs, but both reach the same Memmove, so no difference shows up). At the constant length of 16B, which the JIT can unroll, there is a **real difference** of 0.83x and 45B less code, but it does not justify giving up safety (no bounds checks, no type information). `Array.Copy` is the slowest and bloats code size (1.7KB).
+📉 **Measured — why it is rejected:** At variable lengths it lands at 0.81–1.01x with mostly overlapping CIs (➖ measurement noise — the generated code at the call site differs, but both reach the same Memmove). A revival check across constant lengths (8 / 16 / 64 B, the shapes the JIT can unroll) settled it: the 8–16 B edge is under 0.05 ns with overlapping CIs and does not reproduce across runs, and **at 64 B CopyBlockUnaligned is 1.07x slower** (non-overlapping CIs). The only stable advantage is code size (52–64 B vs 96–102 B), which does not justify giving up safety (no bounds checks, no type information). `Array.Copy` is the slowest and bloats code size (1.7KB).
 
 ✅ **Do this instead:** Default to `Span.CopyTo` (combined with the explicit slicing of MEM-03).
 

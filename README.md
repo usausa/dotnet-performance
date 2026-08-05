@@ -39,14 +39,12 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 
 ## 📋 Pattern index (summary)
 
-> 🔬 marks patterns awaiting re-verification: the benchmark has been extended and the conclusion will be settled by the next measurement run.
-
 | ID | Pattern | Goal | AOT | Example |
 |---|---|---|:---:|:---:|
 | [MEM-01](#-mem-01-skiplocalsinit) | SkipLocalsInit | Skip zero-initialization of locals | ✅ | [Verified](benchmarks/results/MEM-01-SkipLocalsInit.md) |
 | [MEM-02](#-mem-02-struct-element-array--ref-access-data-oriented-layout) | struct element array + ref access | Eliminate per-element heap allocation and indirection | ✅ | [Implemented](src/PerformancePatterns/Typ/TypeMap.cs) |
 | [MEM-03](#-mem-03-explicit-slicing-with-sliceoffset-length) | Explicit Slice(offset, length) | Slicing faster than the range operator | ✅ | [Verified](benchmarks/results/MEM-03-SliceStyle.md) |
-| 🔬 [MEM-04](#-mem-04-passing-struct-arguments-by-in--ref) | Passing struct arguments by in / ref | Avoid value copies of large structs | ✅ | [Verified](benchmarks/results/MEM-04-StructPass.md) |
+| [MEM-04](#-mem-04-passing-struct-arguments-by-in--ref) | Passing struct arguments by in / ref | Avoid value copies of large structs | ✅ | [Verified](benchmarks/results/MEM-04-StructPass.md) |
 | [STK-01](#-stk-01-ref-struct-stack-only-type) | ref struct (stack-only type) | Ban heap escape at the type level | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-zero-copy-access-with-spant--readonlyspant) | Span\<T\> / ReadOnlySpan\<T\> | Zero-copy typed view | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [STK-03](#-stk-03-struct-iterator-pattern) | struct iterator pattern | Remove virtual calls and heap allocation from foreach | ✅ | [Implemented](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -258,13 +256,18 @@ public void Draw(in MutableContext context) => context.Value.Use();
 
 | Struct size | By value | By in | Ratio |
 |---:|---:|---:|---|
-| 8 bytes | 1.21 ns | 1.21 ns | 0.99 |
-| 32 bytes | 1.44 ns | 1.16 ns | **0.81** |
-| 64 bytes | 1.24 ns | 1.21 ns | 0.98 |
-| in + readonly member | — | 1.20 ns | (baseline) |
-| in + non-readonly member | — | 1.88 ns | **1.57 (❌ defensive copy)** |
+| 8 bytes | 1.23 ns | 1.24 ns | 1.01 |
+| 16 bytes | 1.48 ns | 1.25 ns | **0.84** |
+| 32 bytes | 1.31 ns | 1.24 ns | 0.94 |
+| 64 bytes | 3.22 ns | 1.10 ns | **0.34** |
+| 128 bytes | 2.49 ns※ | 1.19 ns | **0.48** |
+| 256 bytes | 3.79 ns | 1.20 ns | **0.32** |
+| in + readonly member | — | 1.19 ns | (baseline) |
+| in + non-readonly member | — | 1.85 ns | **1.51 (❌ defensive copy)** |
 
-Only the 32-byte case shows a real time win — copies up to 64 bytes are largely hidden behind the non-inlined call itself, so do not expect a size-proportional payoff. `in` is never slower and trims code size (63/79 B vs 76/99 B), making it a safe default for readonly structs. The defensive-copy trap is the real hazard: passing by `in` to a non-readonly member is 1.57x slower and doubles code size from 109 B to 219 B. → [Results](benchmarks/results/MEM-04-StructPass.md)
+※ the 128-byte by-value case is bimodal across launches (1.5-3.5 ns — the copy cost is alignment-sensitive)
+
+**`in` stays flat (~1.2 ns) at every size, while by-value grows with size and fluctuates run to run** (the 64-byte case measured 1.24 ns in one run and 3.22 ns in another). From 64 bytes the win is decisive (0.32-0.48x = 2-3x), and 16 bytes already shows a small real win — predictability is itself part of the payoff. The defensive-copy trap remains: passing by `in` to a non-readonly member is 1.51x slower and roughly doubles code size (112 B → 219 B). → [Results](benchmarks/results/MEM-04-StructPass.md)
 
 **Caveats:** The effect varies with size, call frequency, and whether the JIT inlines. Inlining can make the copy disappear entirely, so measure before and after.
 
@@ -2028,13 +2031,13 @@ for (var i = 0; i < span.Length; i++)
 
 **Measured (net10 / x86-64-v4, string keys, non-interned probes):**
 
-| Aspect | 16 entries | 256 entries |
-|---|---|---|
-| Construction (Frozen / Dictionary) | **10.6x** (847 vs 80 ns) | **8.2x** (10,510 vs 1,282 ns) |
-| Construction allocation | 4.25x | 4.25x |
-| Lookup (Frozen / Dictionary) | 1.00 (➖ measurement noise) | 0.98 (➖ measurement noise) |
+| Aspect | 16 entries | 256 entries | 1024 entries |
+|---|---|---|---|
+| Construction (Frozen / Dictionary) | **10.0x** (817 vs 82 ns) | **8.5x** (11,091 vs 1,309 ns) | **5.3x** (32.5 vs 6.2 μs) |
+| Construction allocation | 4.25x | 4.25x | 3.95x (122 KB) |
+| Lookup (Frozen / Dictionary) | 1.07 | 0.97 (➖ measurement noise) | **1.19 (❌ slower, real)** |
 
-**Under these conditions (string keys, 16-256 entries) there is no measurable lookup gain, so the 8-11x construction cost is never amortized.** Adopt it only when a lookup win is measurable on real data. For name resolution over a known key set, COL-04 (sampled hash table, 0.60-0.62x versus Dictionary) is the surer bet. The general record on the rejection side is R-08. → [Results](benchmarks/results/COL-02-FrozenCondition.md)
+**For string keys there is no measurable lookup gain at any size — and at 1024 entries Frozen lookup is measurably slower.** Scaling up does not rescue the trade-off; the 5-10x construction cost is never amortized. Adopt it only when a lookup win is measurable on real data. For name resolution over a known key set, COL-04 (sampled hash table, 0.60-0.62x versus Dictionary) is the surer bet. The general record on the rejection side is R-08. → [Results](benchmarks/results/COL-02-FrozenCondition.md)
 - For dictionaries keyed by `Type`, a purpose-built implementation (TYP-01 style type slots, or an open-addressed type hash map) is about 3x faster than FrozenDictionary
 - A `ReadOnlyDictionary` wrapper is reliably slower by the cost of the wrapper (to express immutability, expose `FrozenDictionary` or `IReadOnlyDictionary` instead)
 
