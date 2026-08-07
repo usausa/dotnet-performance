@@ -14,7 +14,7 @@
     <File Path="README.ja.md" />
   </Folder>
   <Folder Name="/benchmarks/">
-    <Project Path="benchmarks/PerformancePatterns.Benchmarks/PerformancePatterns.Benchmarks.csproj" />
+    <Project Path="benchmarks/PerformancePatterns.Benchmarks/PerformancePatterns.Benchmarks.csproj" DefaultStartup="true" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/PerformancePatterns/PerformancePatterns.csproj" />
