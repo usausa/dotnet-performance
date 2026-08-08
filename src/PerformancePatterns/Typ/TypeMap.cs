@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 /// <summary>
 /// TYP-01: Replaces a Type-keyed dictionary with array index access through a static slot assigned per type.
 /// The path where the type argument is known (<see cref="TryGetValue{T}"/>) becomes a plain index access with no hashing and no collision resolution.
-/// Entries are a struct array accessed by ref (MEM-02), and growth is copy-on-write.
+/// Entries are a struct array accessed by ref (MEM-02), and every write is copy-on-write.
 /// </summary>
 public sealed class TypeMap<TValue>
 {
@@ -52,15 +52,12 @@ public sealed class TypeMap<TValue>
             slotOfType[typeof(T)] = slot;
 
             var current = entries;
-            if (slot >= current.Length)
-            {
-                // copy-on-write: readers can safely keep observing the pre-swap array
-                var next = new Entry[CalculateSize(slot)];
-                current.AsSpan().CopyTo(next);
-                current = next;
-            }
 
-            ref var entry = ref current[slot];
+            // copy-on-write: readers can safely keep observing the pre-swap array
+            var next = new Entry[slot >= current.Length ? CalculateSize(slot) : current.Length];
+            current.AsSpan().CopyTo(next);
+
+            ref var entry = ref next[slot];
             if (!entry.HasValue)
             {
                 Count++;
@@ -69,7 +66,7 @@ public sealed class TypeMap<TValue>
             entry.Value = value;
             entry.HasValue = true;
 
-            Volatile.Write(ref entries, current);
+            Volatile.Write(ref entries, next);
         }
     }
 
