@@ -29,6 +29,39 @@ public class BenchmarkConfig : ManualConfig
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 ```
 
+## 🅰️ Comparing against NativeAOT
+
+Every measurement in this repository is taken under JIT. When a pattern's value depends on JIT-only machinery — speculative devirtualization, Dynamic PGO, tiered promotion — the JIT number does not carry over, and the only way to know is to measure. TYP-07 is the worked example: the ranking of its three variants **reverses** under NativeAOT.
+
+Two things block a naive attempt, and both cost a full run to discover:
+
+1. **`DisassemblyDiagnoser` is not supported on NativeAOT.** BDN rejects the job at validation and every AOT row comes out `NA` — with exit code 0, so it looks like a successful run. Since the base configuration above always carries the diagnoser, an AOT comparison needs a separate config without it (and therefore no Code Size column)
+2. **`vswhere.exe` must be on `PATH`** for the ILCompiler link step (`C:\Program Files (x86)\Microsoft Visual Studio\Installer`). Without it the link fails inside `Microsoft.NETCore.Native.targets` and, again, every AOT row is `NA`
+
+So an AOT comparison is run from a small standalone harness: copy the benchmark bodies, give them a diagnoser-free config, and supply both runtimes on the command line so the job settings are identical.
+
+```csharp
+// Diagnoser-free config for AOT comparison. Do not put a job attribute on the class -
+// pass both runtimes on the command line so JIT and AOT get the same MediumRun settings.
+public class AotComparisonConfig : ManualConfig
+{
+    public AotComparisonConfig()
+    {
+        AddExporter(MarkdownExporter.GitHub);
+        AddDiagnoser(MemoryDiagnoser.Default);
+        AddColumn(StatisticColumn.Min, StatisticColumn.Max, StatisticColumn.P90);
+    }
+}
+```
+
+```
+dotnet run -c Release -- --filter "*" --runtimes net10.0 nativeaot10.0 --job medium
+```
+
+**Reading the result:** BDN computes `Ratio` against the baseline method **on the first runtime**, so every AOT row is scaled to the JIT baseline. To judge the AOT side, re-derive the ratios against the AOT run's own baseline row.
+
+**Checking an assumption rather than a speed:** correctness tests can hide a broken assumption. TYP-07 shifts the type handle right by 3 because it is pointer-aligned; if that stopped holding, lookups would still be correct — the same shift applies at insert and at lookup — and only the bucket distribution would collapse. Assumptions like that need a direct probe, published with `PublishAot=true` and run as the native binary. Note that `dotnet run` on a project with `PublishAot=true` is **still a JIT run**: the property flips the feature switches, so `RuntimeFeature.IsDynamicCodeCompiled` already reads `false` and an AOT self-check will lie. Run `bin/Release/<tfm>/<rid>/publish/<name>.exe` directly.
+
 ## ⚠️ Pitfalls that make measurements meaningless
 
 ### 1. The measurement target vanishing under optimization

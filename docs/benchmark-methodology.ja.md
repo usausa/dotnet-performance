@@ -29,6 +29,39 @@ public class BenchmarkConfig : ManualConfig
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 ```
 
+## 🅰️ NativeAOT との比較測定
+
+本リポジトリの実測はすべて JIT で取得している。パターンの価値が JIT 固有の機構(投機的脱仮想化・Dynamic PGO・階層昇格)に依存している場合、JIT の数値はそのまま持ち越せず、測る以外に知る方法がない。TYP-07 がその実例で、3 方式の順位が NativeAOT では**反転する**。
+
+素直に試すと 2 点で躓く。しかもどちらも「1 回まるごと実行してから気づく」種類の失敗である。
+
+1. **`DisassemblyDiagnoser` は NativeAOT 非対応。** BDN が検証段階でジョブを拒否し、AOT 行はすべて `NA` になる。しかも終了コードは 0 なので成功したように見える。上記の基本構成は常に診断器を含むため、AOT 比較には診断器を外した別 config が必要(その結果 Code Size 列は使えない)
+2. **`vswhere.exe` を `PATH` に通す必要がある**(ILCompiler のリンク段階で使用。実体は `C:\Program Files (x86)\Microsoft Visual Studio\Installer`)。通っていないと `Microsoft.NETCore.Native.targets` 内でリンクが失敗し、やはり AOT 行が全部 `NA` になる
+
+そのため AOT 比較は小さな独立ハーネスで行う。ベンチマーク本体をコピーし、診断器なしの config を与え、両ランタイムをコマンドラインで渡してジョブ設定を揃える。
+
+```csharp
+// AOT 比較用の診断器なし config。クラスにジョブ属性は付けず、
+// 両ランタイムをコマンドラインで渡して JIT / AOT に同じ MediumRun 設定を適用する
+public class AotComparisonConfig : ManualConfig
+{
+    public AotComparisonConfig()
+    {
+        AddExporter(MarkdownExporter.GitHub);
+        AddDiagnoser(MemoryDiagnoser.Default);
+        AddColumn(StatisticColumn.Min, StatisticColumn.Max, StatisticColumn.P90);
+    }
+}
+```
+
+```
+dotnet run -c Release -- --filter "*" --runtimes net10.0 nativeaot10.0 --job medium
+```
+
+**結果の読み方:** BDN の `Ratio` は**最初のランタイム側**のベースラインメソッドに対して計算されるため、AOT 行もすべて JIT のベースラインに対する比になる。AOT 側を判断するには、AOT 実行自身のベースライン行に対して比を取り直すこと。
+
+**速度ではなく前提を確認する場合:** 正しさのテストでは前提の破綻を隠してしまうことがある。TYP-07 は型ハンドルがポインタ整列であることを根拠に右 3 ビットシフトするが、仮にこれが成立しなくなってもルックアップは正しいまま(挿入時と探索時に同じシフトを掛けるため)で、潰れるのはバケット分布だけである。この種の前提は `PublishAot=true` で publish した native バイナリを直接実行して確認する。なお `PublishAot=true` のプロジェクトに対する `dotnet run` は**依然として JIT 実行**である点に注意 — このプロパティは機能スイッチを切り替えるため `RuntimeFeature.IsDynamicCodeCompiled` が既に `false` を返し、AOT 判定を自前で書くと嘘をつく。`bin/Release/<tfm>/<rid>/publish/<name>.exe` を直接実行すること。
+
 ## ⚠️ 測定を無意味にする落とし穴
 
 ### 1. 最適化による測定対象の消滅
