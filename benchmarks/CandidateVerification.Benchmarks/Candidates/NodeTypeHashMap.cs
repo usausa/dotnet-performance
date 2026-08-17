@@ -10,6 +10,8 @@ public sealed class NodeTypeHashMap<TValue>
 {
     private readonly Node?[] buckets;
 
+    private readonly Node?[] handleBuckets;
+
     private readonly int mask;
 
     public NodeTypeHashMap(IEnumerable<KeyValuePair<Type, TValue>> source)
@@ -25,12 +27,18 @@ public sealed class NodeTypeHashMap<TValue>
         }
 
         buckets = new Node?[capacity];
+
+        // Separate table: the handle hash places keys in different buckets than the identity hash
+        handleBuckets = new Node?[capacity];
         mask = capacity - 1;
 
         foreach (var pair in pairs)
         {
             var index = RuntimeHelpers.GetHashCode(pair.Key) & mask;
             buckets[index] = new Node(pair.Key, pair.Value, buckets[index]);
+
+            var handleIndex = (int)((ulong)pair.Key.TypeHandle.Value.ToInt64() >> 3) & mask;
+            handleBuckets[handleIndex] = new Node(pair.Key, pair.Value, handleBuckets[handleIndex]);
         }
     }
 
@@ -39,6 +47,27 @@ public sealed class NodeTypeHashMap<TValue>
     {
         // Virtual dispatch: RuntimeType.GetHashCode via the vtable (PGO may only partially devirtualize)
         var node = buckets[key.GetHashCode() & mask];
+        while (node is not null)
+        {
+            if (ReferenceEquals(node.Key, key))
+            {
+                value = node.Value;
+                return true;
+            }
+
+            node = node.Next;
+        }
+
+        value = default;
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryGetValueHandleHash(Type key, [MaybeNullWhen(false)] out TValue value)
+    {
+        // MethodTable pointer as the identity: a plain field read, but 8-byte aligned,
+        // so the low bits are always zero and must be shifted away before masking
+        var node = handleBuckets[(int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask];
         while (node is not null)
         {
             if (ReferenceEquals(node.Key, key))

@@ -55,6 +55,21 @@ public class TypeIdentityHashBenchmark
         return total;
     }
 
+    [Benchmark(OperationsPerInvoke = 32)]
+    public int HandleHashHit()
+    {
+        var total = 0;
+        foreach (var type in TypeSets.Hit)
+        {
+            if (map.TryGetValueHandleHash(type, out var value))
+            {
+                total += value;
+            }
+        }
+
+        return total;
+    }
+
     [Benchmark(OperationsPerInvoke = 8)]
     public int VirtualHashMiss()
     {
@@ -85,6 +100,21 @@ public class TypeIdentityHashBenchmark
         return total;
     }
 
+    [Benchmark(OperationsPerInvoke = 8)]
+    public int HandleHashMiss()
+    {
+        var total = 0;
+        foreach (var type in TypeSets.Miss)
+        {
+            if (map.TryGetValueHandleHash(type, out var value))
+            {
+                total += value;
+            }
+        }
+
+        return total;
+    }
+
     public static void Verify()
     {
         var benchmark = new TypeIdentityHashBenchmark();
@@ -93,7 +123,8 @@ public class TypeIdentityHashBenchmark
         for (var i = 0; i < TypeSets.Hit.Length; i++)
         {
             if (!benchmark.map.TryGetValueVirtualHash(TypeSets.Hit[i], out var viaVirtual) || (viaVirtual != i) ||
-                !benchmark.map.TryGetValueIdentityHash(TypeSets.Hit[i], out var viaIdentity) || (viaIdentity != i))
+                !benchmark.map.TryGetValueIdentityHash(TypeSets.Hit[i], out var viaIdentity) || (viaIdentity != i) ||
+                !benchmark.map.TryGetValueHandleHash(TypeSets.Hit[i], out var viaHandle) || (viaHandle != i))
             {
                 throw new InvalidOperationException($"Hash path lookup failed for {TypeSets.Hit[i]}.");
             }
@@ -102,14 +133,17 @@ public class TypeIdentityHashBenchmark
         foreach (var type in TypeSets.Miss)
         {
             if (benchmark.map.TryGetValueVirtualHash(type, out _) ||
-                benchmark.map.TryGetValueIdentityHash(type, out _))
+                benchmark.map.TryGetValueIdentityHash(type, out _) ||
+                benchmark.map.TryGetValueHandleHash(type, out _))
             {
                 throw new InvalidOperationException($"Hash path returned a value for missing key {type}.");
             }
         }
 
         if ((benchmark.VirtualHashHit() != benchmark.IdentityHashHit()) ||
-            (benchmark.VirtualHashMiss() != 0) || (benchmark.IdentityHashMiss() != 0))
+            (benchmark.VirtualHashHit() != benchmark.HandleHashHit()) ||
+            (benchmark.VirtualHashMiss() != 0) || (benchmark.IdentityHashMiss() != 0) ||
+            (benchmark.HandleHashMiss() != 0))
         {
             throw new InvalidOperationException("Hash path variants disagree.");
         }

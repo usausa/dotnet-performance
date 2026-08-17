@@ -71,21 +71,25 @@
 | [DSP-03](#-dsp-03-ハンドラ列の不変配列化マルチキャストデリゲート回避) | ハンドラ列の不変配列化 | マルチキャストデリゲートの劣化回避 | ✅ | [実装](src/PerformancePatterns/Dsp/HandlerList.cs) |
 | [DSP-04](#-dsp-04-static-ラムダの徹底tstate-引き回し) | static ラムダの徹底 | キャプチャ禁止を既定にし状態は TState で渡す | ✅ | [検証済](benchmarks/results/DSP-04-StaticLambda.md) |
 | [DSP-05](#-dsp-05-デリゲートパイプラインの事前確定) | デリゲート・パイプラインの事前確定 | 実行時の合成・分岐解決を初期化時へ | ✅ | [検証済](benchmarks/results/DSP-05-PipelineCompose.md) |
+| [DSP-06](#-dsp-06-インデックス転送パイプラインデリゲートのない連鎖) | インデックス転送パイプライン | インターセプタ連鎖から next デリゲートを排除 | ✅ | [検証済](benchmarks/results/DSP-06-IndexForward.md) |
 | [TYP-01](#️-typ-01-静的型スロットtypemap--typeslot) | 静的型スロット(TypeMap / TypeSlot) | Type キー辞書の配列アクセス化 | ⚠️ | [実装](src/PerformancePatterns/Typ/TypeMap.cs) |
 | [TYP-02](#️-typ-02-bitwisecomparert生バイト比較) | BitwiseComparer\<T\> | unmanaged 値型の生バイト比較 | ✅ | [実装](src/PerformancePatterns/Typ/BitwiseComparer.cs) |
 | [TYP-03](#️-typ-03-unsafeaccessor非公開メンバーへの直接アクセス) | UnsafeAccessor | 非公開メンバーへの直接アクセス | ✅ | [検証済](benchmarks/results/TYP-03-UnsafeAccessor.md) |
 | [TYP-04](#️-typ-04-ジェネリック-static-クラスによる型別キャッシュ) | ジェネリック static 型別キャッシュ | 型ごとの成果物の辞書レス取得 | ✅ | [実装](src/PerformancePatterns/Typ/TypeSlot.cs) |
 | [TYP-05](#️-typ-05-unsafeas-による型チェック省略キャスト) | Unsafe.As キャスト | 型保証済みキャストの高速化 | ✅ | [検証済](benchmarks/results/TYP-05-UnsafeAsCast.md) |
 | [TYP-06](#️-typ-06-型別成果物の静的事前組み立て) | 型別成果物の静的事前組み立て | 型ごとの文字列・SQL を初期化時に確定 | ✅ | [検証済](benchmarks/results/TYP-06-StaticArtifact.md) |
+| [TYP-07](#️-typ-07-type-キーのハッシュ取得元の選択) | Type キーのハッシュ取得元 | 仮想 GetHashCode より TypeHandle.Value | ⚠️ | [検証済](benchmarks/results/TYP-07-TypeHashSource.md) |
 | [BIT-01](#-bit-01-ドメイン制約を活かした軽量ハッシュ生成) | ドメイン制約を活かした軽量ハッシュ | 既知キー集合の O(1) ハッシュ | ✅ | [実装](src/PerformancePatterns/Col/SampledNameTable.cs) |
 | [BIT-02](#-bit-02-2-の累乗サイズ--マスクによる剰余置換) | 2 の累乗サイズ + マスク | 剰余(除算)のビット AND 化 | ✅ | [検証済](benchmarks/results/BIT-02-PowerOfTwoMask.md) |
 | [BIT-03](#-bit-03-bitoperations-によるビット走査計数) | BitOperations | ビット走査・計数のハードウェア命令化 | ✅ | [検証済](benchmarks/results/BIT-03-BitOperations.md) |
 | [BIT-04](#-bit-04-xxhash3-による汎用ハッシュ) | XxHash3 | 非暗号ハッシュの高速化 | ✅ | [検証済](benchmarks/results/BIT-04-XxHash3.md) |
+| [BIT-05](#-bit-05-可変長キー探索の順序保存ダイジェスト) | 順序保存キーダイジェスト | 二分探索のプローブをキー本体に触れず決着 | ✅ | [検証済](benchmarks/results/BIT-05-OrderedDigestSearch.md) |
 | [VEC-01](#-vec-01-明示的-simdvectort--vector256) | 明示的 SIMD | Vector\<T\> / Vector256 による一括処理 | ✅ | [検証済](benchmarks/results/VEC-01-VectorSum.md) |
 | [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-02](#-seq-02-stream-構造体-io) | Stream 構造体 I/O | 構造体の直接バイナリ読み書き | ✅ | [検証済](benchmarks/results/SEQ-02-StructStreamIo.md) |
 | [SEQ-03](#-seq-03-遅延評価シーケンス処理batch--segment--traverse) | Batch / Segment / Traverse | 低アロケーションのシーケンス処理 | ✅ | [実装](src/PerformancePatterns/Seq/BatchExtensions.cs) |
 | [SEQ-04](#-seq-04-リングバッファ--増分デリミタ探索) | リングバッファ + 増分探索 | ストリーミング受信の分割 | ✅ | [検証済](benchmarks/results/SEQ-04-RingSplit.md) |
+| [SEQ-05](#-seq-05-長さ未知ストリームの読み出し再確保コピー連鎖の排除) | 長さ未知ストリーム → ReadOnlySequence | 再確保コピー連鎖と LOH 流入の排除 | ✅ | [検証済](benchmarks/results/SEQ-05-StreamSequence.md) |
 | [COL-01](#️-col-01-collectionsmarshal-による内部直接アクセス) | CollectionsMarshal | List/Dictionary 内部への直接アクセス | ✅ | [検証済](benchmarks/results/COL-01-CollectionsMarshal.md) |
 | [COL-02](#️-col-02-frozendictionary-の条件付き採用) | FrozenDictionary 条件付き採用 | 不変辞書の検索高速化 | ✅ | [検証済](benchmarks/results/COL-02-FrozenCondition.md) |
 | [COL-03](#️-col-03-getalternatelookup-による-span-キー検索) | GetAlternateLookup | Span キーでの辞書検索 | ✅ | [検証済](benchmarks/results/COL-04-SampledNameTable.md) |
@@ -109,6 +113,7 @@
 | [ASY-06](#-asy-06-単一ループ型スケジューラ) | 単一ループ型スケジューラ | タイマー乱立の回避 | ✅ | [検証済](benchmarks/results/ASY-06-SchedulerPrimitive.md) |
 | [ASY-07](#-asy-07-ストリーミング-io) | ストリーミング I/O | 全体バッファリングの回避 | ✅ | [検証済](benchmarks/results/ASY-07-StreamBuffering.md) |
 | [CON-01](#-con-01-interlocked-によるワンショットガード) | Interlocked ワンショットガード | Dispose・初期化のロックレス 1 回実行 | ✅ | [検証済](benchmarks/results/CON-01-DisposeGuard.md) |
+| [CON-02](#-con-02-ピン留め資源の参照カウント) | ピン留め資源の参照カウント | 連続実行ごとの retain と決定的解放 | ✅ | [検証済](benchmarks/results/CON-02-RefCount.md) |
 | [SYS-01](#️-sys-01-低コストの時刻経過時間取得) | 低コスト時刻取得 | DateTime.UtcNow 回避 | ✅ | [検証済](benchmarks/results/SYS-01-Timestamp.md) |
 | [DAT-01](#️-dat-01-db-アクセスの列解決最適化) | DB アクセスの列解決最適化 | 序数キャッシュ・1 パス列解決 | ✅ | [検証済](benchmarks/results/DAT-01-OrdinalResolve.md) |
 | [GEN-01](#-gen-01-emit-生成コードの高速化戦略) | Emit 生成コードの高速化戦略 | 生成デリゲートのインライン展開等 | ❌ | [検証済](benchmarks/results/GEN-01-EmitStrategy.md) |
@@ -1302,6 +1307,55 @@ public Widget() => onChanged = HandleChanged;
 
 ---
 
+### 🚦 DSP-06: インデックス転送パイプライン(デリゲートのない連鎖)
+
+**目的:** インターセプタ連鎖から `next` デリゲートを完全に取り除く。各段に継続を渡すのではなく、パイプライン自身と自分のインデックスを渡し、段側が前進呼び出しを行う。
+
+**効果:**
+
+- 1 段の通過が「引数 2 つ増えた通常のインターフェース呼び出し」になる。生成・キャプチャ・保持すべきデリゲートが存在しない
+- 連鎖上の位置は値渡しの `int` で運ばれるため、パイプライン本体は状態を持たず再入可能。1 インスタンスで並行呼び出しを捌ける
+- 既に良解である [DSP-05](#-dsp-05-デリゲートパイプラインの事前確定) の事前合成をさらに上回る。事前合成が消すのは**アロケーション**、インデックス転送が消すのは**デリゲートそのもの**
+
+**AOT:** ✅ 問題なし(DSP-05 よりデリゲートが少ないぶん、むしろ有利)
+
+**実装例:**
+
+```csharp
+public sealed class Pipeline
+{
+    private readonly IInterceptor[] interceptors;
+    private readonly Func<int, ValueTask> terminal;
+
+    public ValueTask InvokeAsync(int command) => ProcessNext(command, 0);
+
+    // ✅ 段にはパイプラインと自分のインデックスを渡す。デリゲートはどこにも生成されない
+    public ValueTask ProcessNext(int command, int index)
+        => index < interceptors.Length
+            ? interceptors[index].InvokeAsync(command, this, index)
+            : terminal(command);
+}
+
+public sealed class LoggingInterceptor : IInterceptor
+{
+    // ✅ キャプチャした継続を呼ぶのではなく、インデックスを進めて前進する
+    public ValueTask InvokeAsync(int command, Pipeline pipeline, int index)
+        => pipeline.ProcessNext(command + 1, index + 1);
+}
+```
+
+**ユースケース:** ミドルウェアスタック、HTTP/RPC クライアントのポリシー連鎖(リトライ・ロギング・認証)、インプロセスメッセージバスの介入処理。連鎖は構築時に固定され、呼び出しはリクエスト/メッセージごとに走る、という形すべて。
+
+**実測結果(net10 / x86-64-v4、素通しインターセプタ 4 段):** 毎 hop クロージャ生成は 32.5 ns / 488 B。コンテキストにキャッシュした継続デリゲートが 13.6 ns(0.42 倍)、DSP-05 の事前合成チェーンが 11.1 ns(0.34 倍)、**インデックス転送が 8.85 ns(0.27 倍)**。素朴案以外の 3 案はいずれも 72 B まで落ちるが、これは呼び出し側自身の `Task` 戻り値であり hop あたりのコストではない(3 案とも hop あたり無アロケーション)。→ [測定結果](benchmarks/results/DSP-06-IndexForward.md)
+
+**注意点:**
+
+- インターセプタのシグネチャが引数 2 つ増え、具体的なパイプライン型を名指しするため、インターセプタ側がパイプラインに結合する。DSP-05 の `Func<T, ValueTask>` は結合しない — ここがトレードオフ
+- **インデックスを共有コンテキストのフィールドに持たせないこと。** それが上の「キャッシュした継続」案であり、3 案中もっとも遅いうえ、呼び出しごとのコンテキストオブジェクト(ひいてはプール)を引きずり込む
+- 1〜2 段では周囲の処理に埋もれて差が消える。ホットパス上の連鎖のための手法
+
+---
+
 ## 🏷️ TYP: 型システム活用
 
 ### 🏷️ TYP-01: 静的型スロット(TypeMap / TypeSlot)
@@ -1581,6 +1635,49 @@ var sql = SqlInsert<Order>.Sql;
 
 ---
 
+### 🏷️ TYP-07: Type キーのハッシュ取得元の選択
+
+**目的:** 型が実行時にしか分からず `Type` をハッシュせざるを得ない場合に、もっとも安い同一性の取得元を選ぶ。TYP-01 の静的スロットは使えない — これは TYP-01 が「避けろ」と言っている側の経路を、可能な限り安くする話。
+
+**効果(実測、net10 / x86-64-v4、32 エントリのノードマップ、hit 32 件 / miss 8 件):**
+
+| ハッシュ取得元 | hit | miss | コードサイズ |
+|---|---|---|---|
+| `type.GetHashCode()` | 1.362 ns | 1.251 ns | 403 B |
+| `RuntimeHelpers.GetHashCode(type)` | 1.116 ns(0.82 倍) | 1.197 ns(0.96 倍) | 355 B |
+| **`type.TypeHandle.Value`** | **0.848 ns(0.62 倍)** | **0.812 ns(0.65 倍)** | **192 B** |
+
+3 経路でバケット配置を意図的に揃え、取得経路だけを変数にしている。仮想呼び出しはディスパッチが残り、`RuntimeHelpers.GetHashCode` はインライン化されてもオブジェクトヘッダ読み出しと「ハッシュ割り当て済みか」の判定が残る。`TypeHandle.Value` は型ハンドルの単純なフィールド読み出しで分岐がなく、コードサイズが半分以下になるのはそのため。
+
+**AOT:** ⚠️ 未検証 — 注意点を参照
+
+**実装例:**
+
+```csharp
+// ❌ 探索のたびに仮想ディスパッチ
+var index = key.GetHashCode() & mask;
+
+// ⚠️ ましだが、オブジェクトヘッダ読み出しと「ハッシュ割り当て済みか」の判定が残る
+var index = RuntimeHelpers.GetHashCode(key) & mask;
+
+// ✅ 単純なフィールド読み出し。ハンドルはポインタ整列で下位 3 ビットが常に 0 なので、
+//    シフトで落とさないと 2 のべき乗テーブルの 1/8 のスロットしか使われない
+var index = (int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask;
+```
+
+**ユースケース:** 実行時の型ディスパッチ表 — シリアライザのフォーマッタ探索、DI の解決キャッシュ、メッセージハンドラのレジストリ。`Type` がジェネリック引数ではなくデータとして流れてくる場面すべて。
+
+**実測結果(net10 / x86-64-v4):** `TypeHandle.Value` は仮想 `GetHashCode` 比で **hit 0.62 倍 / miss 0.65 倍**、コードサイズは 403 B → 192 B。→ [測定結果](benchmarks/results/TYP-07-TypeHashSource.md)
+
+**注意点:**
+
+- **AOT 欄は未検証。** 上記は JIT 実行の数値。NativeAOT ではハンドルが MethodTable ではなく EEType ポインタになるため、コード生成と下位ビット整列の前提の両方を AOT publish で測り直すまで ✅ とは書けない
+- **シフトを忘れないこと。** ハンドルは 8 バイト整列なので、`>> 3` がないと全キーが 8 の倍数のバケットにしか入らない
+- ハンドルが安定なのは「その型がロードされている間」。回収可能な `AssemblyLoadContext` ではアンロードされた型のアドレスが再利用されうるため、生きているエントリすべてについて表が `Type` の強参照を保持している場合にのみ安全
+- 型が**静的に分かる**なら、この話は一切不要 — [TYP-01](#️-typ-01-静的型スロットtypemap--typeslot) のジェネリックスロット(0.09 倍)を使う
+
+---
+
 ## 🔢 BIT: ビット演算・ブランチレス最適化
 
 ### 🔢 BIT-01: ドメイン制約を活かした軽量ハッシュ生成
@@ -1751,6 +1848,57 @@ var hash = XxHash3.HashToUInt64(MemoryMarshal.AsBytes(value.AsSpan()));
 XxHash3 は 8 文字時点で既に速く、長いほど差が開く。`MemoryMarshal.AsBytes` と `fixed` は同等(pinning が不要なぶん Cast を推奨)— ゼロコスト再解釈の確認としては十分。手書きのハッシュループ(FNV-1a)は 64 文字以降でベクトル化された BCL に負けるため、自作しない。→ [測定結果](benchmarks/results/BIT-04-XxHash3.md)
 
 **注意:** 非暗号ハッシュのため、改ざん検知や署名には使えない。
+
+---
+
+### 🔢 BIT-05: 可変長キー探索の順序保存ダイジェスト
+
+**目的:** ソート済み可変長バイトキーへの二分探索で、大半のプローブをキー本体に触れずに決着させる。各キーの先頭 8 バイトを big-endian で `ulong` に詰めると、バイト辞書順に対してこの詰め方は**順序を保存する**ため、ダイジェストが異なる限り、整数比較の結果がキー比較の結果と一致する。
+
+**効果:**
+
+- 1 プローブが「`ulong` の読み出し + 整数比較 1 回」になる。`SequenceCompareTo` の呼び出しもキー配列への間接参照も発生しない
+- ダイジェストが一致したときにだけ、本来のバイト列比較にフォールバックする
+- 表が大きいほど効く(探索が深いほど、キー本体に触れないプローブの回数が増える)。とくに miss は探索深度を最後まで歩いてキー本体を一度も必要としないため、もっとも得をする
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// ✅ ゼロ埋め + big-endian の詰め方がバイト辞書順を保存する
+private static ulong GetDigest(ReadOnlySpan<byte> key)
+{
+    Span<byte> buffer = stackalloc byte[8];
+    buffer.Clear();
+    key[..Math.Min(key.Length, 8)].CopyTo(buffer);
+    return BinaryPrimitives.ReadUInt64BigEndian(buffer);
+}
+
+// ソート済みキー配列と一緒に一度だけ構築しておく
+var mid = (lo + hi) >>> 1;
+var digest = digests[mid];
+int compared;
+if (digest != probeDigest)
+{
+    compared = digest < probeDigest ? 1 : -1;   // キー本体に触れずに決着
+}
+else
+{
+    compared = probe.SequenceCompareTo(keys[mid]);   // 同値のときだけフォールバック
+}
+```
+
+**ユースケース:** ストレージエンジンの索引ブロック — ソート済みの可変長キー列への二分探索で、範囲スキャン・前方一致・後続キー探索も同じ構造を通るため順序を保たざるを得ない場面。
+
+**実測結果(net10 / x86-64-v4、キー 64 / 256 / 1024 件):** 先頭 8 バイトで分かれるキーなら hit **0.74 / 0.68 / 0.65 倍**、miss **0.64 / 0.57 / 0.54 倍**。全キーが 8 バイトの共通接頭辞を持つ場合は符号が反転し、hit **1.31 / 1.27 / 1.30 倍**、miss **1.36 / 1.26 / 1.22 倍**。→ [測定結果](benchmarks/results/BIT-05-OrderedDigestSearch.md)
+
+**注意点:**
+
+- **条件付きであり、最悪ケースは「差がない」ではなく実際の悪化。** キーが 8 バイトの接頭辞を共有すると全ダイジェストが同値になり、結局フォールバックが走るので、ダイジェストは純粋な上乗せコストになって 1.2〜1.4 倍。共通の名前空間接頭辞を持つ識別子的なキーはまさにこれに該当するため、採用前に実際の接頭辞分布を測ること
+- 順序が不要ならハッシュ表が二分探索に無条件で勝つので、この手法の出番はない
+- キー 1 件あたり `ulong` 1 個のメモリ増、および探索のコードサイズが概ね倍(詰め処理がプローブにインライン展開される)
+- 順序保存は **符号なし** big-endian に依存する。little-endian にしたり符号付き比較にすると、静かに壊れる
 
 ---
 
@@ -1968,6 +2116,55 @@ private bool TryReadLine(out ReadOnlySpan<byte> line)
 **実測結果(net10 / x86-64-v4、2 KB 行 × 16 を 256 B チャンクで受信):** 毎回全域再走査 + 行ごと前方詰め 1.70 μs に対し、**増分探索 + 遅延コンパクション 1.13 μs(0.67 倍)**。どちらもゼロアロケーションで、差は「走査済みバイトを再走査しない」「データ移動を行ごとでなく必要時のみにする」ことから生じる(折り返し 2 セグメント処理は未測定、フラットバッファ形での測定)。→ [測定結果](benchmarks/results/SEQ-04-RingSplit.md)
 
 **注意:** バッファ超過時の方針(古いデータを捨てる / 例外 / 拡張)を明示的に決める。
+
+---
+
+### 📜 SEQ-05: 長さ未知ストリームの読み出し(再確保コピー連鎖の排除)
+
+**目的:** 「`MemoryStream` に溜めて `ToArray`」という形をやめる。この形はバッファが倍化するたびに再確保とコピーを払い、最後にもう一度全体をコピーし、85 KB を超えたバッファはすべて LOH に載る。代わりにプールした chunk へ読み込み、`ReadOnlySequence<byte>` として公開する。
+
+**効果:**
+
+- 「元データからのコピー 1 回」だけになる(再確保コピー連鎖と最終 `ToArray` の全コピーが消える)
+- 単一バッファが chunk サイズを超えないため、ペイロードサイズによらず LOH を汚さない
+- 消費側は `ReadOnlySequence<byte>` を相手にする。近年のパース API(`Utf8JsonReader`、`SequenceReader<T>`)は既にこれを受け取れる
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// ❌ 再確保コピー連鎖 + 最後にもう一度全コピー、しかも結果は LOH 上
+using var destination = new MemoryStream();
+source.CopyTo(destination);
+var array = destination.ToArray();
+
+// ✅ PipeReader が自前のプールバッファ上の ReadOnlySequence を渡してくれる
+var reader = PipeReader.Create(source, new StreamPipeReaderOptions(bufferSize: 32 * 1024));
+while (true)
+{
+    var result = await reader.ReadAsync().ConfigureAwait(false);
+    Process(result.Buffer);
+    reader.AdvanceTo(result.Buffer.End);
+    if (result.IsCompleted)
+    {
+        break;
+    }
+}
+
+await reader.CompleteAsync().ConfigureAwait(false);
+```
+
+**ユースケース:** 長さの分からないペイロードをストリームから引き出す場面 — リクエストボディ、BLOB 読み出し、サイズ未知のファイル。
+
+**実測結果(net10 / x86-64-v4、256 KB):** `MemoryStream` 蓄積 + `ToArray` が 167.3 μs / **524,520 B**、Gen0/Gen1/Gen2 がいずれも 166.5 回(大きい配列が Gen2 まで生き残っている)。`PipeReader` は **57.4 μs(0.34 倍)/ 504 B**、自前のプール chunk 版 `ReadOnlySequence` ビルダーは 56.2 μs(0.34 倍)/ 64 B。→ [測定結果](benchmarks/results/SEQ-05-StreamSequence.md)
+
+**注意点:**
+
+- **ここでの答えは `PipeReader` であって自前ビルダーではない。** 自前版は `PipeReader` 比 0.98 倍 — 実差ではあるが 2%、対価は自分で保守することになる約 90 行のセグメントプール。シーケンスを読み取りループより長生きさせたい場合や、入力が `Stream` でない場合にだけ自前を検討する
+- どの案も元データからのコピーは 1 回残る。消えるのは**追加のコピー**であって最初の 1 回ではない
+- `ReadAsync` のたびに `AdvanceTo` が必要で、その後バッファは無効になる。残したいものは前進前にコピーしておく
+- Pipelines の仕組みと 64KB デッドロックの注意点は [ASY-03](#-asy-03-systemiopipelines) を参照
 
 ---
 
@@ -2818,6 +3015,73 @@ public static void EnsureInitialized()
 
 ---
 
+### 🔒 CON-02: ピン留め資源の参照カウント
+
+**目的:** 共有資源(キャッシュ上のページ、プールしたバッファ)を読み手が必要とする間ピン留めし、最後の利用者が終わった時点で決定的に解放する。ただし読み取り 1 件ごとに interlocked 命令を払わずに。
+
+**効果:**
+
+- **run-length バッチングが大きい方の勝ち筋。** 連続する要素が同じ資源に属するなら、要素ごとではなく連続実行ごとに 1 回 retain する。4 ページにまたがる 128 行なら interlocked が 128 組ではなく 4 組で済む
+- **楽観的 retain は小さい方の勝ち筋で、しかも競合時のみ。** CAS リトライループは競り負けるたびに読み直して再試行するが、`Interlocked.Increment` 1 発なら必ず 1 命令で前進する。非競合では両者は同等 — リトライループは実際には一度もリトライしないため
+- 死亡の刻印をゼロではなく大きな負のバイアスで行うため、遅れて到着したインクリメントが死んだエントリを蘇生させることがない
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// ✅ 楽観的: fetch-add 1 回、競合時もリトライストームが起きない
+public bool TryRetain()
+{
+    var result = Interlocked.Increment(ref refCount);
+    if (result >= 1)
+    {
+        return true;
+    }
+
+    Interlocked.Decrement(ref refCount);    // 死亡との競り負け
+    return false;
+}
+
+public void Release()
+{
+    // 遅延インクリメントがカウントをゼロ超に戻せない大きさのバイアスであること
+    if ((Interlocked.Decrement(ref refCount) == 0) &&
+        (Interlocked.CompareExchange(ref refCount, int.MinValue / 2, 0) == 0))
+    {
+        Dispose();
+    }
+}
+
+// ✅ 行ごとではなく連続実行ごとに retain
+Page? last = null;
+foreach (var row in rows)
+{
+    var page = row.Page;
+    if (!ReferenceEquals(page, last))
+    {
+        if (page.TryRetain())
+        {
+            retained[retainedCount++] = page;
+        }
+
+        last = page;
+    }
+}
+```
+
+**ユースケース:** ページ / バッファキャッシュのピン留め — 範囲スキャンが読み取り中のページを退避されないよう固定し、最後の release で GC を待たずに決定的に解放する。
+
+**実測結果(net10 / x86-64-v4):** 4 ページに散った 128 行への run-length バッチングは 1 行あたり 0.483 ns、行ごと retain の 7.68 ns に対して **0.06 倍(約 16 倍)**。プリミティブの入れ替えは **4 スレッド競合下で 0.57 倍**(29.30 → 16.60 ns)、**非競合では 1.00 倍**(7.720 対 7.728 ns、信頼区間が重複)。→ [測定結果](benchmarks/results/CON-02-RefCount.md)
+
+**注意点:**
+
+- **順序が重要 — まずバッチング、次にプリミティブ選択。** バッチングが約 16 倍、プリミティブの入れ替えは 1.75 倍でしかも実際に競合している場合のみ。非競合パスでプリミティブを替えても何も得られない
+- 楽観的版の対価はコードサイズ(115 → 120 B)ではなく正しさの検証面。死亡バイアスを誤ると解放済みオブジェクトが蘇生し、バグから遠い場所で壊れる
+- バッチングが正しいのは連続実行が本当に連続している場合のみ。グループ化を検証しないと、後続要素がまだ保持している資源を解放してしまう
+
+---
+
 ## 🖥️ SYS: システム・OS 機能
 
 ### 🖥️ SYS-01: 低コストの時刻・経過時間取得
@@ -3044,6 +3308,7 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | 小さなヘルパーのインライン化(JIT-01) | 既定ポリシーが自動でインライン化(属性は差なし) | プロファイルなしの静的ヒューリスティクスのみ | `AggressiveInlining` を明示する価値が JIT より大きい |
 | `AggressiveOptimization` | Dynamic PGO を無効化するため**かえって遅くなりうる** | 階層型コンパイルがないため無意味(無害) | JIT では原則使わない。AOT では付けても意味がない |
 | 実行時コード生成(GEN-01) | Emit の最良形はコンパイル済みと同等 | `PlatformNotSupportedException`(AOTP-01) | Source Generator(GEN-02)へ置換する |
+| Type キーのハッシュ取得元(TYP-07) | `TypeHandle.Value` が仮想 `GetHashCode` 比 hit 0.62 倍 | ハンドルが JIT の MethodTable ではなく EEType ポインタになり、ヘッダ読み出し経路のコード生成も変わる | **未検証。** 比率を当てにする前に AOT publish で測り直し、シフトが前提としている下位ビット整列も確認する |
 
 **逆に AOT で有利になる項目:** 起動時の階層コンパイル待ちがないため、TYP-04 / TYP-06 のような型初期化子ベースのキャッシュや静的テーブルは初回から最適化済みで動く。R-01(typeof キャッシュ)が JIT の Tier1 昇格前に不利だった問題も AOT では発生しない。
 
@@ -3158,6 +3423,11 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | 多数候補の文字検索 | TXT-08(候補 2〜3 個は専用オーバーロード) |
 | 固定長フィールドの整形・トリム | TXT-09 |
 | 汎用ハッシュ(長い入力・安定値) | BIT-04 |
+| 長さ未知ストリームを余計なコピーなしで読む | SEQ-05 / ASY-03 |
+| 読み取り中の共有ページ・バッファのピン留め | CON-02 |
+| ソート済み可変長キーの探索 | BIT-05 |
+| 実行時にしか分からない Type のハッシュ | TYP-07 |
+| インターセプタ連鎖をリクエストごとに実行 | DSP-06 / DSP-05 |
 | 型ごとの文字列・SQL の事前確定 | TYP-06 |
 | パイプライン・コールバックの合成コスト削減 | DSP-05 |
 | 同期完了が多い非同期 API | ASY-05 |

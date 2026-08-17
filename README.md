@@ -71,21 +71,25 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [DSP-03](#-dsp-03-immutable-handler-arrays-avoiding-multicast-delegates) | Immutable array of handlers | Avoid multicast delegate degradation | ✅ | [Implemented](src/PerformancePatterns/Dsp/HandlerList.cs) |
 | [DSP-04](#-dsp-04-static-lambdas-everywhere-threading-tstate-through) | static lambdas throughout | Make no-capture the default and pass state via TState | ✅ | [Verified](benchmarks/results/DSP-04-StaticLambda.md) |
 | [DSP-05](#-dsp-05-precomposing-delegate-pipelines) | Pre-resolved delegate pipeline | Move runtime composition and branch resolution to initialization | ✅ | [Verified](benchmarks/results/DSP-05-PipelineCompose.md) |
+| [DSP-06](#-dsp-06-index-forwarding-pipelines-delegate-free-chains) | Index-forwarding pipeline | Drop the next delegate from an interceptor chain entirely | ✅ | [Verified](benchmarks/results/DSP-06-IndexForward.md) |
 | [TYP-01](#️-typ-01-static-type-slots-typemap--typeslot) | Static type slots (TypeMap / TypeSlot) | Turn Type-keyed dictionaries into array access | ⚠️ | [Implemented](src/PerformancePatterns/Typ/TypeMap.cs) |
 | [TYP-02](#️-typ-02-bitwisecomparert-raw-byte-comparison) | BitwiseComparer\<T\> | Raw byte comparison of unmanaged value types | ✅ | [Implemented](src/PerformancePatterns/Typ/BitwiseComparer.cs) |
 | [TYP-03](#️-typ-03-unsafeaccessor-direct-access-to-non-public-members) | UnsafeAccessor | Direct access to non-public members | ✅ | [Verified](benchmarks/results/TYP-03-UnsafeAccessor.md) |
 | [TYP-04](#️-typ-04-per-type-caching-with-generic-static-classes) | Generic static per-type cache | Dictionary-free lookup of per-type artifacts | ✅ | [Implemented](src/PerformancePatterns/Typ/TypeSlot.cs) |
 | [TYP-05](#️-typ-05-skipping-type-checks-on-casts-with-unsafeas) | Unsafe.As cast | Speed up casts already guaranteed by type | ✅ | [Verified](benchmarks/results/TYP-05-UnsafeAsCast.md) |
 | [TYP-06](#️-typ-06-static-pre-assembly-of-per-type-artifacts) | Static pre-assembly of per-type artifacts | Fix per-type strings and SQL at initialization | ✅ | [Verified](benchmarks/results/TYP-06-StaticArtifact.md) |
+| [TYP-07](#️-typ-07-choosing-the-hash-source-for-type-keys) | Hash source for Type keys | TypeHandle.Value over virtual GetHashCode | ⚠️ | [Verified](benchmarks/results/TYP-07-TypeHashSource.md) |
 | [BIT-01](#-bit-01-lightweight-hashing-that-exploits-domain-constraints) | Lightweight hash exploiting domain constraints | O(1) hash for a known key set | ✅ | [Implemented](src/PerformancePatterns/Col/SampledNameTable.cs) |
 | [BIT-02](#-bit-02-power-of-two-sizing-plus-masking-to-replace-modulo) | Power-of-two size + mask | Turn modulo (division) into a bitwise AND | ✅ | [Verified](benchmarks/results/BIT-02-PowerOfTwoMask.md) |
 | [BIT-03](#-bit-03-bit-scanning-and-counting-with-bitoperations) | BitOperations | Hardware instructions for bit scanning and counting | ✅ | [Verified](benchmarks/results/BIT-03-BitOperations.md) |
 | [BIT-04](#-bit-04-general-purpose-hashing-with-xxhash3) | XxHash3 | Faster non-cryptographic hashing | ✅ | [Verified](benchmarks/results/BIT-04-XxHash3.md) |
+| [BIT-05](#-bit-05-order-preserving-digests-for-variable-length-key-search) | Order-preserving key digest | Decide binary-search probes without reading key bytes | ✅ | [Verified](benchmarks/results/BIT-05-OrderedDigestSearch.md) |
 | [VEC-01](#-vec-01-explicit-simd-vectort--vector256) | Explicit SIMD | Bulk processing with Vector\<T\> / Vector256 | ✅ | [Verified](benchmarks/results/VEC-01-VectorSum.md) |
 | [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | General-purpose span splitting (zero allocation) | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-02](#-seq-02-struct-io-over-stream) | Struct I/O over Stream | Direct binary read/write of structs | ✅ | [Verified](benchmarks/results/SEQ-02-StructStreamIo.md) |
 | [SEQ-03](#-seq-03-lazy-sequence-processing-batch--segment--traverse) | Batch / Segment / Traverse | Low-allocation sequence processing | ✅ | [Implemented](src/PerformancePatterns/Seq/BatchExtensions.cs) |
 | [SEQ-04](#-seq-04-ring-buffer-with-incremental-delimiter-search) | Ring buffer + incremental search | Splitting a streaming receive | ✅ | [Verified](benchmarks/results/SEQ-04-RingSplit.md) |
+| [SEQ-05](#-seq-05-reading-an-unknown-length-stream-without-a-grow-copy-chain) | Unknown-length stream to ReadOnlySequence | Remove the grow-copy chain and the LOH traffic | ✅ | [Verified](benchmarks/results/SEQ-05-StreamSequence.md) |
 | [COL-01](#️-col-01-direct-internal-access-with-collectionsmarshal) | CollectionsMarshal | Direct access to List/Dictionary internals | ✅ | [Verified](benchmarks/results/COL-01-CollectionsMarshal.md) |
 | [COL-02](#️-col-02-conditional-adoption-of-frozendictionary) | Conditional use of FrozenDictionary | Faster lookup for immutable dictionaries | ✅ | [Verified](benchmarks/results/COL-02-FrozenCondition.md) |
 | [COL-03](#️-col-03-span-key-lookups-with-getalternatelookup) | GetAlternateLookup | Dictionary lookup with a Span key | ✅ | [Verified](benchmarks/results/COL-04-SampledNameTable.md) |
@@ -109,6 +113,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [ASY-06](#-asy-06-single-loop-scheduler) | Single-loop scheduler | Avoid a proliferation of timers | ✅ | [Verified](benchmarks/results/ASY-06-SchedulerPrimitive.md) |
 | [ASY-07](#-asy-07-streaming-io) | Streaming I/O | Avoid buffering everything | ✅ | [Verified](benchmarks/results/ASY-07-StreamBuffering.md) |
 | [CON-01](#-con-01-one-shot-guards-with-interlocked) | Interlocked one-shot guard | Lock-free run-once for Dispose and initialization | ✅ | [Verified](benchmarks/results/CON-01-DisposeGuard.md) |
+| [CON-02](#-con-02-reference-counting-for-pinned-resources) | Reference counting for pinned resources | Batch retains per run; deterministic release | ✅ | [Verified](benchmarks/results/CON-02-RefCount.md) |
 | [SYS-01](#️-sys-01-low-cost-time-and-elapsed-time-reads) | Low-cost timestamps | Avoid DateTime.UtcNow | ✅ | [Verified](benchmarks/results/SYS-01-Timestamp.md) |
 | [DAT-01](#️-dat-01-optimizing-column-resolution-in-db-access) | Optimized column resolution for DB access | Ordinal caching and single-pass column resolution | ✅ | [Verified](benchmarks/results/DAT-01-OrdinalResolve.md) |
 | [GEN-01](#-gen-01-strategies-for-fast-emit-generated-code) | Speed strategies for Emit-generated code | Inlining of generated delegates and similar | ❌ | [Verified](benchmarks/results/GEN-01-EmitStrategy.md) |
@@ -1302,6 +1307,55 @@ public Widget() => onChanged = HandleChanged;
 
 ---
 
+### 🚦 DSP-06: Index-forwarding pipelines (delegate-free chains)
+
+**Goal:** Remove the `next` delegate from an interceptor chain entirely. Instead of handing each hop a continuation, hand it the pipeline plus its own index and let it call forward.
+
+**Effect:**
+
+- The hop becomes an ordinary interface call with two extra arguments - there is no delegate to create, capture, or keep alive
+- The chain position travels as a by-value `int`, so the pipeline object stays stateless and reentrant: one instance serves concurrent invocations
+- Beats [DSP-05](#-dsp-05-precomposing-delegate-pipelines)'s precomposed chain, which is already the good answer - precomposition removes the *allocation*, index forwarding removes the *delegate*
+
+**AOT:** ✅ No issues (fewer delegates than DSP-05, so if anything it is friendlier)
+
+**Example:**
+
+```csharp
+public sealed class Pipeline
+{
+    private readonly IInterceptor[] interceptors;
+    private readonly Func<int, ValueTask> terminal;
+
+    public ValueTask InvokeAsync(int command) => ProcessNext(command, 0);
+
+    // ✅ The hop receives the pipeline and its own index - no delegate is created anywhere
+    public ValueTask ProcessNext(int command, int index)
+        => index < interceptors.Length
+            ? interceptors[index].InvokeAsync(command, this, index)
+            : terminal(command);
+}
+
+public sealed class LoggingInterceptor : IInterceptor
+{
+    // ✅ Forward by advancing the index, not by invoking a captured continuation
+    public ValueTask InvokeAsync(int command, Pipeline pipeline, int index)
+        => pipeline.ProcessNext(command + 1, index + 1);
+}
+```
+
+**Use cases:** Middleware stacks, HTTP/RPC client policy chains (retry, logging, auth), in-process message bus interceptors - anywhere the chain is fixed at build time but invoked per request or per message.
+
+**Measured (net10 / x86-64-v4, 4 pass-through interceptors):** Allocating a closure per hop costs 32.5 ns / 488 B. A context-cached continuation delegate is 13.6 ns (0.42x), DSP-05's precomposed chain is 11.1 ns (0.34x), and **index forwarding is 8.85 ns (0.27x)**. All three non-naive forms drop to 72 B, which is the caller's own `Task` return rather than per-hop cost - none of them allocates per hop. → [Results](benchmarks/results/DSP-06-IndexForward.md)
+
+**Caveats:**
+
+- The interceptor signature grows by two parameters and names the concrete pipeline type, so the interceptor interface becomes coupled to the pipeline. DSP-05's `Func<T, ValueTask>` stays decoupled - that is the trade
+- **Do not hold the index in a field on a shared context.** That is the "cached continuation" variant measured above: it is the slowest of the three and it forces a per-invocation context object (and therefore a pool) behind it
+- With one or two hops the difference disappears into the surrounding work. This is for chains on a hot path
+
+---
+
 ## 🏷️ TYP: Type system techniques
 
 ### 🏷️ TYP-01: Static type slots (TypeMap / TypeSlot)
@@ -1581,6 +1635,49 @@ Reading a static field is essentially free — below measurement resolution (the
 
 ---
 
+### 🏷️ TYP-07: Choosing the hash source for Type keys
+
+**Goal:** When the type is only known at runtime and you have to hash a `Type`, pick the cheapest source of identity. TYP-01's static slot does not apply here - this is the fallback path it tells you to avoid, made as cheap as it can be.
+
+**Effect (measured, net10 / x86-64-v4, 32-entry node map, 32 hit probes / 8 miss probes):**
+
+| Hash source | Hit | Miss | Code size |
+|---|---|---|---|
+| `type.GetHashCode()` | 1.362 ns | 1.251 ns | 403 B |
+| `RuntimeHelpers.GetHashCode(type)` | 1.116 ns (0.82x) | 1.197 ns (0.96x) | 355 B |
+| **`type.TypeHandle.Value`** | **0.848 ns (0.62x)** | **0.812 ns (0.65x)** | **192 B** |
+
+The bucket layout is held identical across the three so that only the acquisition path varies. The virtual call keeps its dispatch; `RuntimeHelpers.GetHashCode` inlines but still reads the object header and checks whether a hash has been assigned; `TypeHandle.Value` is a plain field read of the type handle with no branch, which is why its code is less than half the size.
+
+**AOT:** ⚠️ Not verified - see Caveats
+
+**Example:**
+
+```csharp
+// ❌ Virtual dispatch on every lookup
+var index = key.GetHashCode() & mask;
+
+// ⚠️ Better, but still an object-header read plus an "is a hash assigned yet" check
+var index = RuntimeHelpers.GetHashCode(key) & mask;
+
+// ✅ Plain field read. The handle is pointer-aligned, so the low 3 bits are always
+//    zero - shift them off or a power-of-two table uses only 1/8 of its slots
+var index = (int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask;
+```
+
+**Use cases:** Runtime type dispatch tables - serializer formatter lookup, DI resolution caches, message handler registries: anywhere a `Type` arrives as data rather than as a generic argument.
+
+**Measured (net10 / x86-64-v4):** `TypeHandle.Value` is **0.62x on hit and 0.65x on miss** against the virtual `GetHashCode`, with code size dropping 403 B → 192 B. → [Results](benchmarks/results/TYP-07-TypeHashSource.md)
+
+**Caveats:**
+
+- **The AOT column is unverified.** These numbers come from a JIT run. Under NativeAOT the handle is an EEType pointer rather than the JIT runtime's MethodTable, so both the codegen and the low-bit alignment assumption need re-measuring on an AOT publish before this can claim ✅
+- **Do not forget the shift.** The handle is 8-byte aligned, so without `>> 3` every key lands in a bucket whose index is a multiple of 8
+- The handle is stable for the process lifetime of a loaded type. Under a collectible `AssemblyLoadContext` an unloaded type's address can be reused, so this is only safe while the table holds a strong `Type` reference for every live entry
+- If the type *is* known statically, none of this applies - use [TYP-01](#️-typ-01-static-type-slots-typemap--typeslot)'s generic slot at 0.09x instead
+
+---
+
 ## 🔢 BIT: Bit manipulation and branchless optimization
 
 ### 🔢 BIT-01: Lightweight hashing that exploits domain constraints
@@ -1751,6 +1848,57 @@ var hash = XxHash3.HashToUInt64(MemoryMarshal.AsBytes(value.AsSpan()));
 XxHash3 is already faster at 8 characters and the gap widens with length. `MemoryMarshal.AsBytes` and `fixed` are equivalent (no pinning required, so prefer the cast) — the reinterpretation is zero-cost. A hand-written hash loop (FNV-1a) is beaten by the vectorized BCL from 64 characters on, so do not roll your own. → [Results](benchmarks/results/BIT-04-XxHash3.md)
 
 **Caveats:** Being a non-cryptographic hash, it cannot be used for tamper detection or signatures.
+
+---
+
+### 🔢 BIT-05: Order-preserving digests for variable-length key search
+
+**Goal:** In a binary search over sorted variable-length byte keys, decide most probes without touching the key bytes. Pack the first 8 bytes of each key big-endian into a `ulong` - for byte-lexicographic ordering that packing **preserves order**, so comparing two digests as integers gives the same answer as comparing the keys, whenever the digests differ.
+
+**Effect:**
+
+- A probe becomes one `ulong` load and one integer compare instead of a `SequenceCompareTo` call plus a pointer chase into the key array
+- Only when two digests are equal does the search fall back to a full byte comparison
+- The gain grows with table size, because a deeper search means more probes that never touch key bytes - and misses gain the most, since a miss walks the full depth and never needs the bytes at all
+
+**AOT:** ✅ No issues
+
+**Example:**
+
+```csharp
+// ✅ Big-endian packing with zero padding preserves byte-lexicographic order
+private static ulong GetDigest(ReadOnlySpan<byte> key)
+{
+    Span<byte> buffer = stackalloc byte[8];
+    buffer.Clear();
+    key[..Math.Min(key.Length, 8)].CopyTo(buffer);
+    return BinaryPrimitives.ReadUInt64BigEndian(buffer);
+}
+
+// Built once alongside the sorted key array
+var mid = (lo + hi) >>> 1;
+var digest = digests[mid];
+int compared;
+if (digest != probeDigest)
+{
+    compared = digest < probeDigest ? 1 : -1;   // decided without reading key bytes
+}
+else
+{
+    compared = probe.SequenceCompareTo(keys[mid]);   // fall back only on a tie
+}
+```
+
+**Use cases:** Storage-engine index blocks - binary search over a sorted run of variable-length keys, where the structure has to stay ordered because range scans, prefix scans and successor lookups go through it too.
+
+**Measured (net10 / x86-64-v4, 64 / 256 / 1024 keys):** With keys that differ inside the first 8 bytes, hit is **0.74x / 0.68x / 0.65x** and miss is **0.64x / 0.57x / 0.54x**. With every key sharing an 8-byte prefix, the sign reverses: hit **1.31x / 1.27x / 1.30x**, miss **1.36x / 1.26x / 1.22x**. → [Results](benchmarks/results/BIT-05-OrderedDigestSearch.md)
+
+**Caveats:**
+
+- **This is conditional, and the worst case is a real regression, not a wash.** If keys share an 8-byte prefix, every digest ties, the fallback runs anyway, and the digest is pure added work at 1.2-1.4x. Identifier-like keys with a common namespace prefix land exactly there - measure the actual prefix distribution before adopting
+- If ordering is not required, a hash table beats binary search outright and this pattern has no place
+- Costs one `ulong` per key of extra memory, and roughly doubles the code size of the search (the packing inlines into the probe)
+- The order-preserving property depends on **unsigned** big-endian packing. Little-endian, or a signed comparison, breaks it silently
 
 ---
 
@@ -1968,6 +2116,55 @@ private bool TryReadLine(out ReadOnlySpan<byte> line)
 **Measured (net10 / x86-64-v4, 16 lines of 2 KB received in 256 B chunks):** Rescanning the whole buffer every time plus compacting after every line takes 1.70 μs, against **1.13 μs (0.67x) for incremental search plus deferred compaction**. Both are zero-allocation; the difference comes from not rescanning already-scanned bytes and from moving data only when necessary instead of per line (the two-segment wraparound path was not measured; the figures come from a flat buffer). → [Results](benchmarks/results/SEQ-04-RingSplit.md)
 
 **Caveats:** Decide the buffer-overflow policy explicitly (drop old data / throw / grow).
+
+---
+
+### 📜 SEQ-05: Reading an unknown-length stream without a grow-copy chain
+
+**Goal:** Stop the "accumulate into a `MemoryStream`, then `ToArray`" shape. That form pays a reallocate-and-copy every time the buffer doubles, then one more full copy at the end, and lands every buffer past 85 KB on the LOH. Read into pooled chunks and expose them as a `ReadOnlySequence<byte>` instead.
+
+**Effect:**
+
+- One copy out of the source instead of one copy plus the grow-copy chain plus a final `ToArray`
+- No LOH traffic regardless of payload size, because no single buffer ever exceeds the chunk size
+- The consumer works against `ReadOnlySequence<byte>`, which most modern parsing APIs already accept (`Utf8JsonReader`, `SequenceReader<T>`)
+
+**AOT:** ✅ No issues
+
+**Example:**
+
+```csharp
+// ❌ Grow-copy chain plus a final full copy, and the result is on the LOH
+using var destination = new MemoryStream();
+source.CopyTo(destination);
+var array = destination.ToArray();
+
+// ✅ PipeReader hands you a ReadOnlySequence over its own pooled buffers
+var reader = PipeReader.Create(source, new StreamPipeReaderOptions(bufferSize: 32 * 1024));
+while (true)
+{
+    var result = await reader.ReadAsync().ConfigureAwait(false);
+    Process(result.Buffer);
+    reader.AdvanceTo(result.Buffer.End);
+    if (result.IsCompleted)
+    {
+        break;
+    }
+}
+
+await reader.CompleteAsync().ConfigureAwait(false);
+```
+
+**Use cases:** Pulling an unknown-length payload out of a stream - a request body, a blob read, a file of unknown size.
+
+**Measured (net10 / x86-64-v4, 256 KB):** `MemoryStream` accumulate + `ToArray` costs 167.3 μs and **524,520 B**, with Gen0/Gen1/Gen2 all at 166.5 collections (the large arrays survive to Gen2). `PipeReader` is **57.4 μs (0.34x) / 504 B**, and a hand-rolled pooled-chunk `ReadOnlySequence` builder is 56.2 μs (0.34x) / 64 B. → [Results](benchmarks/results/SEQ-05-StreamSequence.md)
+
+**Caveats:**
+
+- **`PipeReader` is the answer here, not a hand-rolled builder.** The custom builder measured 0.98x against `PipeReader` - a real difference, and a 2% one, against ~90 lines of segment pooling you then own. Reach for your own only when the sequence must outlive the read loop, or when the source is not a `Stream`
+- All variants still copy the payload once, out of the source into the read buffer. What is removed is the *extra* copies, not the first one
+- `AdvanceTo` must be called for every `ReadAsync`, and the buffer is invalid afterwards. Anything you need to keep must be copied out before advancing
+- See [ASY-03](#-asy-03-systemiopipelines) for the Pipelines mechanics and the 64 KB deadlock caveat
 
 ---
 
@@ -2818,6 +3015,73 @@ public static void EnsureInitialized()
 
 ---
 
+### 🔒 CON-02: Reference counting for pinned resources
+
+**Goal:** Pin a shared resource (a cached page, a pooled buffer) for as long as a reader needs it and release it deterministically when the last user is done, without paying an interlocked operation per item read.
+
+**Effect:**
+
+- **Run-length batching is the large win.** When consecutive items belong to the same resource, retain once per run instead of once per item. 128 rows over 4 pages means 4 interlocked pairs instead of 128
+- **Optimistic retain is the small win, and only under contention.** A CAS retry loop re-reads and retries on every lost race; a single `Interlocked.Increment` always makes progress in one operation. Uncontended, the two are identical - the retry loop never actually retries
+- Death is stamped as a large negative bias rather than zero, so a late increment can never resurrect a dead entry
+
+**AOT:** ✅ No issues
+
+**Example:**
+
+```csharp
+// ✅ Optimistic: one fetch-add, no retry storm under contention
+public bool TryRetain()
+{
+    var result = Interlocked.Increment(ref refCount);
+    if (result >= 1)
+    {
+        return true;
+    }
+
+    Interlocked.Decrement(ref refCount);    // lost the race with death
+    return false;
+}
+
+public void Release()
+{
+    // The bias must be large enough that a late increment cannot lift the count back above zero
+    if ((Interlocked.Decrement(ref refCount) == 0) &&
+        (Interlocked.CompareExchange(ref refCount, int.MinValue / 2, 0) == 0))
+    {
+        Dispose();
+    }
+}
+
+// ✅ Retain once per run, not once per row
+Page? last = null;
+foreach (var row in rows)
+{
+    var page = row.Page;
+    if (!ReferenceEquals(page, last))
+    {
+        if (page.TryRetain())
+        {
+            retained[retainedCount++] = page;
+        }
+
+        last = page;
+    }
+}
+```
+
+**Use cases:** Page / buffer cache pinning - a range scan pins the pages it is reading so they cannot be evicted, and the last release frees deterministically instead of waiting for the GC.
+
+**Measured (net10 / x86-64-v4):** Run-length batching over 128 rows spread across 4 pages takes 0.483 ns/row against 7.68 ns for retain-per-row - **0.06x, about 16x**. The primitive swap is worth **0.57x under 4-thread contention** (29.30 → 16.60 ns) and **1.00x uncontended** (7.720 vs 7.728 ns, overlapping CIs). → [Results](benchmarks/results/CON-02-RefCount.md)
+
+**Caveats:**
+
+- **Order matters: batch first, then choose the primitive.** Batching is worth ~16x, the primitive swap is worth 1.75x and only when threads actually contend. Swapping the primitive on an uncontended path buys nothing
+- The optimistic form's cost is correctness surface, not code size (115 → 120 B). Getting the death bias wrong resurrects freed objects, which fails far from the bug
+- Batching is only valid when the run really is contiguous. Verify the grouping, or you release a resource a later item still holds
+
+---
+
 ## 🖥️ SYS: System and OS facilities
 
 ### 🖥️ SYS-01: Low-cost time and elapsed-time reads
@@ -3044,6 +3308,7 @@ Every measurement in this document was taken under **JIT (net10, Dynamic PGO ena
 | Inlining small helpers (JIT-01) | The default policy inlines automatically (the attribute makes no difference) | Only static heuristics, with no profile | Spelling out `AggressiveInlining` is worth more than it is under JIT |
 | `AggressiveOptimization` | Disables Dynamic PGO, so it **can actually be slower** | Meaningless (and harmless) with no tiered compilation | As a rule, do not use it under JIT; under AOT it does nothing |
 | Runtime code generation (GEN-01) | Emit's best form matches compiled code | `PlatformNotSupportedException` (AOTP-01) | Replace it with a Source Generator (GEN-02) |
+| Hash source for Type keys (TYP-07) | `TypeHandle.Value` 0.62x on hit vs the virtual `GetHashCode` | The handle is an EEType pointer rather than the JIT MethodTable, and the header-read path codegen differs | **Not verified.** Re-measure on an AOT publish before relying on the ratio, and re-check the low-bit alignment the shift depends on |
 
 **What AOT makes better instead:** With no wait for tiered compilation at startup, type-initializer-based caches and static tables such as TYP-04 / TYP-06 run fully optimized from the very first call. The problem where R-01 (typeof caching) lost before Tier1 promotion under JIT also does not arise under AOT.
 
@@ -3158,6 +3423,11 @@ For the shape to emit per scenario and its evidence see the [generated code patt
 | Character search over many candidates | TXT-08 (use the dedicated overload for 2-3 candidates) |
 | Formatting and trimming fixed-length fields | TXT-09 |
 | General-purpose hashing (long inputs, stable values) | BIT-04 |
+| Reading an unknown-length stream without extra copies | SEQ-05 / ASY-03 |
+| Pinning a shared page or buffer while it is read | CON-02 |
+| Searching sorted variable-length keys | BIT-05 |
+| Hashing a Type known only at runtime | TYP-07 |
+| Invoking an interceptor chain per request | DSP-06 / DSP-05 |
 | Precomputing per-type strings and SQL | TYP-06 |
 | Cutting the composition cost of pipelines and callbacks | DSP-05 |
 | Async APIs that usually complete synchronously | ASY-05 |
