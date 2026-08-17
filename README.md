@@ -1649,7 +1649,7 @@ Reading a static field is essentially free — below measurement resolution (the
 
 The bucket layout is held identical across the three so that only the acquisition path varies. The virtual call keeps its dispatch; `RuntimeHelpers.GetHashCode` inlines but still reads the object header and checks whether a hash has been assigned; `TypeHandle.Value` is a plain field read of the type handle with no branch, which is why its code is less than half the size.
 
-**AOT:** ⚠️ Not verified - see Caveats
+**AOT:** ⚠️ **The ranking reverses.** Measured on a NativeAOT publish, the plain virtual `GetHashCode` is the *fastest* of the three and both alternatives are slower than it (identity 1.18x hit / 1.23x miss, handle 1.08x / 1.19x). Under AOT the closed type graph lets `RuntimeType.GetHashCode` be statically devirtualized, so the dispatch that makes it slowest under JIT is gone. Pick by target; if you ship both, the virtual call is the safe default because it is never worst on either runtime
 
 **Example:**
 
@@ -1667,12 +1667,12 @@ var index = (int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask;
 
 **Use cases:** Runtime type dispatch tables - serializer formatter lookup, DI resolution caches, message handler registries: anywhere a `Type` arrives as data rather than as a generic argument.
 
-**Measured (net10 / x86-64-v4):** `TypeHandle.Value` is **0.62x on hit and 0.65x on miss** against the virtual `GetHashCode`, with code size dropping 403 B → 192 B. → [Results](benchmarks/results/TYP-07-TypeHashSource.md)
+**Measured (net10 / x86-64-v4):** Under JIT, `TypeHandle.Value` is **0.62x on hit and 0.65x on miss** against the virtual `GetHashCode`, with code size dropping 403 B → 192 B. Under **NativeAOT the order reverses** and the virtual call wins (see AOT above). → [Results](benchmarks/results/TYP-07-TypeHashSource.md)
 
 **Caveats:**
 
-- **The AOT column is unverified.** These numbers come from a JIT run. Under NativeAOT the handle is an EEType pointer rather than the JIT runtime's MethodTable, so both the codegen and the low-bit alignment assumption need re-measuring on an AOT publish before this can claim ✅
-- **Do not forget the shift.** The handle is 8-byte aligned, so without `>> 3` every key lands in a bucket whose index is a multiple of 8
+- **The win is JIT-only.** On NativeAOT this pattern is a pessimization - measure your actual target before adopting
+- **Do not forget the shift.** The handle is pointer-aligned, so without `>> 3` only 8 of 64 buckets are reachable and the longest chain grows to 8. Correctness will not catch this: the same shift is applied at insert and lookup, so lookups stay right and only the distribution collapses. The alignment itself was confirmed to hold on an AOT publish (40/40 handles 8-byte aligned)
 - The handle is stable for the process lifetime of a loaded type. Under a collectible `AssemblyLoadContext` an unloaded type's address can be reused, so this is only safe while the table holds a strong `Type` reference for every live entry
 - If the type *is* known statically, none of this applies - use [TYP-01](#️-typ-01-static-type-slots-typemap--typeslot)'s generic slot at 0.09x instead
 
@@ -3308,7 +3308,7 @@ Every measurement in this document was taken under **JIT (net10, Dynamic PGO ena
 | Inlining small helpers (JIT-01) | The default policy inlines automatically (the attribute makes no difference) | Only static heuristics, with no profile | Spelling out `AggressiveInlining` is worth more than it is under JIT |
 | `AggressiveOptimization` | Disables Dynamic PGO, so it **can actually be slower** | Meaningless (and harmless) with no tiered compilation | As a rule, do not use it under JIT; under AOT it does nothing |
 | Runtime code generation (GEN-01) | Emit's best form matches compiled code | `PlatformNotSupportedException` (AOTP-01) | Replace it with a Source Generator (GEN-02) |
-| Hash source for Type keys (TYP-07) | `TypeHandle.Value` 0.62x on hit vs the virtual `GetHashCode` | The handle is an EEType pointer rather than the JIT MethodTable, and the header-read path codegen differs | **Not verified.** Re-measure on an AOT publish before relying on the ratio, and re-check the low-bit alignment the shift depends on |
+| Hash source for Type keys (TYP-07) | `TypeHandle.Value` 0.62x on hit vs the virtual `GetHashCode` | **The ranking reverses.** The virtual call becomes the fastest of the three (the closed type graph lets it be statically devirtualized); handle is 1.08x hit / 1.19x miss and identity 1.18x / 1.23x against it | **Use the plain `type.GetHashCode()`.** The handle trick is a pessimization here. Its 8-byte alignment does still hold, so the `>> 3` stays correct - it just stops paying |
 
 **What AOT makes better instead:** With no wait for tiered compilation at startup, type-initializer-based caches and static tables such as TYP-04 / TYP-06 run fully optimized from the very first call. The problem where R-01 (typeof caching) lost before Tier1 promotion under JIT also does not arise under AOT.
 

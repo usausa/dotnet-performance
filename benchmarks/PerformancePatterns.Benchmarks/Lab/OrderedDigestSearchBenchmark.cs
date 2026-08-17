@@ -1,4 +1,4 @@
-namespace CandidateVerification.Benchmarks;
+namespace PerformancePatterns.Benchmarks.Lab;
 
 using System.Buffers.Binary;
 using System.Text;
@@ -15,9 +15,9 @@ public enum DigestKeyShape
     SharedPrefix,
 }
 
-// C-04 (new pattern candidate, BIT): binary search over variable-length keys —
+// BIT-05 study: binary search over variable-length keys -
 // full SequenceCompareTo probes vs order-preserving 8-byte digest array probes.
-// Full verification: table size (64/256/1024) x key shape (random / shared-prefix worst case).
+// Table size (64/256/1024) x key shape (random / shared-prefix worst case).
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
 public class OrderedDigestSearchBenchmark

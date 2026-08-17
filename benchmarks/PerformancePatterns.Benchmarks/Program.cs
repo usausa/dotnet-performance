@@ -43,6 +43,12 @@ public static class Program
         VerifyStarFourBatchA();
         VerifyStarFourBatchB();
         VerifyStarThreeBatch();
+        OrderedDigestSearchBenchmark.Verify();
+        RefCountUncontendedBenchmark.Verify();
+        RetainBatchingBenchmark.Verify();
+        IndexForwardBenchmark.Verify();
+        StreamSequenceBenchmark.Verify();
+        TypeHashSourceBenchmark.Verify();
 
         // Example: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -127,6 +133,13 @@ public static class Program
                 typeof(OrdinalResolveBenchmark),
                 typeof(EmitStrategyBenchmark),
                 typeof(SampledNameTableBenchmark),
+                typeof(OrderedDigestSearchBenchmark),
+                typeof(RefCountUncontendedBenchmark),
+                typeof(RefCountContendedBenchmark),
+                typeof(RetainBatchingBenchmark),
+                typeof(IndexForwardBenchmark),
+                typeof(StreamSequenceBenchmark),
+                typeof(TypeHashSourceBenchmark),
 #if NET9_0_OR_GREATER
                 typeof(SampledNameTableSpanKeyBenchmark),
 #endif

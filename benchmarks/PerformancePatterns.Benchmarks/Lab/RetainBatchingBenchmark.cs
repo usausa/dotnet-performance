@@ -1,11 +1,9 @@
-namespace CandidateVerification.Benchmarks;
+namespace PerformancePatterns.Benchmarks.Lab;
 
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-using CandidateVerification.Benchmarks.Candidates;
-
-// C-06 full verification (2): run-length retain batching for range-scan results.
+// CON-02 study (2): run-length retain batching for range-scan results.
 // 128 consecutive rows over 4 pages: retain per row vs retain once per page run.
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]

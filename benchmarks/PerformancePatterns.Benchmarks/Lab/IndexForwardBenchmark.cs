@@ -1,15 +1,15 @@
-namespace CandidateVerification.Benchmarks;
+namespace PerformancePatterns.Benchmarks.Lab;
 
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// C-08 (DSP-05 update candidate): interceptor chain composition strategies.
+// DSP-06 study: interceptor chain composition strategies.
 // ClosureCompose = per-hop closure allocation (naive) / CachedContinuation = context-cached method-group delegate
 // PrecomposedChain = ASP.NET Core middleware style (delegate chain folded once at build time)
 // IndexForward = Azure.Core HttpPipeline style (policy array + index advancing, no delegate at all)
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
-public class ContinuationChainBenchmark
+public class IndexForwardBenchmark
 {
     private const int InterceptorCount = 4;
 
@@ -34,7 +34,7 @@ public class ContinuationChainBenchmark
             indexedInterceptors[i] = new IndexedPassThroughInterceptor();
         }
 
-        // In production the context comes from a pool (C-01); the single-threaded benchmark reuses one instance
+        // The cached-continuation variant needs a per-invocation context; the single-threaded benchmark reuses one instance
         chainContext = new ChainContext(interceptors, command => counter += command);
 
         // ASP.NET Core style: fold the delegate chain once at build time (closures allocated at setup only)
@@ -81,7 +81,7 @@ public class ContinuationChainBenchmark
 
     public static void Verify()
     {
-        var benchmark = new ContinuationChainBenchmark();
+        var benchmark = new IndexForwardBenchmark();
         benchmark.Setup();
 
         benchmark.counter = 0;
