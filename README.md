@@ -933,7 +933,7 @@ public static void Return(StringBuilder builder)
 - `AggressiveInlining`: Removes the call cost entirely. Ideal for wrapper methods on hot paths
 - `AggressiveOptimization`: Bypasses tiered compilation and compiles optimized code from the first call
 
-**AOT:** ✅ No issues. `AggressiveInlining` applies to AOT compilation as well. `AggressiveOptimization` is effectively meaningless (but harmless) under AOT, which has no tiered compilation
+**AOT:** ✅ No issues, and **this is where the attribute earns its keep.** Measured under NativeAOT the default policy declines this inline - `DefaultPolicy` and `NoInline` come out identical (1,392 vs 1,395 ns) - while `AggressiveInlining` is worth **0.69x**, beating even the JIT's inlined default. Free to add under JIT, decisive under AOT. `AggressiveOptimization` is a separate attribute and effectively meaningless (but harmless) under AOT, which has no tiered compilation. → [Results](benchmarks/results/JIT-01-Inlining.md)
 
 **Example:**
 
@@ -1116,7 +1116,7 @@ public void Return(T[] array)
 - Calls through a variable of a sealed type have a known runtime type, so the JIT can lower them to direct calls
 - The benefit is context-dependent (measurements show no difference where inlining or guarded devirtualization is already in play), but it costs nothing
 
-**AOT:** ✅ No issues. AOT has no profile-driven guarded devirtualization, so pinning the type statically with sealed is worth even more there
+**AOT:** ✅ No issues, but **the "worth more under AOT" reasoning did not survive measurement.** Sealing an interface-typed call site is worth nothing on either runtime (0.99x JIT, 1.00x AOT), and the concrete-type win *shrinks* here (0.92x → 0.96x). What does grow under AOT is the cost of interface dispatch itself, measured at 1.06x → 1.30x in [DSP-02](#-dsp-02-choosing-a-call-abstraction) - so hold the **concrete** type on hot paths, not merely a sealed one. See [Results](benchmarks/results/DSP-01-SealedDevirt.md) for why the two benchmarks disagree on the size of that cost
 
 **Example:**
 
@@ -1163,7 +1163,7 @@ public sealed class BinaryFormatter : IFormatter { ... }
 
 A well-predicted monomorphic virtual call is nearly free (~4%), so delegate ≒ abstract ≒ interface — the old wisdom that "delegates are heavier than interfaces" is false. → [Results](benchmarks/results/DSP-02-CallAbstraction.md)
 
-**AOT:** ✅ No issues (managed function pointers are AOT-compatible)
+**AOT:** ✅ Compatible, but **the ranking in this table is JIT-only and it reverses.** Measured under NativeAOT the delegate becomes the cliff at 5.62x while the function pointer stays at 4.82x - the delegate loses guarded devirtualization and regresses 4.7x in absolute terms, whereas the function pointer barely moves. Interface and abstract dispatch roughly double as well (1.06x → 1.30x). Holding the concrete sealed type is the one row unchanged on both runtimes. → [Results](benchmarks/results/DSP-02-CallAbstraction.md)
 
 **Use cases:** Factory tables in DI containers, formatter resolution in serializers, and holding pipeline stages.
 

@@ -933,7 +933,7 @@ public static void Return(StringBuilder builder)
 - `AggressiveInlining`: 関数呼び出しコストをゼロにする。ホットパスのラッパー関数に最適
 - `AggressiveOptimization`: Tiered Compilation を回避して最初から最適化コンパイルする
 
-**AOT:** ✅ 問題なし。`AggressiveInlining` は AOT コンパイル時にも有効。`AggressiveOptimization` は AOT には階層型コンパイルがないため実質無意味(無害)
+**AOT:** ✅ 問題なし。しかも**属性が本当に効くのはこちら。** NativeAOT の実測では既定ポリシーがこのインライン化を拒否し(`DefaultPolicy` と `NoInline` が 1,392 対 1,395 ns で一致)、`AggressiveInlining` は **0.69 倍**の価値を持つ。JIT のインライン化済み既定すら上回る。JIT では付けても無コスト、AOT では決定的。なお `AggressiveOptimization` は別物で、AOT には階層型コンパイルがないため実質無意味(無害)。→ [測定結果](benchmarks/results/JIT-01-Inlining.md)
 
 **実装例:**
 
@@ -1116,7 +1116,7 @@ public void Return(T[] array)
 - sealed 型の変数経由の呼び出しは実行時型が確定するため、JIT が直接呼び出しに落とせる
 - 効果はコンテキスト依存(既にインライン化やガード付き devirtualization が効いている場合は差が出ないことも実測されている)が、コストはゼロ
 
-**AOT:** ✅ 問題なし。AOT には実行時プロファイルによるガード付き devirtualization がないため、静的に sealed で確定させる価値がむしろ大きい
+**AOT:** ✅ 問題なし。ただし**「AOT では価値が大きい」という理屈は実測で否定された。** インターフェース型の呼び出し箇所を sealed にする効果はどちらの実行形態でも無価値(JIT 0.99 倍 / AOT 1.00 倍)で、具象型で持つ効果はここでは*縮小*する(0.92 → 0.96 倍)。AOT で大きくなるのはインターフェースディスパッチそのもののコストの方で、[DSP-02](#-dsp-02-呼び出し抽象化の選択指針) では 1.06 → 1.30 倍。したがってホットパスでは単に sealed にするのではなく**具象型**で持つこと。このコストの大きさについて 2 つのベンチマークが食い違う理由は [測定結果](benchmarks/results/DSP-01-SealedDevirt.md) を参照
 
 **実装例:**
 
@@ -1163,7 +1163,7 @@ public sealed class BinaryFormatter : IFormatter { ... }
 
 分岐予測の効いた単相仮想呼び出しはほぼ無料(約 4%)で、デリゲート ≒ abstract ≒ インターフェース — 「デリゲートはインターフェースより重い」という古い常識は成立しない。→ [測定結果](benchmarks/results/DSP-02-CallAbstraction.md)
 
-**AOT:** ✅ 問題なし(マネージド関数ポインタは AOT 対応)
+**AOT:** ✅ 対応済み。ただし**この表の順位は JIT 限定であり、AOT では反転する。** NativeAOT の実測では、デリゲートが 5.62 倍で崖になり、関数ポインタは 4.82 倍に留まる — デリゲートがガード付き脱仮想化を失って絶対値で 4.7 倍悪化する一方、関数ポインタはほぼ動かない。インターフェース/抽象ディスパッチも概ね倍増する(1.06 → 1.30 倍)。両実行形態で唯一変わらないのは「具象 sealed 型で保持する」行。→ [測定結果](benchmarks/results/DSP-02-CallAbstraction.md)
 
 **ユースケース:** DI コンテナのファクトリ表、シリアライザのフォーマッタ解決、パイプラインのステージ保持。
 
