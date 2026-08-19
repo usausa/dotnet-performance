@@ -49,6 +49,11 @@ public static class Program
         IndexForwardBenchmark.Verify();
         StreamSequenceBenchmark.Verify();
         TypeHashSourceBenchmark.Verify();
+        StringSwitchSmallBenchmark.Verify();
+        StringSwitchBenchmark.Verify();
+        StringSwitchLongKeyBenchmark.Verify();
+        StringSwitch64Benchmark.Verify();
+        StringSwitch128Benchmark.Verify();
 
         // Example: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -140,6 +145,11 @@ public static class Program
                 typeof(IndexForwardBenchmark),
                 typeof(StreamSequenceBenchmark),
                 typeof(TypeHashSourceBenchmark),
+                typeof(StringSwitchSmallBenchmark),
+                typeof(StringSwitchBenchmark),
+                typeof(StringSwitchLongKeyBenchmark),
+                typeof(StringSwitch64Benchmark),
+                typeof(StringSwitch128Benchmark),
 #if NET9_0_OR_GREATER
                 typeof(SampledNameTableSpanKeyBenchmark),
 #endif

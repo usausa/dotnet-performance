@@ -105,6 +105,7 @@
 | [TXT-07](#-txt-07-stringcreate--tryformat--ispanformattable) | string.Create / TryFormat | 文字列生成のゼロアロケーション化 | ✅ | [検証済](benchmarks/results/TXT-07-StringCreate.md) |
 | [TXT-08](#-txt-08-searchvaluest) | SearchValues\<T\> | 多数候補探索の SIMD 最適化 | ✅ | [検証済](benchmarks/results/TXT-08-SearchValues.md) |
 | [TXT-09](#-txt-09-固定長整形の応用イディオム) | 固定長整形の応用 | TryFormat + Fill・ベクトル化トリム | ✅ | [検証済](benchmarks/results/TXT-09-FixedFieldFormat.md) |
+| [TXT-10](#-txt-10-文字列判定の-switch-集約) | 文字列判定の switch 集約 | コンパイラの長さ・文字バケット化 | ✅ | [検証済](benchmarks/results/TXT-10-StringSwitchDispatch.md) |
 | [ASY-01](#-asy-01-async-ステートマシンの省略) | async ステートマシンの省略 | 単純フォワードの Task 直接返し | ✅ | [検証済](benchmarks/results/ASY-01-AsyncElision.md) |
 | [ASY-02](#-asy-02-systemthreadingchannels-による生産者消費者) | System.Threading.Channels | 生産者消費者キュー | ✅ | [検証済](benchmarks/results/ASY-02-Channels.md) |
 | [ASY-03](#-asy-03-systemiopipelines) | System.IO.Pipelines | I/O ストリーミングのパイプ化 | ✅ | [検証済](benchmarks/results/ASY-03-Pipelines.md) |
@@ -2291,6 +2292,8 @@ public bool TryResolve(ReadOnlySpan<char> name, out int value)
 
 **設計指針:** 生成コードなら要素数が生成時に分かるため、件数に応じて Equals 連鎖(小)/ ハッシュ switch(中〜)を出し分けるのが理想。
 
+**キー集合がコンパイル時に確定しているなら、まず素の `switch` を書く**(64 件までは本表のどの実装より速い)→ [TXT-10](#-txt-10-文字列判定の-switch-集約)。本パターンを使うのは **64 件超 / 集合が実行時にしか確定しない / コードサイズが制約になる**場合。
+
 **リポジトリ内実装:** [SampledNameTable.cs](src/PerformancePatterns/Col/SampledNameTable.cs)(BIT-01 のハッシュ + BIT-02 のマスク + バケット内 Ordinal 確定) / [テスト](tests/PerformancePatterns.Tests/Col/SampledNameTableTest.cs) / [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Col/SampledNameTableBenchmark.cs) / [測定結果](benchmarks/results/COL-04-SampledNameTable.md)
 
 **実測結果(net10 / x86-64-v4、名前解決を要素数別に):**
@@ -2348,6 +2351,8 @@ public static int Sum(IEnumerable<int> source)
 **ユースケース:** コレクションユーティリティ、シリアライザ・マッパーの入力受け取り、LINQ 風演算子。
 
 **関連:** 事前容量確保には `TryGetNonEnumeratedCount`(.NET 6+)で同じ分岐思想を適用できる(列挙せずに件数取得 → `new List<T>(count)` / COL-01 SetCount へ接続)。
+
+**同じ結論が `object` → `string` 変換でも成立(実測):** boxed 値を `x is IFormattable f ? f.ToString(null, InvariantCulture) : x.ToString()` で変換する汎用コンバータを、型別高速パス(`int v => v.ToString(...)` 形の型 switch)へ置き換えても利得はない。**単型入力では 1.11 倍遅くなり**(5.56 → 6.15 ns、信頼区間非重複)、混在型入力では同等(15.43 → 15.39 ns、信頼区間重複)。逆アセンブリで機構も確認済み — 単型では GDV が `int.ToString` を完全にインライン化して `UInt32ToDecStr` へ `tail.jmp` するのに対し、型 switch 側は 576〜660 B でインライン閾値を超えるため out-of-line のまま残り、変換 1 回ごとに call を払う。**この switch は文字列 switch([TXT-10](#-txt-10-文字列判定の-switch-集約))とは別物**(型パターンの MethodTable 比較であって、長さ・文字バケット化ではない)。
 
 **リポジトリ内実装:** [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Lab/EnumerableDispatchBenchmark.cs) / [測定結果](benchmarks/results/COL-05-EnumerableDispatch.md)
 
@@ -2719,6 +2724,75 @@ var trimmed = start < 0 ? [] : field[start..(end + 1)];
 **ユースケース:** 固定長レコード(帳票・EDI・レガシー連携)、プロトコルの固定幅フィールド、ID 整形。
 
 **注意:** UTF-16 の無変換コピーはエンディアンと文字集合の前提を固定できる場合のみ。外部仕様との互換が必要なら明示変換を使う(SEQ-02 と同じ注意)。
+
+---
+
+### 🔤 TXT-10: 文字列判定の switch 集約
+
+**目的:** コンパイル時に確定した文字列集合の判定を `switch` に集約し、長さ・文字のバケット判定を Roslyn に任せる。手書きのディスパッチ最適化を書く前の既定手段にする。
+
+**効果:**
+
+- **適用域は 5〜64 件。** 16 件で `Equals` 連鎖比 **hit 0.51 / miss 0.33**。`Dictionary`(1.38 倍)にも `SampledNameTable`(1.09 倍)にも hit で勝つ
+- **64 件では手書きサンプリングハッシュ switch と互角**(hit 1.06 / miss 1.00、信頼区間重複)
+- **128 件で崩壊**(hit 1.73 / miss **3.79**)。Roslyn が FNV-1a の全文字ハッシュ + 191 ノードの二分探索木へ切り替わるため
+- **≤4 件は効果ゼロ** — 生成コードが手書き `Equals` 連鎖と**命令列まで完全一致**(60 命令 / 263 B)。span 入力ではむしろ連鎖が速い(1.17 倍)
+- C# 11 以降は `ReadOnlySpan<char>` の文字列定数パターンも同じ最適化を受ける(string switch 比 1.1 倍程度)
+
+**AOT:** ✅ 問題なし(生成されるのは分岐とジャンプテーブルのみで、実行時コード生成もリフレクションも使わない)
+
+**実装例:**
+
+```csharp
+// ✅ 5〜64 件: switch を書くだけでよい(コンパイラが長さ → 文字のバケット判定にする)
+public static int GetIndex(ReadOnlySpan<char> name) => name switch
+{
+    "Id" => 0,
+    "Name" => 1,
+    "CreatedAt" => 2,
+    _ => -1,
+};
+
+// ❌ 64 件超で素の switch を書くと FNV 全文字走査 + 二分探索になる
+//    → サンプリングハッシュ switch(長さ + 3 文字)を生成する(GEN-02 / generated-code-patterns シナリオ 1)
+```
+
+**戦略はコンパイラが「長さバケットあたりの件数」で決める**(件数だけでは決まらない):
+
+| キー集合 | 生成される戦略 | 全文字走査 |
+|---|---|---|
+| 4 | 長さ + 文字比較(手書き連鎖と同一) | なし |
+| 16 | 長さ + 文字比較 | なし |
+| 64 | 長さジャンプテーブル → バケット内文字ジャンプテーブル | なし |
+| 128 | FNV-1a 全文字ループ + ハッシュ二分探索木 191 ノード | **あり** |
+| 16 × 58〜62 字 | 長さジャンプテーブル + 先頭文字 + AVX-512 一括比較 | なし |
+
+**実測結果(net10 / x86-64-v4、1 プローブあたり):**
+
+| 方式 | 16 件 hit | 16 件 miss | 64 件 hit | 128 件 hit | 128 件 miss |
+|---|---:|---:|---:|---:|---:|
+| `Equals` 連鎖(16 件の基準) | 3.466 ns | 6.080 ns | — | — | — |
+| **素の switch** | **1.776(0.51)** | **1.993(0.33)** | 2.792(1.06) | 4.580(1.73) | 10.112(**3.79**) |
+| サンプリングハッシュ switch(64 / 128 件の基準) | — | — | **2.633(1.00)** | **2.650(1.00)** | **2.687(1.00)** |
+| `SampledNameTable`(COL-04) | 3.788(1.09) | 4.908(0.81) | 3.607(1.37) | 3.722(1.41) | 4.300(1.61) |
+
+**コードサイズは件数に比例して膨張する**(16 件 1,185 B → 128 件 11,611 B)。`SampledNameTable` は 730〜780 B で一定のため、AOT サイズや I-cache 圧が効く文脈では速度で 1.1〜1.9 倍負けてもテーブルが正解になりうる。→ [測定結果](benchmarks/results/TXT-10-StringSwitchDispatch.md)
+
+**ユースケース:** Source Generator が出力する名前 → インデックス解決(DB 列名、プロパティ名、JSON キー)、enum の名前解決、プロトコルのヘッダディスパッチ。
+
+**適用できない条件 — 入力の変換が必要な照合:** 上の利得は「**素の** `Equals` 連鎖」に対するもので、プローブをそのまま比較できることが前提。**入力を変換してから照合する形では成立しない。** DB 列名照合(`OrdinalIgnoreCase`)で入力を大文字化してから素の switch に流す形を実測すると、**8 列で 4.5〜7.8 倍・24 列でも 1.76〜1.89 倍の劣化**になる。
+
+| 方式(列あたり) | 8 列 | 24 列 |
+|---|---:|---:|
+| 現行(連鎖 / サンプリングハッシュ) | **1.93 ns** | **5.38 ns** |
+| 素の switch(大小処理なし・参照値) | 4.29 ns | 4.27 ns |
+| `Ascii.ToUpper`(SIMD)+ span switch | 9.04 ns | 9.48 ns |
+
+**正規化の増分は約 4.8〜5.2 ns/列で、SIMD 版でも変わらない。** 「全文字を畳んでバッファへ書き、switch 側でもう一度全文字を読む」という構造そのものの代償であり、API の選び方では回避できない。switch のディスパッチ利得(4.3 ns/列・規模非依存)を上回るため、**変換が要るなら大文字化サンプリング + `OrdinalIgnoreCase` 確定のハッシュ形を使う**(変換するのは 3 文字だけで済む)。
+
+**注意:** switch は **ordinal(大小区別)**。**キー長は判断材料にならない**(58〜62 文字でも逆転しない)。外部記事の「0.15 倍」は 67 値の if 連鎖比であり、**現実的な期待値は 16 件で 0.5 倍前後**。
+
+**リポジトリ内実装:** src 実装なし(生成コードの形そのものが対象) / [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Lab/StringSwitchDispatchBenchmark.cs) / [測定結果](benchmarks/results/TXT-10-StringSwitchDispatch.md)
 
 ---
 
@@ -3162,7 +3236,7 @@ if (reader.Read())
 }
 ```
 
-**列名照合の戦略選択:** 列数に応じて `String.Equals(OrdinalIgnoreCase)` の連鎖(少数)と サンプリングハッシュ switch(中〜多数)を使い分ける(COL-04 / BIT-01)。生成コードなら列数が生成時に分かるため出し分けられる。
+**列名照合の戦略選択:** 列数に応じて `String.Equals(OrdinalIgnoreCase)` の連鎖(少数)と サンプリングハッシュ switch(中〜多数)を使い分ける(COL-04 / BIT-01)。生成コードなら列数が生成時に分かるため出し分けられる。大小区別でよい照合なら 64 件までは素の switch が最速(TXT-10)。
 
 **CommandBehavior の選択:**
 
@@ -3254,12 +3328,12 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 
 | シナリオ | 生成すべき形 | 根拠実測 |
 |---|---|---|
-| 名前 → インデックス解決 | ≤4 件は Equals 連鎖 / ≥5 件はサンプリングハッシュ switch(定数焼き込み) | COL-04 / R-07 |
+| 名前 → インデックス解決 | ≤4 件は Equals 連鎖 / 5〜64 件は素の switch / 64 件超はサンプリングハッシュ switch(定数焼き込み) | TXT-10 / COL-04 / R-07 |
 | 型別成果物(SQL・型名・キー) | const / static readonly / `"..."u8` へ直書き | TYP-06(0.09 ns) |
 | DB 行マッパー | 序数 struct + `in` 渡し + 型別 getter(`GetValue` は生成しない) | DAT-01(0.13 倍) |
 | ファクトリ / DI | 依存グラフを `new` 直書きへインライン展開(子ファクトリ連鎖を生成しない) | GEN-01(連鎖 2.3 倍) |
 | 整形・シリアライズ | `TryFormat` 直呼び + u8 リテラル + `string.Create` + テーブル(TXT-01) | TXT-01 / 05 / 07、R-16 |
-| enum 特化 | 名前スイッチの適用 + ToString は switch 定数返し | COL-04 に帰着 |
+| enum 特化 | 名前スイッチの適用 + ToString は switch 定数返し | TXT-10 / COL-04 に帰着 |
 | コレクション変換 | 容量確定 + `SetCount` + Span 直書きループ | COL-01 / COL-06 |
 | 変更通知・イベント | EventArgs の static readonly 焼き込み + 購読数に応じた形 | DSP-03 / DSP-04 |
 
@@ -3422,6 +3496,7 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | 文字列生成のゼロアロケーション化 | TXT-07 |
 | 多数候補の文字検索 | TXT-08(候補 2〜3 個は専用オーバーロード) |
 | 固定長フィールドの整形・トリム | TXT-09 |
+| コンパイル時確定の文字列集合の判定 | TXT-10(64 件超・実行時確定は COL-04 / BIT-01) |
 | 汎用ハッシュ(長い入力・安定値) | BIT-04 |
 | 長さ未知ストリームを余計なコピーなしで読む | SEQ-05 / ASY-03 |
 | 読み取り中の共有ページ・バッファのピン留め | CON-02 |

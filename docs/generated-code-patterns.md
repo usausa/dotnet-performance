@@ -22,7 +22,7 @@ Corresponding main pattern: **GEN-02** in [README](../README.md). For where this
 
 **Scenario:** Resolving a known set of strings — DB column names, property names, JSON keys — to a number.
 
-**What to generate:** Branch on the count.
+**What to generate:** Branch on the count, in three tiers. **The middle tier is a plain switch** — let the compiler do the work before reaching for a hand-written dispatch.
 
 ```csharp
 // Count ≤ 4: Equals chain (generated form)
@@ -34,7 +34,18 @@ public static int GetIndex(ReadOnlySpan<char> name)
     return -1;
 }
 
-// Count ≥ 5: sampling-hash switch (hash constants are computed and baked in at generation time)
+// Count 5-64: plain switch (Roslyn turns it into length -> character bucketing)
+public static int GetIndex(ReadOnlySpan<char> name)
+    => name switch
+    {
+        "Id" => 0,
+        "Name" => 1,
+        "CreatedAt" => 2,
+        // ...
+        _ => -1,
+    };
+
+// Count > 64: sampling-hash switch (hash constants are computed and baked in at generation time)
 public static int GetIndex(ReadOnlySpan<char> name)
 {
     switch (SamplingHash.Calculate(name))   // (length << 16) ^ (first << 8) ^ (mid << 4) ^ last
@@ -47,15 +58,27 @@ public static int GetIndex(ReadOnlySpan<char> name)
 }
 ```
 
-**Why it is faster:** Unlike a general hash that reads every character, sampling the length plus 3 characters narrows the candidates, and the confirming comparison is a single SIMD-accelerated `SequenceEqual`. Since the hash constants become JIT constants, the switch turns into a jump table.
+**Why these three tiers:**
+
+- **≤ 4 entries:** a plain switch compiles to **exactly the same code as the Equals chain**, so there is nothing to gain. On span input the chain is marginally faster
+- **5-64 entries:** Roslyn emits length bucketing plus character tests (two levels of jump table at 64), and **never reads every character**. It matches the hand-written sampling hash while the generated code stays far simpler
+- **> 64 entries:** this is where Roslyn switches to an FNV-1a hash **over every character** plus a binary search over the hash values. The hand-written sampling form (length + 3 characters, no loop) earns its place from here on
+
+**Why the sampling hash wins above 64:** Unlike a general hash that reads every character, sampling the length plus 3 characters narrows the candidates, and the confirming comparison is a single SIMD-accelerated `SequenceEqual`. Since the hash constants become JIT constants, the switch turns into a jump table.
 
 **Measured evidence:**
 
+- A plain switch is **0.51x (hit) / 0.33x (miss)** of the Equals chain at 16 entries, level with the sampling-hash switch at 64 (1.06 / 1.00), and **collapses to 1.73 / 3.79x at 128** → [TXT-10-StringSwitchDispatch.md](../benchmarks/results/TXT-10-StringSwitchDispatch.md)
+- At 4 entries the plain switch and the Equals chain have an **identical instruction stream** (60 instructions, 263 B) → same record
 - The sampling hash table (runtime version) runs at 0.56–0.84x of `Dictionary`, and with Span keys beats even `FrozenDictionary` at every size → [COL-04-SampledNameTable.md](../benchmarks/results/COL-04-SampledNameTable.md)
 - Linear search (the runtime version of the Equals chain) only wins up to 4 entries, degrading to 2.73x at 16 → same record (the basis for the branch threshold)
 - Because the positions are chosen at generation time, a colliding key set can be recovered by moving the sampling positions (a degree of freedom unique to codegen that the runtime version does not have)
 
-**Caveats:** For case-insensitive matching, upper-case the sampled characters before computing the hash and make the confirming comparison `OrdinalIgnoreCase`. Comparisons are always ordinal (TXT-03).
+**Caveats:**
+
+- Case-insensitive matching **cannot use the plain switch** (a switch is always ordinal). Upper-case the sampled characters before computing the hash and make the confirming comparison `OrdinalIgnoreCase`. Comparisons are always ordinal (TXT-03). **Normalizing the input up front to reach a plain switch measures 4.5-7.8x slower at 8 columns and 1.76-1.89x at 24** - normalization adds 4.8-5.2 ns per column, more than the switch's 4.3 ns dispatch gain, and the SIMD `Ascii.ToUpper` version is no cheaper → [TXT-10](../benchmarks/results/TXT-10-StringSwitchDispatch.md)
+- **Key length is not a branching criterion.** Even at 16 keys of 58-62 characters Roslyn does not use FNV — it uses a length jump table, the first character, and a vector compare. What decides the switchover is **keys per length bucket**, not character count
+- Switch code size grows with the count (1,185 B at 16 entries, 11,611 B at 128). Where AOT size or I-cache pressure is the constraint, a runtime table (COL-04, a flat 730-780 B) is worth considering even below 64 entries
 
 ---
 

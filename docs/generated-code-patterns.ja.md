@@ -22,7 +22,7 @@ Source Generator で**どのようなコードを生成すればパフォーマ�
 
 **シナリオ:** DB 列名、プロパティ名、JSON キーなど「既知の文字列集合 → 番号」の解決。
 
-**生成すべきコード:** 件数で出し分ける。
+**生成すべきコード:** 件数で 3 段に出し分ける。**中心は「素の switch」** — 手書きのディスパッチ最適化を書く前に、まずコンパイラに任せる。
 
 ```csharp
 // 件数 ≤ 4: Equals 連鎖(生成イメージ)
@@ -34,7 +34,18 @@ public static int GetIndex(ReadOnlySpan<char> name)
     return -1;
 }
 
-// 件数 ≥ 5: サンプリングハッシュ switch(ハッシュ定数は生成時に計算して焼き込む)
+// 件数 5〜64: 素の switch(Roslyn が長さ → 文字のバケット判定へ変換する)
+public static int GetIndex(ReadOnlySpan<char> name)
+    => name switch
+    {
+        "Id" => 0,
+        "Name" => 1,
+        "CreatedAt" => 2,
+        // ...
+        _ => -1,
+    };
+
+// 件数 > 64: サンプリングハッシュ switch(ハッシュ定数は生成時に計算して焼き込む)
 public static int GetIndex(ReadOnlySpan<char> name)
 {
     switch (SamplingHash.Calculate(name))   // (length << 16) ^ (first << 8) ^ (mid << 4) ^ last
@@ -47,15 +58,27 @@ public static int GetIndex(ReadOnlySpan<char> name)
 }
 ```
 
-**なぜ速いか:** 全文字を読む一般ハッシュと違い、長さ + 3 文字のサンプリングで候補を絞り、確定比較は SIMD 化された `SequenceEqual` 1 回。ハッシュ定数が JIT 定数になるため switch はジャンプテーブル化される。
+**なぜこの 3 段か:**
+
+- **≤ 4 件:** 素の switch を書いても**生成コードが Equals 連鎖と完全一致**するため、変える意味がない。span 入力では連鎖の方がわずかに速い
+- **5〜64 件:** Roslyn は長さバケット + 文字比較(64 件では 2 段のジャンプテーブル)を生成し、**全文字を読まない**。手書きサンプリングハッシュとほぼ同性能で、生成コードは圧倒的に単純
+- **> 64 件:** ここで Roslyn は FNV-1a の**全文字ハッシュ + ハッシュ値の二分探索木**へ切り替わる。手書きサンプリング(長さ + 3 文字、ループなし)の出番はここから
+
+**なぜサンプリングハッシュが > 64 件で速いか:** 全文字を読む一般ハッシュと違い、長さ + 3 文字のサンプリングで候補を絞り、確定比較は SIMD 化された `SequenceEqual` 1 回。ハッシュ定数が JIT 定数になるため switch はジャンプテーブル化される。
 
 **実測の裏付け:**
 
+- 素の switch は 16 件で Equals 連鎖の **0.51 倍(hit)/ 0.33 倍(miss)**、64 件でサンプリングハッシュ switch と互角(1.06 / 1.00)、**128 件で 1.73 / 3.79 倍に崩壊** → [TXT-10-StringSwitchDispatch.md](../benchmarks/results/TXT-10-StringSwitchDispatch.md)
+- 4 件では素の switch と Equals 連鎖の**命令列が完全一致**(60 命令 / 263 B) → 同上
 - サンプリングハッシュ表(実行時版)が `Dictionary` の 0.56〜0.84 倍、Span キーでは `FrozenDictionary` にも全サイズで勝つ → [COL-04-SampledNameTable.md](../benchmarks/results/COL-04-SampledNameTable.md)
 - 線形探索(Equals 連鎖の実行時版)が勝つのは 4 件まで、16 件で 2.73 倍に劣化 → 同上(出し分け閾値の根拠)
 - 生成時に位置を選べるため、衝突するキー集合ではサンプリング位置の変更で回復できる(実行時版にはできない生成ならではの自由度)
 
-**注意:** 大文字小文字を無視する場合はサンプリング文字を大文字化して計算し、確定比較を `OrdinalIgnoreCase` にする。比較は常に序数系(TXT-03)。
+**注意:**
+
+- 大文字小文字を無視する場合は**素の switch を使えない**(switch は ordinal 固定)。サンプリング文字を大文字化して計算し、確定比較を `OrdinalIgnoreCase` にする。比較は常に序数系(TXT-03)。**入力を先に正規化して素の switch へ流す形は実測で 8 列 4.5〜7.8 倍 / 24 列 1.76〜1.89 倍の劣化**(正規化の増分 4.8〜5.2 ns/列が switch のディスパッチ利得 4.3 ns/列を上回る。SIMD の `Ascii.ToUpper` でも同じ)→ [TXT-10](../benchmarks/results/TXT-10-StringSwitchDispatch.md)
+- **キー長は出し分けの基準にならない。** 58〜62 文字 × 16 件でも Roslyn は FNV を使わず、長さジャンプテーブル + 先頭文字 + ベクトル比較で捌く。切替を決めるのは文字数ではなく**長さバケットあたりの件数**
+- switch のコードサイズは件数に比例する(16 件 1,185 B → 128 件 11,611 B)。AOT サイズや I-cache 圧が制約になるなら、64 件以下でも実行時テーブル(COL-04、730〜780 B 一定)を選ぶ余地がある
 
 ---
 

@@ -105,6 +105,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [TXT-07](#-txt-07-stringcreate--tryformat--ispanformattable) | string.Create / TryFormat | Zero-allocation string creation | ✅ | [Verified](benchmarks/results/TXT-07-StringCreate.md) |
 | [TXT-08](#-txt-08-searchvaluest) | SearchValues\<T\> | SIMD-optimized search over many candidates | ✅ | [Verified](benchmarks/results/TXT-08-SearchValues.md) |
 | [TXT-09](#-txt-09-applied-idioms-for-fixed-length-formatting) | Advanced fixed-width formatting | TryFormat + Fill and vectorized trimming | ✅ | [Verified](benchmarks/results/TXT-09-FixedFieldFormat.md) |
+| [TXT-10](#-txt-10-aggregating-string-matching-into-a-switch) | Switch aggregation for string matching | Compiler-generated length / character bucketing | ✅ | [Verified](benchmarks/results/TXT-10-StringSwitchDispatch.md) |
 | [ASY-01](#-asy-01-eliding-the-async-state-machine) | Eliding the async state machine | Return the Task directly for simple forwarding | ✅ | [Verified](benchmarks/results/ASY-01-AsyncElision.md) |
 | [ASY-02](#-asy-02-producerconsumer-with-systemthreadingchannels) | System.Threading.Channels | Producer/consumer queue | ✅ | [Verified](benchmarks/results/ASY-02-Channels.md) |
 | [ASY-03](#-asy-03-systemiopipelines) | System.IO.Pipelines | Pipelined I/O streaming | ✅ | [Verified](benchmarks/results/ASY-03-Pipelines.md) |
@@ -2291,6 +2292,8 @@ public bool TryResolve(ReadOnlySpan<char> name, out int value)
 
 **Design guidance:** In generated code the element count is known at generation time, so ideally emit an Equals chain (small) or a hash switch (medium and up) depending on the count.
 
+**If the key set is fixed at compile time, write a plain `switch` first** - up to 64 entries it beats every implementation in this table → [TXT-10](#-txt-10-aggregating-string-matching-into-a-switch). Use this pattern when there are **more than 64 entries, the set is only known at runtime, or code size is the constraint**.
+
 **Implementation in this repo:** [SampledNameTable.cs](src/PerformancePatterns/Col/SampledNameTable.cs) (BIT-01 hash + BIT-02 mask + Ordinal confirmation inside the bucket) / [Tests](tests/PerformancePatterns.Tests/Col/SampledNameTableTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Col/SampledNameTableBenchmark.cs) / [Results](benchmarks/results/COL-04-SampledNameTable.md)
 
 **Measured (net10 / x86-64-v4, name resolution by element count):**
@@ -2348,6 +2351,8 @@ public static int Sum(IEnumerable<int> source)
 **Use cases:** Collection utilities, input acceptance in serializers and mappers, LINQ-style operators.
 
 **Related:** The same branching idea applies to pre-sizing via `TryGetNonEnumeratedCount` (.NET 6+) (get the count without enumerating → feed `new List<T>(count)` / COL-01 SetCount).
+
+**The same conclusion holds for `object` → `string` conversion (measured):** replacing a generic converter (`x is IFormattable f ? f.ToString(null, InvariantCulture) : x.ToString()`) with a type-switch fast path (`int v => v.ToString(...)`) gains nothing. It is **1.11x slower on monomorphic input** (5.56 → 6.15 ns, non-overlapping CIs) and level on mixed input (15.43 → 15.39 ns, overlapping CIs). The mechanism is confirmed in the disassembly: on monomorphic input GDV inlines `int.ToString` completely and `tail.jmp`s into `UInt32ToDecStr`, whereas the type switch is 576-660 B — over the inlining threshold — so it stays out of line and costs a call per conversion. **This switch is unrelated to the string switch ([TXT-10](#-txt-10-aggregating-string-matching-into-a-switch))**: it is MethodTable comparison on type patterns, not length / character bucketing.
 
 **Implementation in this repo:** [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Lab/EnumerableDispatchBenchmark.cs) / [Results](benchmarks/results/COL-05-EnumerableDispatch.md)
 
@@ -2719,6 +2724,75 @@ var trimmed = start < 0 ? [] : field[start..(end + 1)];
 **Use cases:** Fixed-length records (reports, EDI, legacy integration), fixed-width protocol fields, ID formatting.
 
 **Caveats:** Conversion-free UTF-16 copies apply only when the endianness and character-set assumptions can be pinned. Use explicit conversion when compatibility with an external spec is required (the same caveat as SEQ-02).
+
+---
+
+### 🔤 TXT-10: Aggregating string matching into a switch
+
+**Purpose:** Aggregate matching against a compile-time string set into a `switch` and let Roslyn do the length / character bucketing. Make it the default before reaching for a hand-written dispatch.
+
+**Effect:**
+
+- **The window is 5-64 entries.** At 16 keys it is **0.51x hit / 0.33x miss** against an `Equals` chain, and it beats `Dictionary` (1.38x) and `SampledNameTable` (1.09x) on hit
+- **At 64 keys it is level with a hand-written sampling-hash switch** (1.06x hit, 1.00x miss, CIs overlap)
+- **At 128 keys it collapses** (1.73x hit, **3.79x** miss) because Roslyn switches to an FNV-1a hash over every character plus a 191-node binary search tree
+- **At <=4 keys there is no effect** - the compiler emits **the same instruction stream** as a hand-written `Equals` chain (60 instructions, 263 B). On span input the chain is actually faster (1.17x)
+- Since C# 11 a `ReadOnlySpan<char>` constant pattern gets the same optimization (about 1.1x the string switch)
+
+**AOT:** ✅ No issue (it emits only branches and jump tables - no runtime codegen, no reflection)
+
+**Example:**
+
+```csharp
+// ✅ 5-64 entries: just write the switch (the compiler turns it into length -> character bucketing)
+public static int GetIndex(ReadOnlySpan<char> name) => name switch
+{
+    "Id" => 0,
+    "Name" => 1,
+    "CreatedAt" => 2,
+    _ => -1,
+};
+
+// ❌ Above 64 entries a plain switch becomes a full-string FNV scan plus a binary search
+//    -> emit a sampling-hash switch (length + 3 characters) instead (GEN-02 / generated-code-patterns scenario 1)
+```
+
+**The compiler picks the strategy by keys-per-length-bucket**, not by key count alone:
+
+| Key set | Generated strategy | Scans every character |
+|---|---|---|
+| 4 | Length + character tests (identical to the hand-written chain) | no |
+| 16 | Length + character tests | no |
+| 64 | Length jump table -> per-bucket character jump table | no |
+| 128 | FNV-1a loop over every character + a 191-node binary search | **yes** |
+| 16 x 58-62 chars | Length jump table + first character + AVX-512 compare | no |
+
+**Measured (net10 / x86-64-v4, per probe):**
+
+| Approach | 16 hit | 16 miss | 64 hit | 128 hit | 128 miss |
+|---|---:|---:|---:|---:|---:|
+| `Equals` chain (baseline at 16) | 3.466 ns | 6.080 ns | — | — | — |
+| **Plain switch** | **1.776 (0.51)** | **1.993 (0.33)** | 2.792 (1.06) | 4.580 (1.73) | 10.112 (**3.79**) |
+| Sampling-hash switch (baseline at 64 / 128) | — | — | **2.633 (1.00)** | **2.650 (1.00)** | **2.687 (1.00)** |
+| `SampledNameTable` (COL-04) | 3.788 (1.09) | 4.908 (0.81) | 3.607 (1.37) | 3.722 (1.41) | 4.300 (1.61) |
+
+**Code size grows with the key set** (1,185 B at 16 keys, 11,611 B at 128). `SampledNameTable` stays flat at 730-780 B, so where binary size or I-cache pressure matters the table can win even when it is 1.1-1.9x slower. → [Results](benchmarks/results/TXT-10-StringSwitchDispatch.md)
+
+**Use cases:** Name-to-index resolution emitted by a Source Generator (DB columns, property names, JSON keys), enum name resolution, protocol header dispatch.
+
+**Where it does not apply - matching that needs a conversion:** the gain above is against a **plain** `Equals` chain, one where the probe is compared exactly as it arrives. **It does not hold once the input has to be converted first.** On the DB column-name shape (`OrdinalIgnoreCase`), upper-casing the probe so a plain switch can be used measures **4.5-7.8x slower at 8 columns and still 1.76-1.89x at 24**.
+
+| Approach (per column) | 8 cols | 24 cols |
+|---|---:|---:|
+| Current (chain / sampling hash) | **1.93 ns** | **5.38 ns** |
+| Plain switch, no case handling (reference) | 4.29 ns | 4.27 ns |
+| `Ascii.ToUpper` (SIMD) + span switch | 9.04 ns | 9.48 ns |
+
+**Normalization adds about 4.8-5.2 ns per column and the SIMD version is no cheaper.** The cost is structural - fold every character into a buffer, then read every character again in the switch - so no API choice avoids it, and it exceeds the switch's own dispatch gain (4.3 ns per column, size-independent). **When a conversion is required, use the hash form** with upper-cased sampling plus an `OrdinalIgnoreCase` confirm, where only 3 characters are converted.
+
+**Caution:** The switch is **ordinal (case-sensitive)**. **Key length is not a criterion** (no reversal even at 58-62 characters). The external report's 0.15x is an if-chain comparison at 67 values; **0.5x at 16 keys is the realistic expectation**.
+
+**Repository implementation:** No src implementation (the generated code shape itself is the pattern) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Lab/StringSwitchDispatchBenchmark.cs) / [Results](benchmarks/results/TXT-10-StringSwitchDispatch.md)
 
 ---
 
@@ -3162,7 +3236,7 @@ if (reader.Read())
 }
 ```
 
-**Choosing a column-name matching strategy:** Switch between a chain of `String.Equals(OrdinalIgnoreCase)` (few columns) and a sampling-hash switch (moderate to many) based on the column count (COL-04 / BIT-01). Codegen knows the column count at generation time, so it can emit the right one.
+**Choosing a column-name matching strategy:** Switch between a chain of `String.Equals(OrdinalIgnoreCase)` (few columns) and a sampling-hash switch (moderate to many) based on the column count (COL-04 / BIT-01). Codegen knows the column count at generation time, so it can emit the right one. Where case-sensitive matching is acceptable, a plain switch is fastest up to 64 entries (TXT-10).
 
 **Choosing a CommandBehavior:**
 
@@ -3254,12 +3328,12 @@ The `Call` vs `Callvirt` substitution, on the other hand, measured 6.36 vs 6.46 
 
 | Scenario | Shape to emit | Supporting measurement |
 |---|---|---|
-| Name → index resolution | ≤4 entries: Equals chain / ≥5 entries: sampling-hash switch (constants baked in) | COL-04 / R-07 |
+| Name → index resolution | ≤4 entries: Equals chain / 5-64: plain switch / >64: sampling-hash switch (constants baked in) | TXT-10 / COL-04 / R-07 |
 | Per-type artifacts (SQL, type names, keys) | Written literally as const / static readonly / `"..."u8` | TYP-06 (0.09 ns) |
 | DB row mapper | Ordinal struct + `in` passing + typed getters (never emit `GetValue`) | DAT-01 (0.13x) |
 | Factories / DI | Inline the dependency graph into literal `new` expressions (never emit chained child factories) | GEN-01 (chaining is 2.3x) |
 | Formatting / serialization | Direct `TryFormat` calls + u8 literals + `string.Create` + lookup tables (TXT-01) | TXT-01 / 05 / 07, R-16 |
-| enum specialization | Apply a name switch; make ToString return constants from a switch | Reduces to COL-04 |
+| enum specialization | Apply a name switch; make ToString return constants from a switch | Reduces to TXT-10 / COL-04 |
 | Collection conversion | Fixed capacity + `SetCount` + a loop writing straight into the Span | COL-01 / COL-06 |
 | Change notification / events | Bake EventArgs into static readonly fields; shape by subscriber count | DSP-03 / DSP-04 |
 
@@ -3422,6 +3496,7 @@ For the shape to emit per scenario and its evidence see the [generated code patt
 | Zero-allocation string creation | TXT-07 |
 | Character search over many candidates | TXT-08 (use the dedicated overload for 2-3 candidates) |
 | Formatting and trimming fixed-length fields | TXT-09 |
+| Matching against a compile-time string set | TXT-10 (COL-04 / BIT-01 above 64 entries or when the set is runtime-only) |
 | General-purpose hashing (long inputs, stable values) | BIT-04 |
 | Reading an unknown-length stream without extra copies | SEQ-05 / ASY-03 |
 | Pinning a shared page or buffer while it is read | CON-02 |
