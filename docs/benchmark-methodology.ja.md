@@ -187,5 +187,6 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | ✅ 収録([ASY-02](../README.ja.md#-asy-02-systemthreadingchannels-による生産者消費者)、~45ns/要素・Bounded は 2 倍) |
 | ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 | ✅ 条件付き収録([ASY-03](../README.ja.md#-asy-03-systemiopipelines)、小データは 1.63 倍・アロケーション 1/80。64KB デッドロック注意) |
 | ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-03 | ✅ 収録([ASY-04](../README.ja.md#-asy-04-iasyncenumerable-のコスト認知と使い分け)、要素あたり 11.6 倍のコスト認知) |
+| ⑥ | net11 世代ウォッチ | net11 GA 後に再測定: ① enum の Equals 経由ボックス化が JIT 特殊化で消える(STK-05 の暗黙ボックス化リストへ世代注記)② LINQ Min/Max のベクトル化(VEC-01 の「BCL 済み API 優先」指針の裏付け強化) | STK-05 / VEC-01 | ⏳ net11 GA 待ち |
 
 ---

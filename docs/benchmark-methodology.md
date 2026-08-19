@@ -187,5 +187,6 @@ Differences that measurement could not resolve, listed together with the result 
 | ⑤ | System.Threading.Channels | Producer-consumer queues. Effect of the Bounded/Unbounded and SingleReader/SingleWriter options | DSP-03 | ✅ Documented ([ASY-02](../README.md#-asy-02-producerconsumer-with-systemthreadingchannels), ~45ns/element. Bounded is 2x) |
 | ⑤ | System.IO.Pipelines | I/O pipelines via PipeReader/PipeWriter. Compared against processing a Stream directly | BUF-02 | ✅ Documented conditionally ([ASY-03](../README.md#-asy-03-systemiopipelines), 1.63x on small data / 1/80 the allocation. Watch out for the 64KB deadlock) |
 | ⑤ | The cost of IAsyncEnumerable | Per-element overhead of await foreach (vs IEnumerable / Channel), and the conventions around \[EnumeratorCancellation\] | SEQ-03 | ✅ Documented ([ASY-04](../README.md#-asy-04-knowing-the-cost-of-iasyncenumerable-and-when-to-use-it), being aware of the 11.6x per-element cost) |
+| ⑥ | net11 generation watch | Re-measure after net11 GA: (1) enum boxing through Equals disappears via JIT specialization (add a generation note to STK-05's implicit-boxing list), (2) LINQ Min/Max vectorization (reinforces VEC-01's prefer-BCL-APIs guidance) | STK-05 / VEC-01 | ⏳ Waiting for net11 GA |
 
 ---
