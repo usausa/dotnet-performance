@@ -211,4 +211,4 @@ Where case folding, culture handling, or trimming has to happen first, use the s
 - **<= 4 entries**: no reason to change - the chain and the switch are the same code, and on span input the chain wins
 - Key length is not a criterion
 - The switch is **ordinal**. Case-insensitive matching cannot use it; use the sampling-hash form with upper-cased sampling plus an `OrdinalIgnoreCase` confirm. Normalizing the input up front to reach a plain switch is measurably worse at every size
-- The external report's 0.15x figure is an if-chain comparison at 67 values; **0.5x at 16 keys is the realistic expectation**
+- Expect **around 0.5x against an Equals chain at 16 keys** - a real win, but not an order-of-magnitude one

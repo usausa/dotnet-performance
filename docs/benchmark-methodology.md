@@ -101,6 +101,10 @@ If you mix benchmarks for APIs that exist only on newer runtimes into one class 
 
 Do preparation such as searching for colliding keys or generating data in `[GlobalSetup]` and keep it out of the measurement. `IterationSetup` degrades measurement accuracy, so design for GlobalSetup plus no need for state resets wherever possible.
 
+### 9. Measuring a polymorphic call site only once per process
+
+Dynamic PGO settles differently in each process, so on a **polymorphic** shape (several concrete types passing through one call site) the Tier1 code size swings by an order of magnitude and **even the sign of the ratio flips**. In TXT-11 the same code measured 0.91x, 0.97x and 1.05x across runs, and the baseline's Tier1 code size was observed anywhere from 1,777 B to 15,792 B. Either **confirm the sign across several processes** or restrict the comparison to a monomorphic shape, which stays stable under the same conditions.
+
 ## ⚖️ Decision criteria
 
 - Evaluate on **three axes: speed, allocation, and code size**. An improvement on one axis alone is weak justification for adoption
@@ -126,6 +130,40 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 ```
 
 Example: GEN-01's replacement of delegate Invoke with a `Call` measured as noise at 6.36 vs 6.46 ns, but the JitDisasm comparison showed **68 instructions / 229 bytes matching exactly**, which confirmed "no difference" (the load of the target field doubles as the null check, so the JIT removes the `callvirt` check).
+
+---
+
+## 🗂️ How pattern IDs are classified
+
+Families come in two kinds.
+
+- **Use-case based** - TXT / COL / SEQ / ASY / DAT / GEN / TYP / SYS (grouped by what is being worked on)
+- **Mechanism based** - MEM / STK / BUF / JIT / DSP / BIT / VEC / CON (grouped by the technique used)
+
+**The rule:** if a use-case family applies, **prefer it**; otherwise place the entry by mechanism. When an entry spans **several** use-case families, keep it in the family of its representative use case rather than inventing a new destination.
+
+**Where the lines fall** (settled by actual decisions):
+
+| Family | What belongs here | The confusing neighbour |
+|---|---|---|
+| TYP | Handling **types themselves as data** (Type-keyed maps, per-type caches, casts, accessors) | Boundary with JIT, below |
+| JIT | **Writing code so the JIT emits specialized output** (attributes, generic constraints, branches that get constant-folded) | Even when a type parameter is the subject, it is JIT if it steers codegen rather than handling type data |
+| DSP | **How the call itself is assembled** (sealed, delegate vs interface vs function pointer, handler lists, pipelines) | The same *outcome* (devirtualization) does not merge families if the technique sits at a different layer |
+| BIT | **Folding keys into a bit representation / reducing to integer arithmetic** (lightweight hashes, masks, digests) | Even when the use case is lookup, it is BIT if the folding is the subject |
+| COL | Collection search, conversion, and internal access | If the key is a `Type`, it is TYP (precedent: TYP-01 / TYP-07) |
+| TXT | Producing and matching strings and text | Even when the mechanism is type dispatch, it is TXT if the subject is string production (precedent: TXT-11) |
+
+**Decisions on record:** seven entries were reviewed on 2026-08-19 and **none were moved**.
+
+| Entry | The question | Decision |
+|---|---|---|
+| BIT-05 order-preserving digest | Use case is search (COL), mechanism is bit manipulation | Stays in BIT (same line as BIT-01) |
+| TYP-07 hash source for Type keys | Use case is lookup (COL) | Stays in TYP (paired with TYP-01; Type-keyed lookup is TYP) |
+| JIT-02 IEquatable constraint | The outcome is devirtualization (DSP) | Stays in JIT (a declaration that steers codegen) |
+| JIT-03 / JIT-05 | Generic specialization (TYP) | Stay in JIT (the constant-folding trio) |
+| COL-03 GetAlternateLookup | Has no result file of its own | Stays in COL (one comparative benchmark referenced by several IDs is natural) |
+| BIT-01 vs COL-04 | Two IDs over one artifact | Both stay (how to build the hash vs which implementation to pick - different subjects) |
+| TXT-03 Try pattern | Not a text topic | Stays in TXT (spans several use-case families, so there is no destination) |
 
 ---
 

@@ -1737,7 +1737,9 @@ return (length << 16)
 
 **Measured findings on applicability:**
 
-- Against the C# compiler's string switch (lowered to length plus character checks for few cases, to a full-text hash plus jump table for many), there is no universal winner. For few cases (up to ~4) the compiler-generated code is faster; for medium sets (~12) and key sets that collide easily on a shared prefix, the sampled-hash switch is about 2x faster; for large sets (32+) the compiler-generated code wins again
+- The comparison against the C# compiler's string switch was re-measured in [TXT-10](#-txt-10-aggregating-string-matching-into-a-switch). **The compiler picks its strategy by keys-per-length-bucket, not by key count** - only at 128 keys does it switch to a full-text FNV hash plus a **191-node binary search** over the hashes; it never becomes a jump table
+- The winner changes with size: **at 4 keys the generated code is identical to a hand-written `Equals` chain** (60 instructions, 263 B); **up to 64 keys the compiler's switch and a sampled-hash switch are level** (1.06 hit / 1.00 miss at 64); **above 64 the sampled hash wins** (at 128 the compiler's switch degrades to 1.73x hit / 3.79x miss). **Key length is not a criterion** (no reversal even at 16 keys of 58-62 characters)
+- The runtime table (`SampledNameTable`) loses to the compiler's switch from 16 to 128 keys (1.09-1.41x hit). **Use a switch (or a generated sampled-hash switch) when the key set is fixed at compile time, and the runtime table only when the set is known only at run time**
 - For case-insensitive enum name parsing it is overwhelming: 0.11-0.24x versus `Enum.TryParse` (ignoreCase). A plain string switch is Ordinal and therefore unusable for ignoreCase, which leaves this pattern the only option. For a handful of entries a chain of `Equals(OrdinalIgnoreCase)` ifs (0.17x) is enough
 - For key sets where fixed first/middle/last sampling collides, search for non-colliding sampling positions at code-generation time (Source Generator) and bake them in as constants
 
@@ -2789,7 +2791,7 @@ public static int GetIndex(ReadOnlySpan<char> name) => name switch
 
 **Normalization adds about 4.8-5.2 ns per column and the SIMD version is no cheaper.** The cost is structural - fold every character into a buffer, then read every character again in the switch - so no API choice avoids it, and it exceeds the switch's own dispatch gain (4.3 ns per column, size-independent). **When a conversion is required, use the hash form** with upper-cased sampling plus an `OrdinalIgnoreCase` confirm, where only 3 characters are converted.
 
-**Caution:** The switch is **ordinal (case-sensitive)**. **Key length is not a criterion** (no reversal even at 58-62 characters). The external report's 0.15x is an if-chain comparison at 67 values; **0.5x at 16 keys is the realistic expectation**.
+**Caution:** The switch is **ordinal (case-sensitive)**. **Key length is not a criterion** (no reversal even at 58-62 characters). Expect **around 0.5x against a chain at 16 keys** - a real win, but not an order-of-magnitude one.
 
 **Repository implementation:** No src implementation (the generated code shape itself is the pattern) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Lab/StringSwitchDispatchBenchmark.cs) / [Results](benchmarks/results/TXT-10-StringSwitchDispatch.md)
 
