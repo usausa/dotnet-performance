@@ -106,6 +106,7 @@
 | [TXT-08](#-txt-08-searchvaluest) | SearchValues\<T\> | 多数候補探索の SIMD 最適化 | ✅ | [検証済](benchmarks/results/TXT-08-SearchValues.md) |
 | [TXT-09](#-txt-09-固定長整形の応用イディオム) | 固定長整形の応用 | TryFormat + Fill・ベクトル化トリム | ✅ | [検証済](benchmarks/results/TXT-09-FixedFieldFormat.md) |
 | [TXT-10](#-txt-10-文字列判定の-switch-集約) | 文字列判定の switch 集約 | コンパイラの長さ・文字バケット化 | ✅ | [検証済](benchmarks/results/TXT-10-StringSwitchDispatch.md) |
+| [TXT-11](#-txt-11-object--string-変換の型別高速パス) | object → string の型別高速パス | interface 経由変換の devirtualization | ✅ | [検証済](benchmarks/results/TXT-11-ObjectToStringFastPath.md) |
 | [ASY-01](#-asy-01-async-ステートマシンの省略) | async ステートマシンの省略 | 単純フォワードの Task 直接返し | ✅ | [検証済](benchmarks/results/ASY-01-AsyncElision.md) |
 | [ASY-02](#-asy-02-systemthreadingchannels-による生産者消費者) | System.Threading.Channels | 生産者消費者キュー | ✅ | [検証済](benchmarks/results/ASY-02-Channels.md) |
 | [ASY-03](#-asy-03-systemiopipelines) | System.IO.Pipelines | I/O ストリーミングのパイプ化 | ✅ | [検証済](benchmarks/results/ASY-03-Pipelines.md) |
@@ -2352,8 +2353,6 @@ public static int Sum(IEnumerable<int> source)
 
 **関連:** 事前容量確保には `TryGetNonEnumeratedCount`(.NET 6+)で同じ分岐思想を適用できる(列挙せずに件数取得 → `new List<T>(count)` / COL-01 SetCount へ接続)。
 
-**同じ結論が `object` → `string` 変換でも成立(実測):** boxed 値を `x is IFormattable f ? f.ToString(null, InvariantCulture) : x.ToString()` で変換する汎用コンバータを、型別高速パス(`int v => v.ToString(...)` 形の型 switch)へ置き換えても利得はない。**単型入力では 1.11 倍遅くなり**(5.56 → 6.15 ns、信頼区間非重複)、混在型入力では同等(15.43 → 15.39 ns、信頼区間重複)。逆アセンブリで機構も確認済み — 単型では GDV が `int.ToString` を完全にインライン化して `UInt32ToDecStr` へ `tail.jmp` するのに対し、型 switch 側は 576〜660 B でインライン閾値を超えるため out-of-line のまま残り、変換 1 回ごとに call を払う。**この switch は文字列 switch([TXT-10](#-txt-10-文字列判定の-switch-集約))とは別物**(型パターンの MethodTable 比較であって、長さ・文字バケット化ではない)。
-
 **リポジトリ内実装:** [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Lab/EnumerableDispatchBenchmark.cs) / [測定結果](benchmarks/results/COL-05-EnumerableDispatch.md)
 
 ---
@@ -2793,6 +2792,49 @@ public static int GetIndex(ReadOnlySpan<char> name) => name switch
 **注意:** switch は **ordinal(大小区別)**。**キー長は判断材料にならない**(58〜62 文字でも逆転しない)。外部記事の「0.15 倍」は 67 値の if 連鎖比であり、**現実的な期待値は 16 件で 0.5 倍前後**。
 
 **リポジトリ内実装:** src 実装なし(生成コードの形そのものが対象) / [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Lab/StringSwitchDispatchBenchmark.cs) / [測定結果](benchmarks/results/TXT-10-StringSwitchDispatch.md)
+
+---
+
+### 🔤 TXT-11: object → string 変換の型別高速パス
+
+**目的:** boxed 値を文字列化する汎用コンバータで、`IFormattable` 経由の interface 呼び出しの前に型別高速パスを置き、具象 `ToString` へ直接到達させる。
+
+**効果:** **単型の呼び出し site でのみ有効。利くかどうかは「高速パスがインライン閾値に収まるか」で決まる。**
+
+| 型別高速パス | 単型入力 | 混在型入力 | Tier1 サイズ | インライン化 |
+|---|---:|---:|---:|:---:|
+| **狭い(`int` / `string` + フォールバック)** | **0.91〜0.96** | 判定不能 | 216〜315 B | ✅ |
+| 広い(対応型を全部並べた 9 アーム) | **1.10〜1.13(遅い)** | 判定不能 | 660〜799 B | ❌ |
+
+- **単型は 3 run とも方向が一致**(狭い版は毎回 信頼区間非重複で改善、広い版は毎回 悪化)。狭い版は呼び出し側へインライン化され、**広い版は out-of-line のまま残って変換 1 回ごとに call を払う。単型では高速パスを置かない方が速い**
+- **混在型は差を主張できない。** 同じ狭い版が run 間で 0.91 / 0.97 / 1.05 と符号ごと変わり、基準側も 15.59 → 14.22 ns と 6% 漂う。原因は interface 経路の Tier1 コードが 1,777〜15,792 B と振れること(Dynamic PGO の収束差)。生成コードは別物なので「差なし」ではなく **➖ 誤差**として記録する
+- 割り当ては 3 形態とも同一(返す文字列が支配的)
+
+**AOT:** ✅ 問題なし。ただし AOT には実行時プロファイル由来の devirtualization がないため、interface 経路側の強みが消える分、**高速パスの相対価値は JIT 環境より高くなる**見込み(未実測)
+
+**実装例:**
+
+```csharp
+// ✅ 呼び出し site を支配する少数の型だけ。小さく保つ
+public static string Convert(object value) => value switch
+{
+    int v => v.ToString(CultureInfo.InvariantCulture),
+    string v => v,
+    _ => value is IFormattable f ? f.ToString(null, CultureInfo.InvariantCulture) : value.ToString()!,
+};
+
+// ❌ 対応型を全部並べる(インライン閾値を超えて自滅する)
+```
+
+**確認方法:** `DOTNET_JitDisasm=<メソッド名>` + `DOTNET_TC_CallCountingDelayMs=0` で Tier1 の `Total bytes of code` を取り、呼び出し側のサイズと比べてインライン化されたかを見る(DisassemblyDiagnoser は型 switch の本体を出力しないことがある)。
+
+**ユースケース:** ORM のパラメータ変換、ログの値整形、シリアライザの汎用値変換。
+
+**注意:** 利得の出所は**型テストによる devirtualization** であって、**最短オーバーロード選択ではない**(`ToString()` と `ToString(provider)` の差は net10 で再現しないことを別途確認済み)。またここの `switch` は**型パターンの MethodTable 比較**であり、文字列 switch([TXT-10](#-txt-10-文字列判定の-switch-集約))の長さ・文字バケット化とは別物。
+
+**関連:** 同じ型テストの考え方をコレクション引数へ適用したものが [COL-05](#️-col-05-ienumerable-引数の具象型ディスパッチ)(あちらの決め手は入力の型分布)。静的型情報による直接化は [DSP-01](#-dsp-01-sealed-による-devirtualization)。
+
+**リポジトリ内実装:** [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Lab/ObjectToStringBenchmark.cs) / [測定結果](benchmarks/results/TXT-11-ObjectToStringFastPath.md)
 
 ---
 
@@ -3497,6 +3539,7 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | 多数候補の文字検索 | TXT-08(候補 2〜3 個は専用オーバーロード) |
 | 固定長フィールドの整形・トリム | TXT-09 |
 | コンパイル時確定の文字列集合の判定 | TXT-10(64 件超・実行時確定は COL-04 / BIT-01) |
+| boxed 値の文字列化 | TXT-11(高速パスは少数の型に絞る) |
 | 汎用ハッシュ(長い入力・安定値) | BIT-04 |
 | 長さ未知ストリームを余計なコピーなしで読む | SEQ-05 / ASY-03 |
 | 読み取り中の共有ページ・バッファのピン留め | CON-02 |

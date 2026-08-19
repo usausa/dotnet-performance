@@ -106,6 +106,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [TXT-08](#-txt-08-searchvaluest) | SearchValues\<T\> | SIMD-optimized search over many candidates | ✅ | [Verified](benchmarks/results/TXT-08-SearchValues.md) |
 | [TXT-09](#-txt-09-applied-idioms-for-fixed-length-formatting) | Advanced fixed-width formatting | TryFormat + Fill and vectorized trimming | ✅ | [Verified](benchmarks/results/TXT-09-FixedFieldFormat.md) |
 | [TXT-10](#-txt-10-aggregating-string-matching-into-a-switch) | Switch aggregation for string matching | Compiler-generated length / character bucketing | ✅ | [Verified](benchmarks/results/TXT-10-StringSwitchDispatch.md) |
+| [TXT-11](#-txt-11-type-fast-path-for-object--string-conversion) | Type fast path for object → string | Devirtualizing conversion that goes through an interface | ✅ | [Verified](benchmarks/results/TXT-11-ObjectToStringFastPath.md) |
 | [ASY-01](#-asy-01-eliding-the-async-state-machine) | Eliding the async state machine | Return the Task directly for simple forwarding | ✅ | [Verified](benchmarks/results/ASY-01-AsyncElision.md) |
 | [ASY-02](#-asy-02-producerconsumer-with-systemthreadingchannels) | System.Threading.Channels | Producer/consumer queue | ✅ | [Verified](benchmarks/results/ASY-02-Channels.md) |
 | [ASY-03](#-asy-03-systemiopipelines) | System.IO.Pipelines | Pipelined I/O streaming | ✅ | [Verified](benchmarks/results/ASY-03-Pipelines.md) |
@@ -2352,8 +2353,6 @@ public static int Sum(IEnumerable<int> source)
 
 **Related:** The same branching idea applies to pre-sizing via `TryGetNonEnumeratedCount` (.NET 6+) (get the count without enumerating → feed `new List<T>(count)` / COL-01 SetCount).
 
-**The same conclusion holds for `object` → `string` conversion (measured):** replacing a generic converter (`x is IFormattable f ? f.ToString(null, InvariantCulture) : x.ToString()`) with a type-switch fast path (`int v => v.ToString(...)`) gains nothing. It is **1.11x slower on monomorphic input** (5.56 → 6.15 ns, non-overlapping CIs) and level on mixed input (15.43 → 15.39 ns, overlapping CIs). The mechanism is confirmed in the disassembly: on monomorphic input GDV inlines `int.ToString` completely and `tail.jmp`s into `UInt32ToDecStr`, whereas the type switch is 576-660 B — over the inlining threshold — so it stays out of line and costs a call per conversion. **This switch is unrelated to the string switch ([TXT-10](#-txt-10-aggregating-string-matching-into-a-switch))**: it is MethodTable comparison on type patterns, not length / character bucketing.
-
 **Implementation in this repo:** [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Lab/EnumerableDispatchBenchmark.cs) / [Results](benchmarks/results/COL-05-EnumerableDispatch.md)
 
 ---
@@ -2793,6 +2792,49 @@ public static int GetIndex(ReadOnlySpan<char> name) => name switch
 **Caution:** The switch is **ordinal (case-sensitive)**. **Key length is not a criterion** (no reversal even at 58-62 characters). The external report's 0.15x is an if-chain comparison at 67 values; **0.5x at 16 keys is the realistic expectation**.
 
 **Repository implementation:** No src implementation (the generated code shape itself is the pattern) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Lab/StringSwitchDispatchBenchmark.cs) / [Results](benchmarks/results/TXT-10-StringSwitchDispatch.md)
+
+---
+
+### 🔤 TXT-11: Type fast path for object → string conversion
+
+**Purpose:** In a generic converter that turns boxed values into strings, put a type fast path in front of the `IFormattable` interface call so the concrete `ToString` is reached directly.
+
+**Effect:** **Worth it on monomorphic call sites only, and only if the fast path stays small enough to inline.**
+
+| Type fast path | Monomorphic | Mixed | Tier1 size | Inlined |
+|---|---:|---:|---:|:---:|
+| **Narrow (`int` / `string` + fallback)** | **0.91-0.96** | inconclusive | 216-315 B | ✅ |
+| Wide (9 arms, every supported type) | **1.10-1.13 (slower)** | inconclusive | 660-799 B | ❌ |
+
+- **Monomorphic agrees across all three runs**: the narrow form is faster every time with non-overlapping CIs, the wide form slower every time. The narrow form is inlined into the caller; **the wide form stays out of line and pays a call per conversion, making it worse than having no fast path at all**
+- **Mixed input supports no claim.** The same narrow form measured 0.91x, 0.97x and 1.05x - it changes sign between runs - and the baseline itself drifts from 15.59 to 14.22 ns. The cause is the interface path's Tier1 code size swinging between 1,777 B and 15,792 B as Dynamic PGO settles differently. The generated code does differ, so this is recorded as **measurement noise**, not as "no difference"
+- Allocation is identical in all three forms (the returned string dominates)
+
+**AOT:** ✅ No issue. AOT has no profile-driven devirtualization, so the interface path loses its advantage there and **the fast path should be worth relatively more than under the JIT** (not yet measured)
+
+**Example:**
+
+```csharp
+// ✅ Only the few types that dominate the call site. Keep it small
+public static string Convert(object value) => value switch
+{
+    int v => v.ToString(CultureInfo.InvariantCulture),
+    string v => v,
+    _ => value is IFormattable f ? f.ToString(null, CultureInfo.InvariantCulture) : value.ToString()!,
+};
+
+// ❌ Enumerating every supported type - it defeats itself by exceeding the inlining threshold
+```
+
+**How to check:** run with `DOTNET_JitDisasm=<method>` and `DOTNET_TC_CallCountingDelayMs=0`, then compare the Tier1 `Total bytes of code` against the caller's size to see whether it was inlined (the DisassemblyDiagnoser may not emit type-switch bodies at all).
+
+**Use cases:** ORM parameter conversion, value formatting for logs, generic value conversion in serializers.
+
+**Caution:** The gain comes from **devirtualization via the type test**, not from shortest-overload selection (the `ToString()` vs `ToString(provider)` difference was separately found not to reproduce on net10). And the `switch` here lowers to **MethodTable comparisons on type patterns** - unrelated to the length / character bucketing of [TXT-10](#-txt-10-aggregating-string-matching-into-a-switch).
+
+**Related:** [COL-05](#️-col-05-concrete-type-dispatch-for-ienumerable-parameters) applies the same type-test idea to `IEnumerable<T>` arguments, where the deciding factor is the input type distribution instead. For devirtualization from static type information see [DSP-01](#-dsp-01-devirtualization-via-sealed).
+
+**Repository implementation:** [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Lab/ObjectToStringBenchmark.cs) / [Results](benchmarks/results/TXT-11-ObjectToStringFastPath.md)
 
 ---
 
@@ -3497,6 +3539,7 @@ For the shape to emit per scenario and its evidence see the [generated code patt
 | Character search over many candidates | TXT-08 (use the dedicated overload for 2-3 candidates) |
 | Formatting and trimming fixed-length fields | TXT-09 |
 | Matching against a compile-time string set | TXT-10 (COL-04 / BIT-01 above 64 entries or when the set is runtime-only) |
+| Converting a boxed value to string | TXT-11 (keep the fast path to a few types) |
 | General-purpose hashing (long inputs, stable values) | BIT-04 |
 | Reading an unknown-length stream without extra copies | SEQ-05 / ASY-03 |
 | Pinning a shared page or buffer while it is read | CON-02 |

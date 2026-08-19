@@ -27,24 +27,3 @@ LaunchCount=2  WarmupCount=10
 | EnumerateIterator | 486.7 ns |  3.87 ns |  5.29 ns | 480.2 ns | 498.6 ns | 496.5 ns |     542 B |         - |
 | DispatchIterator  | 552.0 ns | 28.85 ns | 42.29 ns | 501.2 ns | 623.2 ns | 598.8 ns |   1,175 B |         - |
 
-## Related: `object` → `string` conversion
-
-The same finding in a different shape. A generic converter written as `x is IFormattable f ? f.ToString(null, InvariantCulture) : x.ToString()` was compared against a type-switch fast path (`int v => v.ToString(CultureInfo.InvariantCulture)`, 9 arms).
-
-| Shape | Interface path | Type switch | Ratio |
-|---|---:|---:|---:|
-| Monomorphic (all int) | **5.559 ns** | 6.149 ns | **1.11** (non-overlapping CIs - a real regression) |
-| Mixed (16 boxed types) | **15.427 ns** | 15.389 ns | 1.00 (overlapping CIs) |
-
-Allocation is identical (40 B / 32 B). Tier1 disassembly (`DOTNET_JitDisasm`):
-
-| | Monomorphic | Mixed |
-|---|---|---|
-| `ConvertInterface` | 201 B, **inlined into the caller** (loop 966 B) | 221 B, inlined (loop 901 B) |
-| `ConvertTypeSwitch` | **660 B, not inlined** (loop 50 B - a call per value) | **576 B, not inlined** (loop 50 B) |
-
-- On monomorphic input the interface form reports `4 inlinees with PGO data`: one MethodTable guard, then `int.ToString(IFormatProvider)` fully inlined down to a `tail.jmp` into `System.Number.UInt32ToDecStr_NoSmallNumberCheck`, small-value fast path included. A hand-written type test cannot improve on that
-- The type switch exceeds the inlining threshold, so it stays out of line and adds a call per conversion - that is the 1.11x
-- On mixed input the interface form loses its guard (`Dynamic PGO`, 2 inlinees), the two converge, and the type switch is left with 2.6x the code size
-
-**Not adopted.** The difference is real at the JIT level, but it favours the existing interface form. Measured with a 9-arm type switch; a narrower fast path that stays under the inlining threshold was not measured.
