@@ -55,6 +55,10 @@ public static class Program
         StringSwitch64Benchmark.Verify();
         StringSwitch128Benchmark.Verify();
         ObjectToStringBenchmark.Verify();
+        ColumnMatchPascal8Benchmark.Verify();
+        ColumnMatchSnake8Benchmark.Verify();
+        ColumnMatchPascal24Benchmark.Verify();
+        ColumnMatchSnake24Benchmark.Verify();
 
         // Example: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
@@ -152,6 +156,10 @@ public static class Program
                 typeof(StringSwitch64Benchmark),
                 typeof(StringSwitch128Benchmark),
                 typeof(ObjectToStringBenchmark),
+                typeof(ColumnMatchPascal8Benchmark),
+                typeof(ColumnMatchSnake8Benchmark),
+                typeof(ColumnMatchPascal24Benchmark),
+                typeof(ColumnMatchSnake24Benchmark),
 #if NET9_0_OR_GREATER
                 typeof(SampledNameTableSpanKeyBenchmark),
 #endif
