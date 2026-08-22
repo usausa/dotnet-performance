@@ -45,6 +45,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [MEM-02](#-mem-02-struct-element-array--ref-access-data-oriented-layout) | struct element array + ref access | Eliminate per-element heap allocation and indirection | ✅ | [Implemented](src/PerformancePatterns/Typ/TypeMap.cs) |
 | [MEM-03](#-mem-03-explicit-slicing-with-sliceoffset-length) | Explicit Slice(offset, length) | Tighter slicing codegen than the range operator | ✅ | [Verified](benchmarks/results/MEM-03-SliceStyle.md) |
 | [MEM-04](#-mem-04-passing-struct-arguments-by-in--ref) | Passing struct arguments by in / ref | Avoid value copies of large structs | ✅ | [Verified](benchmarks/results/MEM-04-StructPass.md) |
+| [MEM-05](#-mem-05-struct-layout-optimization-size-and-field-order) | Struct layout optimization | Cut footprint through size and field order | ✅ | [Verified](benchmarks/results/MEM-05-StructLayout.md) |
 | [STK-01](#-stk-01-ref-struct-stack-only-type) | ref struct (stack-only type) | Ban heap escape at the type level | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-zero-copy-access-with-spant--readonlyspant) | Span\<T\> / ReadOnlySpan\<T\> | Zero-copy typed view | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [STK-03](#-stk-03-struct-iterator-pattern) | struct iterator pattern | Remove virtual calls and heap allocation from foreach | ✅ | [Implemented](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -54,6 +55,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [STK-07](#-stk-07-lazy-allocation-and-shared-singletons) | Lazy allocation and shared singletons | Allocate only when used; share the empty instance | ✅ | [Verified](benchmarks/results/STK-07-LazyAllocation.md) |
 | [STK-08](#-stk-08-fixed-length-buffers-inside-structs-with-inlinearray) | InlineArray | Fixed-length buffer inside a struct (.NET 8+) | ✅ | [Verified](benchmarks/results/STK-08-InlineArray.md) |
 | [STK-09](#-stk-09-params-readonlyspant) | params ReadOnlySpan\<T\> | Remove the array allocation for variadic arguments (C# 13) | ✅ | [Verified](benchmarks/results/STK-09-ParamsSpan.md) |
+| [STK-11](#-stk-11-ref-field-cursor-for-structured-reads) | ref field cursor | Sequential reads of differing field widths | ✅ | [Verified](benchmarks/results/STK-11-RefFieldStructRead.md) |
 | [BUF-01](#-buf-01-buffer-reuse-with-arraypoolt) | ArrayPool\<T\> | Reduce GC pressure from throwaway buffers | ✅ | [Implemented](src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
 | [BUF-02](#-buf-02-ibufferwritert--getspan--advance-pattern) | IBufferWriter\<T\> + GetSpan / Advance | Write directly into the output buffer | ✅ | [Implemented](src/PerformancePatterns/Buf/PooledBufferWriter.cs) |
 | [BUF-03](#-buf-03-bufferwriterslimt-stack-first-writing) | BufferWriterSlim\<T\> | Stack-first buffer writing | ✅ | [Implemented](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
@@ -61,6 +63,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [BUF-05](#-buf-05-tiered-temporary-buffer-strategy-stackalloc--arraypool-unified) | Tiered temporary buffer strategy | Unified threshold switch between stackalloc and pool | ✅ | [Implemented](src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
 | [BUF-06](#-buf-06-skipping-zero-init-with-gcallocateuninitializedarray) | GC.AllocateUninitializedArray | Skip zero-initialization when allocating large arrays | ✅ | [Verified](benchmarks/results/BUF-06-UninitializedArray.md) |
 | [BUF-07](#-buf-07-reusing-reference-type-instances-with-objectpool) | ObjectPool | Reuse reference-type instances | ✅ | [Verified](benchmarks/results/BUF-07-ObjectPool.md) |
+| [BUF-08](#-buf-08-working-with-memoryt-span-resolution-cost-and-array-interop) | Working with Memory\<T\> | .Span resolution cost and copy-free array interop | ✅ | [Verified](benchmarks/results/BUF-08-MemoryAccess.md) |
 | [JIT-01](#️-jit-01-aggressiveinlining--aggressiveoptimization) | AggressiveInlining / AggressiveOptimization | Force inlining and optimization | ✅ | [Verified](benchmarks/results/JIT-01-Inlining.md) |
 | [JIT-02](#️-jit-02-branch-elimination-via-iequatablet-constraints) | Branch elimination via IEquatable\<T\> constraint | Remove virtual dispatch from comparison | ✅ | [Verified](benchmarks/results/TYP-02-BitwiseComparer.md) |
 | [JIT-03](#️-jit-03-generic-specialization-via-typeoft-branches) | typeof(T) branch specialization | Remove branches from generic conversion | ✅ | [Verified](benchmarks/results/JIT-03-TypeofBranch.md) |
@@ -85,6 +88,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [BIT-04](#-bit-04-general-purpose-hashing-with-xxhash3) | XxHash3 | Faster non-cryptographic hashing | ✅ | [Verified](benchmarks/results/BIT-04-XxHash3.md) |
 | [BIT-05](#-bit-05-order-preserving-digests-for-variable-length-key-search) | Order-preserving key digest | Decide binary-search probes without reading key bytes | ✅ | [Verified](benchmarks/results/BIT-05-OrderedDigestSearch.md) |
 | [VEC-01](#-vec-01-explicit-simd-vectort--vector256) | Explicit SIMD | Bulk processing with Vector\<T\> / Vector256 | ✅ | [Verified](benchmarks/results/VEC-01-VectorSum.md) |
+| [VEC-02](#-vec-02-fixed-width-intrinsics-byte-shuffle) | Fixed-width intrinsics | Lane permutation Vector\<T\> cannot express | ✅ | [Verified](benchmarks/results/VEC-02-VectorShuffle.md) |
 | [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | General-purpose span splitting (zero allocation) | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-02](#-seq-02-struct-io-over-stream) | Struct I/O over Stream | Direct binary read/write of structs | ✅ | [Verified](benchmarks/results/SEQ-02-StructStreamIo.md) |
 | [SEQ-03](#-seq-03-lazy-sequence-processing-batch--segment--traverse) | Batch / Segment / Traverse | Low-allocation sequence processing | ✅ | [Implemented](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -96,6 +100,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [COL-04](#️-col-04-choosing-a-lookup-strategy-for-small-element-counts) | Small-set lookup strategy | Choose the implementation by size and shape | ✅ | [Implemented](src/PerformancePatterns/Col/SampledNameTable.cs) |
 | [COL-05](#️-col-05-concrete-type-dispatch-for-ienumerable-parameters) | IEnumerable concrete-type dispatch | Route List/array inputs onto a Span path | ✅ | [Verified](benchmarks/results/COL-05-EnumerableDispatch.md) |
 | [COL-06](#️-col-06-shape-specialized-collection-conversion) | Shape-specialized collection conversion | Optimize the allocation and copy strategy for the destination | ✅ | [Verified](benchmarks/results/COL-06-CollectionConvert.md) |
+| [COL-07](#️-col-07-existence-checked-ref-lookup-with-getvaluerefornullref) | GetValueRefOrNullRef | Fuse existence check and update into one probe | ✅ | [Verified](benchmarks/results/COL-07-ValueRefLookup.md) |
 | [TXT-01](#-txt-01-formatting-and-conversion-with-lookup-tables) | Lookup-table formatting | Table-driven fixed-format formatting | ✅ | [Implemented](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#-txt-02-stackalloc-first-string-building) | stackalloc-first string building | Low-allocation alternative to StringBuilder | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [TXT-03](#-txt-03-avoiding-exceptions-with-the-try-pattern) | Try pattern | Do not use exceptions for control flow | ✅ | [Verified](benchmarks/results/TXT-03-TryPattern.md) |
@@ -116,6 +121,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [ASY-07](#-asy-07-streaming-io) | Streaming I/O | Avoid buffering everything | ✅ | [Verified](benchmarks/results/ASY-07-StreamBuffering.md) |
 | [CON-01](#-con-01-one-shot-guards-with-interlocked) | Interlocked one-shot guard | Lock-free run-once for Dispose and initialization | ✅ | [Verified](benchmarks/results/CON-01-DisposeGuard.md) |
 | [CON-02](#-con-02-reference-counting-for-pinned-resources) | Reference counting for pinned resources | Batch retains per run; deterministic release | ✅ | [Verified](benchmarks/results/CON-02-RefCount.md) |
+| [CON-03](#-con-03-false-sharing-and-cache-line-padding) | False sharing padding | Separate concurrent counters onto cache lines | ✅ | [Verified](benchmarks/results/CON-03-FalseSharing.md) |
 | [SYS-01](#️-sys-01-low-cost-time-and-elapsed-time-reads) | Low-cost timestamps | Avoid DateTime.UtcNow | ✅ | [Verified](benchmarks/results/SYS-01-Timestamp.md) |
 | [DAT-01](#️-dat-01-optimizing-column-resolution-in-db-access) | Optimized column resolution for DB access | Ordinal caching and single-pass column resolution | ✅ | [Verified](benchmarks/results/DAT-01-OrdinalResolve.md) |
 | [GEN-01](#-gen-01-strategies-for-fast-emit-generated-code) | Speed strategies for Emit-generated code | Inlining of generated delegates and similar | ❌ | [Verified](benchmarks/results/GEN-01-EmitStrategy.md) |
@@ -165,7 +171,7 @@ public bool MoveNext()
 **Effect:**
 
 - Measured: creating and walking class elements costs 63.6ns / 664B, while struct elements in a pooled array cost 9.8ns / 0B (16 elements). The cost stays nearly flat as the element count grows
-- Even for walk-dominated work it is about 1.5x faster with zero allocation (elements are laid out contiguously, improving cache efficiency)
+- The walk itself does not get faster (within 3% of a freshly allocated class array). The win is **removing the per-element heap allocation** plus a contiguous layout that does not degrade as the heap ages
 
 **AOT:** ✅ No issues
 
@@ -197,11 +203,11 @@ for (var i = 0; i < entries.Length; i++)
 
 ### 💾 MEM-03: Explicit slicing with Slice(offset, length)
 
-**Goal:** Use `span.Slice(offset, length)` instead of the range operator `span[offset..]` to cut slice-creation cost.
+**Goal:** Use `span.Slice(offset, length)` instead of the range operator `span[offset..]` to tighten the generated code for slice creation (**there is no time difference** — decide on code size and readability).
 
 **Effect:**
 
-- Measured: with the same write API, the slicing style alone accounts for roughly a 1.2-1.5x difference (repeated binary writes). Code size shrinks too (137B → 87B)
+- **The time difference cannot be resolved by measurement** (overlapping confidence intervals). What you get is one fewer instruction per iteration (15 vs 14 instructions, 103 vs 100 B), not speed
 - The range operator computes and validates a "rest of the buffer" length, whereas an explicit length in `Slice` performs only the validation that is needed
 
 **AOT:** ✅ No issues
@@ -280,6 +286,69 @@ public void Draw(in MutableContext context) => context.Value.Use();
 
 ---
 
+### 💾 MEM-05: Struct layout optimization (size and field order)
+
+**Goal:** Make the struct itself smaller, which cuts both the footprint of an array walk and the cost of passing it by value. This sits **upstream** of MEM-02 (array of structs + ref access) and MEM-04 (pass by `in` above 16 bytes).
+
+**Effect:**
+
+- The same four fields come out as either 32 or 24 bytes depending on declaration order alone. **0.67-0.71x on scattered access**
+- Sequential traversal shows no difference: the prefetcher absorbs the footprint gap. The win is on random / scattered access
+- Once the type is smaller, the MEM-04 question ("is this over 16 bytes, do I need `in`?") can disappear entirely, because the by-value copy also gets cheaper
+
+**AOT:** ✅ No issues
+
+**Example:**
+
+```csharp
+// ❌ Alternating wide and narrow fields. C# emits Sequential for structs by default, so the padding stays (32 bytes)
+internal struct Padded
+{
+    public long Id;      // offset 0
+    public int Kind;     // offset 8  (+4 padding)
+    public long Value;   // offset 16
+    public int Flags;    // offset 24 (+4 padding)
+}
+
+// ✅ Order the fields wide-first yourself (24 bytes)
+internal struct Packed
+{
+    public long Id;      // offset 0
+    public long Value;   // offset 8
+    public int Kind;     // offset 16
+    public int Flags;    // offset 20
+}
+
+// ✅ Let the runtime reorder (24 bytes; only for internal types that are not tied to an external format)
+[StructLayout(LayoutKind.Auto)]
+internal struct Auto
+{
+    public long Id;
+    public int Kind;
+    public long Value;
+    public int Flags;
+}
+```
+
+**Use cases:** Hash table entries, parser token arrays, column metadata, arrays of value-type components — any struct a library lays out in bulk.
+
+**Measured (net10 / x86-64-v3, 16 bytes x 16,384 elements):** sizes confirmed with `Unsafe.SizeOf` — **Padded 32 B / Packed 24 B / Auto 24 B**.
+
+| Traversal | Padded (32 B) | Packed (24 B) | Auto (24 B) |
+|---|---:|---:|---:|
+| Sequential | 14,840 ns (1.00) | 14,742 ns (0.995) | 14,345 ns (0.968) |
+| **Scattered** | **26,213 ns (1.00)** | **18,516 ns (0.71)** | **17,662 ns (0.67)** |
+
+The sequential rows have overlapping confidence intervals and cannot be resolved. The scattered rows do not overlap: **0.67-0.71x**. By-value passing also moves, 2.034 → 1.854 ns (error bars do not overlap). → [Measurement](benchmarks/results/MEM-05-StructLayout.md)
+
+**Caveats:**
+
+- **The generated code is identical for all three types** (65 B sequential / 93 B scattered). The difference is on the **data** side, not the code side, so this book's "overlapping CIs plus identical code means no difference" rule **does not apply here**. Sequential showing no difference is the prefetcher at work, not evidence that layout is irrelevant
+- **Never use `LayoutKind.Auto` on a type that is tied to an external format.** Binary I/O and interop layouts stay fixed with `Sequential` + `Pack`, as in SEQ-02
+- Structs containing reference fields get their layout decided by the runtime regardless, so this technique mainly targets unmanaged field sets
+
+---
+
 ## 🥞 STK: Stack usage and zero-allocation type design
 
 ### 🥞 STK-01: ref struct (stack-only type)
@@ -315,6 +384,8 @@ public ref struct SpanTokenizer<T> where T : IEquatable<T>
 
 - Constraints apply: it cannot be held as a field of a class, cannot cross `await` / `yield`, and so on (partially relaxed since C# 13)
 - Since C# 13, ref structs can implement interfaces and the `allows ref struct` constraint is available
+- **`scoped` (C# 11) is the modifier that relaxes the escape constraint a ref struct imposes on callers.** On a parameter it becomes a contract that the reference will not leave the method. **It has no effect on generated code whatsoever** — caller and callee disassembly were confirmed identical instruction for instruction — so it is neither something to add for speed nor something to avoid for speed → [Measurement](benchmarks/results/LAB-ScopedRef.md)
+- **`[UnscopedRef]` (C# 11) is what lets a struct member return `ref this.field`.** Without it the member does not compile at all (CS8170). It is **not a performance pattern** though: a ref-returning accessor measures 1.07x against a get/set pair with code growing 85 → 88 B, so no axis improves ([R-20](docs/rejected-patterns.md))
 
 ---
 
@@ -477,6 +548,23 @@ public static object Box(int value) => value switch
 
 **Caveats:** If generic constraints (`where T : struct` plus an interface constraint) let you design the whole call chain without boxing, that is the real fix (see JIT-02).
 
+**When the box already exists (`Unsafe.Unbox<T>`):** this pattern is about not boxing in the first place, but the situation is different when an **already boxed value is handed to you** — an `object` field, a `Dictionary<K, object>`, an interop boundary. Unbox / mutate the copy / rebox pays one allocation per update, so take a ref into the existing box with `Unsafe.Unbox<T>` instead.
+
+```csharp
+// ❌ A new box per update (8,192 B for 256 updates)
+var value = (Counter)boxes[i];
+value.Count++;
+boxes[i] = value;
+
+// ✅ Take a ref into the existing box: zero allocation, and the box identity is preserved
+ref var value = ref Unsafe.Unbox<Counter>(boxes[i]);
+value.Count++;
+```
+
+**Measured (net10 / x86-64-v3, updating 256 boxed structs):** the rebox form is 1,601.5 ns / 582 B / **8,192 B allocated**, against **286.5 ns (0.18x) / 251 B / 0 B** for `Unsafe.Unbox`. All three axes — time, code size, allocation — improve. → [Measurement](benchmarks/results/LAB-UnboxInPlace.md)
+
+**Caveat for `Unsafe.Unbox`:** a type mismatch raises `InvalidCastException` (unlike `Unsafe.As`, the type is checked), but passing a reference that is not a box is undefined. Restrict it to **boxes you created yourself**.
+
 **Main sources of implicit boxing (review checklist):**
 
 - Assigning a struct to an interface-typed variable or argument (`IComparer<T> c = myStructComparer`)
@@ -633,6 +721,88 @@ public static void Trace(params ReadOnlySpan<string> values)
 **Measured (net10 / x86-64-v4, 3 arguments):** `params T[]` 4.46 ns / 48 B → `params ReadOnlySpan<T>` **1.10 ns / 0 B (0.25x)**. The allocation disappears with no change to the call syntax. → [Results](benchmarks/results/STK-09-ParamsSpan.md)
 
 **Caveats:** When replacing `params T[]` in a public library API, consider keeping both overloads for compatibility with existing calls that pass an array explicitly.
+
+---
+
+### 🥞 STK-11: ref field cursor for structured reads
+
+**Goal:** In a sequential parse that reads fields of differing widths, hold the cursor position as **the ref itself** (C# 11 ref fields) rather than as an index.
+
+**Effect:**
+
+- **0.75x** against index arithmetic written out at the call site, and the code is smaller too: 163 → **111 B**
+- Even without reaching for ref fields, the re-slicing form gets to **0.81x** at 128 B
+
+**AOT:** ✅ No issues
+
+**Scope (the line against R-12 is the point of this pattern):**
+
+| Shape | Verdict | Why |
+|---|:---:|---|
+| Whole-element iteration (read N values of one type) | ❌ [R-12](docs/rejected-patterns.md) | Indexed form gets bounds-check elimination and auto-vectorization. The ref form is 1.21x slower |
+| **Field-granular structured reads** (each step reads a different width) | ✅ This pattern | The loop is not a counted loop, so the indexed form has no advantage to give |
+
+**Example:**
+
+```csharp
+// Record layout: [byte tag][ushort length][length bytes payload]
+internal ref struct FieldRefReader
+{
+    private readonly ref byte end;
+
+    private ref byte current;
+
+    public FieldRefReader(ReadOnlySpan<byte> source)
+    {
+        current = ref MemoryMarshal.GetReference(source);
+        end = ref Unsafe.Add(ref current, source.Length);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryReadHeader(out byte tag, out int length)
+    {
+        if (!Unsafe.IsAddressLessThan(ref current, ref end))
+        {
+            tag = 0;
+            length = 0;
+            return false;
+        }
+
+        tag = current;
+        length = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref current, 1));
+        current = ref Unsafe.Add(ref current, 3);
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<byte> ReadPayload(int length)
+    {
+        var payload = MemoryMarshal.CreateReadOnlySpan(ref current, length);
+        current = ref Unsafe.Add(ref current, length);
+        return payload;
+    }
+}
+```
+
+**Use cases:** Frame parsing for custom protocols, variable-length binary records, TLV decoders.
+
+**Measured (net10 / x86-64-v3, parsing 512 records):**
+
+| Form | Time | Ratio | Code size |
+|---|---:|---|---:|
+| Index arithmetic written at the call site (baseline) | 1,038.8 ns | 1.00 | 163 B |
+| Cursor holding span + position | 994.0 ns | 0.96 | 153 B |
+| **Cursor that re-slices the remainder** | **842.3 ns** | **0.81** | **128 B** |
+| **ref field cursor** | **782.5 ns** | **0.75** | **111 B** |
+
+Confidence intervals do not overlap (761-836 vs 988-1,095 ns). **As a staged move, switching to the re-slicing cursor alone already buys 0.81x.** Going all the way to ref fields is worth the remaining 0.06x plus the code size. → [Measurement](benchmarks/results/STK-11-RefFieldStructRead.md)
+
+**Caveats:**
+
+- **Do not use this for whole-element iteration.** Per R-12 it loses to the indexed form
+- ref fields can only live in a `ref struct`, and cannot cross `await` / `yield`
+- `Unsafe.ReadUnaligned` reads in machine byte order. Use `BinaryPrimitives` when the external format fixes the endianness (same caveat as SEQ-02)
+- End detection uses `Unsafe.IsAddressLessThan`. Getting the end ref wrong makes the check always true, the JIT removes the check entirely, and the result is an "impossibly fast" wrong number. Pin the correctness down with Verify (measurement pitfall 3)
 
 ---
 
@@ -924,6 +1094,108 @@ public static void Return(StringBuilder builder)
 
 ---
 
+### 🧺 BUF-08: Working with Memory\<T\> (Span resolution cost and array interop)
+
+**Goal:** `Memory<T>` is not "a `Span<T>` that survives `await`". `.Span` is a property call that resolves the backing store (array / `string` / `MemoryManager<T>`), and it shows up once it is inside a loop.
+
+**Effect:**
+
+- Resolving `.Span` per element costs **3.67x** against hoisting it once out of the loop
+- Even at chunk granularity, `memory.Slice(...).Span` loses to slicing a hoisted `Span` by 1.10-1.13x
+- `MemoryMarshal.TryGetArray` bridges to APIs that only accept `byte[]` + offset + count **with no copy** (4,120 → 0 B allocated)
+- `MemoryManager<T>` is the only way to publish an unmanaged region as `Memory<T>`
+
+**AOT:** ✅ No issues
+
+**Example:**
+
+```csharp
+// ❌ Resolving .Span on every iteration
+for (var offset = 0; offset < length; offset += ChunkSize)
+{
+    Process(memory.Slice(offset, ChunkSize).Span);
+}
+
+// ✅ Resolve once, then slice
+var span = memory.Span;
+for (var offset = 0; offset < length; offset += ChunkSize)
+{
+    Process(span.Slice(offset, ChunkSize));
+}
+
+// ✅ Bridge to a legacy byte[] + offset + count API without copying
+if (MemoryMarshal.TryGetArray<byte>(memory, out var segment))
+{
+    legacy.Write(segment.Array!, segment.Offset, segment.Count);
+}
+else
+{
+    var buffer = memory.ToArray();   // not array backed, so the copy has to stay
+    legacy.Write(buffer, 0, buffer.Length);
+}
+```
+
+```csharp
+// Publishing an unmanaged region as Memory<T>
+internal sealed unsafe class NativeMemoryManager<T> : MemoryManager<T>
+    where T : unmanaged
+{
+    private readonly int length;
+
+    private T* pointer;
+
+    public NativeMemoryManager(int length)
+    {
+        this.length = length;
+        pointer = (T*)NativeMemory.Alloc((nuint)length, (nuint)sizeof(T));
+    }
+
+    public override Span<T> GetSpan() => new(pointer, length);
+
+    public override MemoryHandle Pin(int elementIndex = 0) => new(pointer + elementIndex);
+
+    public override void Unpin()
+    {
+        // Unmanaged memory never moves, so there is nothing to release
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (pointer is not null)
+        {
+            NativeMemory.Free(pointer);
+            pointer = null;
+        }
+    }
+}
+```
+
+**Use cases:** Buffer handling in async I/O, connecting to existing `byte[]`-based APIs, exposing mmap or native interop regions.
+
+**Measured (net10 / x86-64-v3, 4,096 bytes):**
+
+| Form | Time | Ratio | Code size | Allocated |
+|---|---:|---|---:|---:|
+| `.Span` hoisted + chunk Slice (baseline) | 1.281 μs | 1.00 | 248 B | 0 B |
+| `memory.Slice(...).Span` per chunk | 1.409 μs | 1.10 | 268 B | 0 B |
+| `.Span` hoisted + element access | 1.030 μs | 0.81 | 201 B | 0 B |
+| **`memory.Span[i]` per element** | **3.783 μs** | **2.96** | 178 B | 0 B |
+| MemoryManager backed, hoisted | 1.244 μs | 0.97 | 297 B | 0 B |
+| MemoryManager backed, resolved per chunk | 1.441 μs | 1.13 | **518 B** | 0 B |
+| `ToArray()` + legacy API (baseline) | 1.715 μs | 1.00 | 889 B | **4,120 B** |
+| **`TryGetArray` + legacy API** | **1.545 μs** | **0.90** | **414 B** | **0 B** |
+
+**The backing store does not matter once `.Span` is hoisted** (1.244 ≒ 1.281 μs), but the code that resolves `.Span` is 1.7x larger for the MemoryManager case (518 vs 297 B). That is the part that shows up inside a loop. → [Measurement](benchmarks/results/BUF-08-MemoryAccess.md)
+
+**Caveats:**
+
+- If the work completes inside a synchronous scope, take a `Span<T>` in the first place (BUF-05). `Memory<T>` is only needed across an async boundary (BUF-04)
+- `TryGetArray` returns false for `MemoryManager`-backed and `string`-backed memory. **Always keep the copy fallback reachable**
+- `MemoryManager<T>` implements `IDisposable` explicitly, so `manager.Dispose()` resolves to the protected `Dispose(bool)` and fails to compile. Write `((IDisposable)manager).Dispose()`
+- Native allocations are outside the GC, so R-13's argument about POH allocation cost does not apply — but freeing becomes your responsibility
+
+---
+
 ## ⚙️ JIT: JIT optimization support
 
 ### ⚙️ JIT-01: AggressiveInlining / AggressiveOptimization
@@ -1026,6 +1298,8 @@ public static T Convert<T>(int value)
 **Measured (net10 / x86-64-v4, summing int[1024]):** The generic version with typeof(T) branches runs 212.4 ns vs. 213.7 ns for a hand-written int version — **the branches cost nothing** (code size 35 vs 32 B, essentially identical: the JIT folds `typeof(T) == typeof(int)` to a constant per instantiation and removes the branch). Correctness of the fallback path is confirmed by Verify. → [Results](benchmarks/results/JIT-03-TypeofBranch.md)
 
 **Related finding:** Caching `typeof(X)` in a `static readonly Type` field is pointless (the JIT turns `typeof` itself into a constant; measurements show identical time and code size). Prefer readability.
+
+**How to write the reinterpretation:** the example above uses `Unsafe.As<int, T>(ref value)`, but **for same-sized value types make `Unsafe.BitCast<int, T>(value)` the default.** The generated code is identical (21 B in the generic form; with `T = int` the reinterpretation disappears entirely), while `BitCast` rejects a size mismatch at compile time or run time. Keep `Unsafe.As<TFrom, TTo>` for **reinterpretations where the sizes differ** (looking at a prefix, reading as a wider type). → [Measurement](benchmarks/results/LAB-BitCast.md)
 
 ---
 
@@ -1580,6 +1854,7 @@ public T Resolve<T>()
 
 - If the type correspondence breaks, you do not get an `InvalidCastException` — it silently corrupts (undefined behavior). Enforce type safety in the registration API and confine `Unsafe.As` behind a private boundary
 - Verifying with a normal cast plus `Debug.Assert` in Debug builds and using `Unsafe.As` only in Release is also a workable arrangement
+- **For value-to-value reinterpretation use `Unsafe.BitCast`, not `Unsafe.As<TFrom, TTo>`.** This pattern (`Unsafe.As<T>(object)`) is a reference cast and a different thing entirely, but the shared name makes the two easy to confuse. Bit reinterpretation of same-sized value types can move to the safe form at no cost in generated code (JIT-03 / [Measurement](benchmarks/results/LAB-BitCast.md))
 
 ---
 
@@ -1817,7 +2092,7 @@ while (mask != 0UL)
 **Effect:**
 
 - XxHash3 has high throughput on long inputs and is available through the static `HashToUInt64` / `Hash` APIs
-- A `char` sequence can be reinterpreted as bytes with `MemoryMarshal.Cast<char, byte>`, and that conversion is **measured to be zero-cost** (no different from a `fixed` pointer)
+- A `char` sequence can be reinterpreted as bytes with `MemoryMarshal.Cast<char, byte>`, and that conversion is **measured to be zero-cost** (no different from a `fixed` pointer). Note though that `Cast` **changes the length when element sizes differ and silently truncates the remainder**, and **performs no alignment check** (it can raise `DataMisalignedException` on Arm), so the caller has to guarantee that the byte length is a multiple of the element size
 - `string.GetHashCode` is randomized per process, so it **cannot be used where a value must be stable across processes or persisted**. XxHash3 is stable
 
 **AOT:** ✅ No issues (NuGet: System.IO.Hashing)
@@ -1952,6 +2227,79 @@ for (; i < span.Length; i++)
 
 ---
 
+### 🧮 VEC-02: Fixed-width intrinsics (byte shuffle)
+
+**Goal:** Perform a lane permutation that `Vector<T>` cannot express, using a `Vector128` shuffle. This is **the place VEC-01 points to** when it says to drop to a fixed width only when the algorithm requires a specific lane arrangement.
+
+**Effect:**
+
+- **0.46x** against a scalar loop for `uint` endianness reversal (a pure lane permutation)
+- Even without a shuffle, the `Vector<T>` arithmetic form (building the permutation from shifts and masks) reaches 0.50x — but its code is 1.75x larger (333 vs 190 B)
+
+**AOT:** ✅ No issues (always provide the `IsSupported` / `IsHardwareAccelerated` guard and a scalar fallback)
+
+**Example:**
+
+```csharp
+// Swapping byte positions cannot be written with Vector<T>. Use Vector128.Shuffle with a constant mask
+private static readonly Vector128<byte> ReverseMask = Vector128.Create(
+    (byte)3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
+
+public static void ReverseEndianness(ReadOnlySpan<uint> source, Span<uint> destination)
+{
+    var i = 0;
+    if (Vector128.IsHardwareAccelerated)
+    {
+        ref var srcHead = ref MemoryMarshal.GetReference(source);
+        ref var dstHead = ref MemoryMarshal.GetReference(destination);
+        var lanes = Vector128<uint>.Count;
+        for (; i <= source.Length - lanes; i += lanes)
+        {
+            var loaded = Vector128.LoadUnsafe(ref srcHead, (nuint)i);
+            Vector128.Shuffle(loaded.AsByte(), ReverseMask).AsUInt32().StoreUnsafe(ref dstHead, (nuint)i);
+        }
+    }
+
+    for (; i < source.Length; i++)   // scalar tail
+    {
+        destination[i] = BinaryPrimitives.ReverseEndianness(source[i]);
+    }
+}
+```
+
+**Use cases:** Endianness conversion, nibble expansion (hex / Base-N encoders), byte-level table lookup, fixed permutation patterns.
+
+**Measured (net10 / x86-64-v3 (Zen 3 / AVX2), endianness reversal of 1,021 `uint` values):**
+
+| Implementation | Time | Ratio | Code size |
+|---|---:|---|---:|
+| Scalar (`BinaryPrimitives`) (baseline) | 266.46 ns | 1.00 | 145 B |
+| **`Vector128.Shuffle` (portable)** | **121.53 ns** | **0.46** | 190 B |
+| `Ssse3.Shuffle` (raw ISA intrinsic) | 64.35 ns | 0.24 | 190 B |
+| `Vector<T>` arithmetic form (no shuffle) | 131.78 ns | 0.50 | 333 B |
+
+→ [Measurement](benchmarks/results/VEC-02-VectorShuffle.md)
+
+**⚠️ The 0.24x for `Ssse3.Shuffle` is not an API difference — there is no performance reason to drop to raw ISA intrinsics:**
+
+The two forms produce **byte-identical disassembly** (190 B each, the same `vpshufb`; only the address of the constant mask differs). The measured 1.76x comes from where the hot loop lands.
+
+| Form | Loop start | Loop range | 64-byte boundary |
+|---|---|---|---|
+| `Ssse3.Shuffle` | `…9F5C` | `9F5C`-`9F78` | **fits inside** `[9F40, 9F80)` |
+| `Vector128.Shuffle` | `…9FBC` | `9FBC`-`9FD8` | **straddles** `9FC0` |
+
+**Confirmed by adding byte-identical duplicate methods:** each duplicate reproduced its original's address and time (`Vector128…B` 124.41 ns at `…9FBC`, `Ssse3…B` 65.69 ns at `…9F5C`). Swapping the declaration order does not move the placement. So **default to the portable `Vector128.Shuffle`**.
+
+**Caveats:**
+
+- Look for a vectorized BCL API first (VEC-01's design guidance). This pattern is only for "no BCL API exists, and `Vector<T>` cannot express it either"
+- Always test the tail and the unsupported-CPU fallback. Making the element count **not** a multiple of the vector width keeps the tail path live on every run
+- `Vector128.Shuffle` normalizes indices (out of range gives 0). With a constant mask the JIT folds it, so that safety costs nothing
+- **This section was measured on an x86-64-v3 (AVX2) machine.** The rest of this book was measured on x86-64-v4 (AVX-512), so absolute values are not directly comparable
+
+---
+
 ## 📜 SEQ: Sequential I/O and sequence processing
 
 ### 📜 SEQ-01: SpanTokenizer\<T\>
@@ -2028,6 +2376,8 @@ public static void Write<T>(this Stream stream, in T value) where T : unmanaged
 **The largest improvement in this catalog.** Field-by-field I/O passes through buffer bounds checks and formatting on every call, whereas bulk reinterpretation is a single memcpy. → [Results](benchmarks/results/SEQ-02-StructStreamIo.md)
 
 **Caveats:** The memory layout becomes the external format verbatim, so pin it with `[StructLayout(LayoutKind.Sequential, Pack = 1)]` or similar and make endianness and padding explicit design decisions. When compatibility across environments is needed, use explicit conversion via `BinaryPrimitives`.
+
+**Note (`Unsafe.As` vs `Unsafe.BitCast`):** the example above views `T` as a byte sequence — a reinterpretation between different sizes — so `Unsafe.As<T, byte>` is the correct tool. **When you are only swapping between same-sized value types, make `Unsafe.BitCast` the default** instead: the generated code is identical and it rejects a size mismatch. → [Measurement](benchmarks/results/LAB-BitCast.md)
 
 ---
 
@@ -2422,6 +2772,59 @@ List refill (16 elements / 256 elements):
 → [Results](benchmarks/results/COL-06-CollectionConvert.md)
 
 **Caveats:** `MoveToImmutable` **requires Count and Capacity to match exactly** (it throws if short or over). Use `ToImmutable()` when the count is not fixed.
+
+---
+
+### 🗃️ COL-07: Existence-checked ref lookup with GetValueRefOrNullRef
+
+**Goal:** Do "update if present, otherwise nothing" in a **single** hash probe. This is the **non-inserting** counterpart to COL-01's `GetValueRefOrAddDefault`.
+
+**Effect:**
+
+- The update path runs at **0.48-0.62x** against `TryGetValue` + indexer write-back (two probes)
+- **Code size drops from 8,270 to 1,080 B.** The indexer setter drags the whole insert path (`TryInsert` / `Resize` / hash helpers) into the caller; the ref-returning form needs none of it
+- The gain is **the single probe**, not the avoided value copy — the ratio is the same for an 8-byte and a 32-byte value
+
+**AOT:** ✅ No issues
+
+**Example:**
+
+```csharp
+// ❌ Two probes, and the indexer setter inlines the whole insert path
+if (map.TryGetValue(key, out var value))
+{
+    map[key] = value + 1;
+}
+
+// ✅ One probe. Take a ref to the existing slot and update in place
+ref var slot = ref CollectionsMarshal.GetValueRefOrNullRef(map, key);
+if (!Unsafe.IsNullRef(ref slot))
+{
+    slot++;
+}
+```
+
+**Use cases:** Hit counters and statistics, bulk updates restricted to existing entries, refreshing cache timestamps.
+
+**Measured (net10 / x86-64-v3, 256 probes into a 1,024-entry dictionary):**
+
+| Probe | Form | Time | vs the two-probe form | Code size |
+|---|---|---:|---|---:|
+| All hit | `TryGetValue` + indexer update | 4.997 μs | 1.00 | **8,270 B** (10 methods) |
+| All hit | **`GetValueRefOrNullRef` update** | **2.401 μs** | **0.48** | **1,080 B** (2 methods) |
+| Half miss | `TryGetValue` + indexer update | 3.185 μs | 1.00 | 8,051 B |
+| Half miss | **`GetValueRefOrNullRef` update** | **1.967 μs** | **0.62** | 895 B |
+| 32-byte value | `TryGetValue` + indexer update | 5.028 μs | 1.00 | 3,294 B |
+| 32-byte value | **`GetValueRefOrNullRef` update** | **2.560 μs** | **0.51** | 1,088 B |
+
+**For read-only lookups there is no difference.** 0.98-1.00x against `TryGetValue` with overlapping confidence intervals, identical instruction counts (199 vs 199 on all hit), and code size that moves both ways (+16 / -14 / -4 B). → [Measurement](benchmarks/results/COL-07-ValueRefLookup.md)
+
+**Caveats:**
+
+- **For reads alone, keep `TryGetValue`.** The value of this pattern is fusing the read and the write
+- Do not modify the dictionary while holding the ref (a resize swaps the internal array and the ref points at the old storage — same constraint as COL-01)
+- If insertion is also needed, use `GetValueRefOrAddDefault` (COL-01). Pick the API by whether "missing" means insert or means skip
+- The `ContainsKey` + indexer shape is two probes and is rejected at build time by CA1854. It is not a candidate to compare against
 
 ---
 
@@ -3200,6 +3603,59 @@ foreach (var row in rows)
 
 ---
 
+### 🔒 CON-03: False sharing and cache line padding
+
+**Goal:** Break the cache invalidation ping-pong that happens when per-worker counters land on the same cache line.
+
+**Effect:**
+
+- Writing to adjacent slots concurrently costs 7.4x at 2 workers and **29.7x at 8 workers**
+- **64 bytes of padding is not enough.** At 8 workers the 128-byte form is 2.86x faster than the 64-byte form
+- Making the writes `Interlocked` does not remove the penalty, it amplifies it
+
+**AOT:** ✅ No issues
+
+**Example:**
+
+```csharp
+// ❌ Per-worker counters share one or two cache lines
+private readonly long[] counters = new long[workerCount];
+
+// ✅ One slot per 128 bytes, wide enough to account for adjacent line prefetching
+[StructLayout(LayoutKind.Explicit, Size = 128)]
+internal struct PaddedCounter
+{
+    [FieldOffset(0)]
+    public long Value;
+}
+
+private readonly PaddedCounter[] counters = new PaddedCounter[workerCount];
+
+// Equivalent if you would rather stay with a plain array: stride the indices
+private readonly long[] strided = new long[workerCount * 16];   // 16 * 8 = 128-byte stride
+```
+
+**Use cases:** Per-worker statistics counters, sharded hit counts, ring buffer head / tail, intermediate buffers for parallel aggregation.
+
+**Measured (net10 / x86-64-v3 (Zen 3, 12 physical / 24 logical), 50,000 writes per worker):**
+
+| Workers | Adjacent (baseline) | 64 bytes | **128 bytes** | Adjacent + Interlocked | 128 bytes + Interlocked |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 516.51 μs | 69.43 μs (0.14) | **66.86 μs (0.13)** | 646.38 μs (1.28) | 415.88 μs (0.82) |
+| 4 | 853.96 μs | 93.73 μs (0.11) | **92.94 μs (0.11)** | 1,680.32 μs (1.97) | 444.70 μs (0.52) |
+| 8 | 1,565.20 μs | 150.59 μs (0.10) | **52.66 μs (0.03)** | 6,612.19 μs (4.23) | 673.50 μs (0.43) |
+
+**The largest improvement in this book.** Even 2 workers already pay 7.4x, and 8 workers pay 29.7x (1,565.20 / 52.66). → [Measurement](benchmarks/results/CON-03-FalseSharing.md)
+
+**Caveats:**
+
+- **Default to 128 bytes.** At 2 and 4 workers it ties with 64 bytes, but at 8 workers 64 bytes measures 150.59 μs against 52.66 μs — a 2.86x gap. Adjacent line prefetching is why the BCL itself pads to 128
+- **`Interlocked` does not hide the penalty.** At 8 workers adjacent interlocked is 4.23x the adjacent volatile baseline, and 9.8x its padded counterpart. Any design that puts `Interlocked` on an array of counters has this pattern as a **precondition** (CON-01 targets a single variable and is unaffected)
+- Time scales with the worker count, so **ratios are only meaningful inside one worker count**
+- This trades memory for throughput. Paying 128 bytes per worker is only worth it for counters that really are written concurrently
+- Cache line width is hardware dependent. These numbers are from Zen 3 (64-byte lines plus adjacent line prefetching)
+
+---
 ## 🖥️ SYS: System and OS facilities
 
 ### 🖥️ SYS-01: Low-cost time and elapsed-time reads
@@ -3458,6 +3914,9 @@ Techniques measured and judged to have no effect or to be counterproductive. **D
 | R-16 | Hand-written digit-ordering tricks (right-align then shift, reverse writing) | 2.5-4.8x slower than TryFormat + Fill |
 | R-17 | Substituting Call for a delegate Invoke (to avoid Callvirt) | JIT codegen confirmed byte-identical (net10) |
 | R-18 | Hand-written unsigned-overflow range checks | The JIT already fuses the two comparisons; codegen is effectively identical |
+| R-19 | "P/Invoke speed-up" as a pattern (LibraryImport / SuppressGCTransition) | LibraryImport is the standard declaration form; SuppressGCTransition shows no gain |
+| R-20 | Ref-returning accessor via `[UnscopedRef]` (for performance) | 1.07x against a get/set pair with code growing 85 → 88 B; no axis improves |
+| R-21 | Recovering an index from a ref with `Unsafe.ByteOffset` | 1.45x against carrying the index, and larger code (same conclusion as R-02) |
 
 ---
 
@@ -3539,6 +3998,12 @@ For the shape to emit per scenario and its evidence see the [generated code patt
 | Optimizing allocation and copying in collection conversion | COL-06 |
 | Zero-allocation string creation | TXT-07 |
 | Character search over many candidates | TXT-08 (use the dedicated overload for 2-3 candidates) |
+| Separating concurrent counters onto cache lines | CON-03 |
+| Optimizing struct size and field order | MEM-05 |
+| Handling Memory\<T\> inside a loop | BUF-08 |
+| Existence-checked update of a dictionary entry | COL-07 |
+| Lane permutation Vector\<T\> cannot express | VEC-02 |
+| Field-granular reads of variable-length records | STK-11 |
 | Formatting and trimming fixed-length fields | TXT-09 |
 | Matching against a compile-time string set | TXT-10 (COL-04 / BIT-01 above 64 entries or when the set is runtime-only) |
 | Converting a boxed value to string | TXT-11 (keep the fast path to a few types) |
@@ -3565,21 +4030,29 @@ The low-level APIs are spread across many patterns, so this table cross-referenc
 
 | API | Purpose | Related patterns |
 |---|---|---|
-| `Unsafe.Add(ref r, i)` | Offset access from a ref (no bounds check) | R-02 (structural uses only) |
+| `Unsafe.Add(ref r, i)` | Offset access from a ref (no bounds check) | STK-11 (structured reads) / R-02 (rejected for whole-element walks) |
 | `Unsafe.As<T>(object)` | Cast that skips the type check (reference types) | TYP-05 |
 | `Unsafe.As<TFrom, TTo>(ref v)` | Reinterpreting a ref (generic specialization, bit reinterpretation) | JIT-03 / SEQ-02 |
 | `Unsafe.ReadUnaligned / WriteUnaligned` | unmanaged reads and writes at positions with no alignment guarantee | SEQ-01 / SEQ-02 / BUF-02 |
 | `Unsafe.SkipInit(out v)` | Skipping initialization of an out variable | MEM-01 / SEQ-02 |
 | `Unsafe.SizeOf<T>()` | Size of an unmanaged type (a JIT constant) | SEQ-01 / SEQ-02 |
-| `Unsafe.IsAddressLessThan` | Comparing the positions of two refs (end detection) | R-02 (structural uses only) |
-| `Unsafe.BitCast<TFrom, TTo>` (.NET 8+) | Safe bit reinterpretation of same-size value types (the safe form of As) | SEQ-02 / TYP-02 |
-| `MemoryMarshal.GetReference(span)` | Getting a ref to the start of a Span | R-02 (structural uses only) |
-| `MemoryMarshal.GetArrayDataReference(array)` | Getting a ref to the start of an array | R-02 (structural uses only) |
-| `MemoryMarshal.Cast<TFrom, TTo>(span)` | Reinterpreting a Span's element type (zero cost) | TYP-02 / candidate XxHash3 |
+| `Unsafe.IsAddressLessThan` | Comparing the positions of two refs (end detection) | STK-11 (structured reads) / R-02 (rejected for whole-element walks) |
+| `Unsafe.AreSame(ref a, ref b)` | Testing whether two refs point at the same location (alias check) | Quick reference only ([Measurement](benchmarks/results/LAB-RefIdentity.md)) |
+| `Unsafe.ByteOffset(ref a, ref b)` | Byte distance between two refs. Recovering an index this way **does not pay off** ([R-21](docs/rejected-patterns.md)) | R-21 (rejected) |
+| `MemoryExtensions.Overlaps(span, other)` | Testing whether two Spans intersect as ranges | Quick reference only (1.40x heavier than `AreSame`) |
+| `Unsafe.BitCast<TFrom, TTo>` (.NET 8+) | Bit reinterpretation of same-size value types (**the form of As that rejects a size mismatch. Identical generated code**) | TYP-05 / JIT-03 / SEQ-02 / TYP-02 |
+| `Unsafe.Unbox<T>(object)` | Getting a ref into an existing box (update without reboxing) | STK-05 |
+| `MemoryMarshal.GetReference(span)` | Getting a ref to the start of a Span | STK-11 / VEC-02 (SIMD loads) / R-02 (manual walking rejected) |
+| `MemoryMarshal.GetArrayDataReference(array)` | Getting a ref to the start of an array | R-02 (rejected; this book has no positive use) |
+| `MemoryMarshal.Cast<TFrom, TTo>(span)` | Reinterpreting a Span's element type (zero cost; **the length changes when element sizes differ and the remainder is truncated. No alignment check**) | TYP-02 / BIT-04 / [traps](benchmarks/results/LAB-SpanReinterpret.md) |
 | `MemoryMarshal.AsBytes(span)` | Viewing a Span as bytes | TYP-02 |
-| `MemoryMarshal.CreateSpan(ref r, len)` | Building a Span from a ref | SEQ-02 |
+| `MemoryMarshal.TryGetArray(memory)` | Getting an array segment out of a Memory without copying | BUF-08 |
+| `MemoryManager<T>` | Publishing an unmanaged region as Memory | BUF-08 |
+| `MemoryMarshal.CreateSpan(ref r, len)` | Building a Span from a ref | SEQ-02 / STK-11 |
 | `CollectionsMarshal.AsSpan(list)` | Getting a Span over a List's internal array | COL-01 |
 | `CollectionsMarshal.GetValueRefOrAddDefault` | Getting a ref to a dictionary entry | COL-01 |
+| `CollectionsMarshal.GetValueRefOrNullRef` | Getting a ref to an existing entry only (pairs with `Unsafe.IsNullRef`) | COL-07 |
+| `Unsafe.IsNullRef(ref r)` | Testing whether a ref is null (receiving an optional ref) | COL-07 |
 | `RuntimeHelpers.IsReferenceOrContainsReferences<T>()` | Per-type branching on whether references are present (a JIT constant) | JIT-05 |
 
 **Shared caveat:** These APIs make you responsible for bounds checking and type safety. Keep them inside internal implementations that sit behind a public API's input validation, and pair them with `Debug.Assert` in Debug builds.

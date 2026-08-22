@@ -108,7 +108,7 @@
 
 📉 **実測・不採用の理由:** `MemoryMarshal.Cast` / `Unsafe.As` による再解釈と同速か、fixed の固定コスト分だけ遅い。unsafe コンテキストの導入コスト(監査・安全性)に見合う利得がない。
 
-✅ **代わりにやること:** Span / ref ベースで書く。再解釈は `MemoryMarshal.Cast`(ゼロコスト実測済み。BIT-04 の再測定では 8 / 512 文字で fixed より Cast が信頼区間非重複で速い — pinning が不要なぶん)、unmanaged 読み書きは SEQ-02(Stream 構造体 I/O)。
+✅ **代わりにやること:** Span / ref ベースで書く。再解釈は `MemoryMarshal.Cast`(ゼロコスト実測済み。BIT-04 の再測定では 8 / 512 文字で fixed より Cast が信頼区間非重複で速い — pinning が不要なぶん)、unmanaged 読み書きは SEQ-02(Stream 構造体 I/O)。**ただし `Cast` は要素サイズが異なると長さが変わって端数を黙って切り捨て、アラインメント検査も行わない**(Arm で `DataMisalignedException`)。`fixed` を捨てる代わりにこの 2 点は呼び出し側で保証する → [LAB-SpanReinterpret.md](../benchmarks/results/LAB-SpanReinterpret.md)
 
 🔗 **測定記録:** [BIT-04-XxHash3.md](../benchmarks/results/BIT-04-XxHash3.md)(Cast vs fixed の比較を含む)
 
@@ -221,6 +221,30 @@
 📉 **実測・不採用の理由:** `[LibraryImport]` は .NET 7 以降の P/Invoke 宣言の標準であり最適化ではない — blittable なシグネチャでは `DllImport` と同一の呼び出しになり(1.13 vs 1.14 ns)、比較する意味がない。ソース生成による AOT/トリミング対応マーシャリングのために既定として採用するもの。`[SuppressGCTransition]` は **1.26 倍(遅い)** — 素の遷移コスト自体がマネージド呼び出し比 +0.06 ns 程度しかなく、スキップして得るものがない。速度面の利得が計測できず、厳格な制約(サブマイクロ秒・非ブロッキング・コールバック禁止・例外禁止、違反はプロセス全体の GC 遅延)を伴うため、汎用の高速化パターンとしては成立しない。
 
 ✅ **代わりにやること:** P/Invoke 宣言は当然のこととして `[LibraryImport]` で書く(価値は AOT/トリミング対応であって速度ではない)。`[SuppressGCTransition]` は制約を満たし、かつ対象環境で利得を計測できた呼び出しに限って付ける。呼び出し側コードサイズは半減する(70 vs 163 B)ため、インライン化の観点で効く場合はある。
+
+---
+
+### R-20: `[UnscopedRef]` による ref 返しアクセサ(性能目的)
+
+🎯 **狙い:** struct の内部スロットを `[UnscopedRef] public ref long GetSlot(int index)` で ref 返しし、getter + setter の 2 回アクセスを 1 回にまとめて速くする。
+
+📉 **実測・不採用の理由:** get/set ペア 0.5013 ns に対して ref 返し 0.5349 ns(**1.07 倍**、信頼区間重複)。逆アセンブリは確かに別物になる — ref 版はループ本体が `add [r8],r10` の 1 命令 read-modify-write に畳まれる — が、アドレス計算の `lea` が増えるため**命令数は同じ 7 のまま、コードサイズは 85 → 88 B と増加**する。時間・コードサイズ・命令数のどの軸にも改善がない。
+
+✅ **代わりにやること:** 素直に getter / setter を書く(格納が `[InlineArray]` なら添字アクセスはインライン展開され、2 回アクセスでもコストは変わらない)。**`[UnscopedRef]` 自体は不要ではない** — struct のメンバーが `ref this.field` を返す API を書くには必須で、付けないと CS8170 でコンパイルできない。不採用にするのは「速くなるから付ける」という動機だけ(STK-01 の注意を参照)。
+
+🔗 **測定記録:** [LAB-ScopedRef.md](../benchmarks/results/LAB-ScopedRef.md)
+
+---
+
+### R-21: `Unsafe.ByteOffset` による ref からの index 復元
+
+🎯 **狙い:** `foreach (ref var item in span)` で回しつつ、必要になった時点で `Unsafe.ByteOffset(ref first, ref item) / sizeof(T)` から index を逆算し、index を持ち回るコストを省く。
+
+📉 **実測・不採用の理由:** index を持ち回る素の `for` 560.1 ns に対して復元形は 811.0 ns(**1.45 倍**、信頼区間非重複)。コードサイズも 64 → 82 B と増える。R-02 と同じ理由で、索引形は JIT にとって最も扱いやすい形であり、ref 中心に書き換えると index が高くつく。
+
+✅ **代わりにやること:** index が要るなら索引形の `for` で index を持ち回る。`Unsafe.ByteOffset` は距離計算そのものが目的の場合(バッファ内のオフセット算出など)に限って使う。
+
+🔗 **測定記録:** [LAB-RefIdentity.md](../benchmarks/results/LAB-RefIdentity.md)
 
 ---
 

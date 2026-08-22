@@ -60,6 +60,21 @@ public static class Program
         ColumnMatchPascal24Benchmark.Verify();
         ColumnMatchSnake24Benchmark.Verify();
 
+        // Study queue 7: ref / Unsafe additions (not yet adopted, see docs/verification-plan-batch7.ja.md)
+        ScopedRefBenchmark.Verify();
+        RefFieldStructReadBenchmark.Verify();
+        ValueRefLookupBenchmark.Verify();
+        ValueRefLargeLookupBenchmark.Verify();
+        StructLayoutBenchmark.Verify();
+        FalseSharingBenchmark.Verify();
+        MemorySpanCostBenchmark.Verify();
+        MemoryInteropBenchmark.Verify();
+        BitCastBenchmark.Verify();
+        SpanReinterpretBenchmark.Verify();
+        RefIdentityBenchmark.Verify();
+        UnboxInPlaceBenchmark.Verify();
+        VectorShuffleBenchmark.Verify();
+
         // Example: dotnet run -c Release --framework net10.0 -- --filter "*"
         BenchmarkSwitcher
             .FromTypes(
@@ -160,6 +175,20 @@ public static class Program
                 typeof(ColumnMatchSnake8Benchmark),
                 typeof(ColumnMatchPascal24Benchmark),
                 typeof(ColumnMatchSnake24Benchmark),
+                // Study queue 7: ref / Unsafe additions
+                typeof(ScopedRefBenchmark),
+                typeof(RefFieldStructReadBenchmark),
+                typeof(ValueRefLookupBenchmark),
+                typeof(ValueRefLargeLookupBenchmark),
+                typeof(StructLayoutBenchmark),
+                typeof(FalseSharingBenchmark),
+                typeof(MemorySpanCostBenchmark),
+                typeof(MemoryInteropBenchmark),
+                typeof(BitCastBenchmark),
+                typeof(SpanReinterpretBenchmark),
+                typeof(RefIdentityBenchmark),
+                typeof(UnboxInPlaceBenchmark),
+                typeof(VectorShuffleBenchmark),
 #if NET9_0_OR_GREATER
                 typeof(SampledNameTableSpanKeyBenchmark),
 #endif

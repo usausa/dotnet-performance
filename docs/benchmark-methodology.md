@@ -105,6 +105,19 @@ Do preparation such as searching for colliding keys or generating data in `[Glob
 
 Dynamic PGO settles differently in each process, so on a **polymorphic** shape (several concrete types passing through one call site) the Tier1 code size swings by an order of magnitude and **even the sign of the ratio flips**. In TXT-11 the same code measured 0.91x, 0.97x and 1.05x across runs, and the baseline's Tier1 code size was observed anywhere from 1,777 B to 15,792 B. Either **confirm the sign across several processes** or restrict the comparison to a monomorphic shape, which stays stable under the same conditions.
 
+### 10. Identical instruction streams can still differ 2x by placement (same code size ≠ same performance)
+
+The decision rule "overlapping confidence intervals plus identical generated code means **no difference**" is correct, but **the reverse inference — "the code is identical, so the performance must be identical" — does not hold.** The VEC-02 verification is the counterexample: `Vector128.Shuffle` and `Ssse3.Shuffle` produce **byte-identical disassembly** (190 B, the same `vpshufb`) and still measured 121.53 vs 64.35 ns, a reproducible **1.76x**. The cause was where the hot loop landed: one fits inside a 64-byte instruction fetch window, the other straddles the boundary.
+
+**How to separate the two:** when an unexpected difference appears and the disassembly matches, **add a byte-identical duplicate method and measure it**.
+
+| Observation | Conclusion |
+|---|---|
+| The duplicate matches its original's time | Placement. Not an API or coding difference |
+| The duplicate differs from its original | Placement as well (and unstable). Question the measurement setup |
+
+**Swapping the declaration order does not separate them.** The JIT's code heap placement does not depend on declaration order, so reordering leaves the addresses unchanged (confirmed in VEC-02). Loop start addresses are readable from the DisassemblyDiagnoser output (`printInstructionAddresses`).
+
 ## ⚖️ Decision criteria
 
 - Evaluate on **three axes: speed, allocation, and code size**. An improvement on one axis alone is weak justification for adoption
@@ -200,6 +213,11 @@ Differences that measurement could not resolve, listed together with the result 
 | R-04 do-while / descending for | Exactly equal | **Different code** (do-while keeps a bounds check inside the loop, 63 B; the descending form is cloned, 85 B) | ➖ **Measurement noise**. Default to for / while |
 | R-10 Instance readonly field | 0.006-0.016 ns, below the measurable range | The load is **identical apart from the offset** (4 B) | ❌ **No difference** (instance readonly contributes nothing to JIT optimization) |
 | R-14 Replacing copies with CopyBlockUnaligned | Variable length 0.92-1.01x at 512 B+; constant 8 B 0.89x / 16 B 0.94x - all with overlapping CIs. At constant 64 B it is **1.07x slower** (non-overlapping) | The call shape differs (52-64 B vs 96-102 B), but both **reach the same Memmove** | ➖ **Measurement noise** where CIs overlap, and the sign reverses by 64 B. Code size is the only surviving advantage, which does not outweigh the safety loss |
+| 7-1 `scoped` on span / ref parameters | 69.22 vs 70.00 ns / 2.276 vs 2.296 ns, CIs overlap | Caller and callee **instruction streams identical** (89 / 35 B, 50 / 38 B) | ❌ **No difference** (a pure compile-time contract; documented in STK-01 as a safety tool) |
+| 7-1 `[UnscopedRef]` ref-returning accessor | 0.5013 vs 0.5349 ns, CIs overlap | **Different code**, but the same 7 instructions and code grows 85 → 88 B | ❌ **Rejected** (no axis improves → R-20) |
+| 7-7 `Unsafe.BitCast` vs `Unsafe.As` | 241.5 vs 243.9 ns, CIs overlap | **Instruction streams identical** (57 B x3 concrete, 21 B x2 generic) | ❌ **No difference** — but **adopted on the safety axis** (identical code proves the switch is free) |
+| 7-3 `GetValueRefOrNullRef` read path | 0.98-1.00x, CIs overlap | Identical instruction counts (199 vs 199); code size moves both ways (+16 / -14 / -4 B) | ❌ **No difference** (only the update path is adopted → COL-07) |
+| 7-9 `Vector128.Shuffle` vs `Ssse3.Shuffle` | 121.53 vs 64.35 ns, **CIs do not overlap** | **Instruction streams identical** (190 B) | ⚠️ **Placement**, not an API difference (see pitfall 10) |
 
 | Batch | Candidate | Summary / question under test | Related | Status |
 |:---:|---|---|---|:---:|
@@ -226,5 +244,18 @@ Differences that measurement could not resolve, listed together with the result 
 | ⑤ | System.IO.Pipelines | I/O pipelines via PipeReader/PipeWriter. Compared against processing a Stream directly | BUF-02 | ✅ Documented conditionally ([ASY-03](../README.md#-asy-03-systemiopipelines), 1.63x on small data / 1/80 the allocation. Watch out for the 64KB deadlock) |
 | ⑤ | The cost of IAsyncEnumerable | Per-element overhead of await foreach (vs IEnumerable / Channel), and the conventions around \[EnumeratorCancellation\] | SEQ-03 | ✅ Documented ([ASY-04](../README.md#-asy-04-knowing-the-cost-of-iasyncenumerable-and-when-to-use-it), being aware of the 11.6x per-element cost) |
 | ⑥ | net11 generation watch | Re-measure after net11 GA: (1) enum boxing through Equals disappears via JIT specialization (add a generation note to STK-05's implicit-boxing list), (2) LINQ Min/Max vectorization (reinforces VEC-01's prefer-BCL-APIs guidance) | STK-05 / VEC-01 | ⏳ Waiting for net11 GA |
+| ⑦ | `scoped` / `[UnscopedRef]` (C# 11) | Does it show in codegen? Does a ref-returning accessor beat a get/set pair? | STK-01 | ❌ No difference / rejected (R-20). `scoped` documented in STK-01 |
+| ⑦ | ref field cursor for structured reads | Does it beat the indexed form in the field-granular shape R-12 named? | STK-01 / R-12 | ✅ Adopted ([STK-11](../README.md), 0.75x) |
+| ⑦ | `GetValueRefOrNullRef` + `IsNullRef` | Can an existence-checked update collapse into one probe? | COL-01 | ✅ Adopted ([COL-07](../README.md), update 0.48-0.62x; read path shows no difference) |
+| ⑦ | Struct layout (size and field order) | Does 32 → 24 bytes show in traversal and argument passing? | MEM-02 / MEM-04 | ✅ Conditionally adopted ([MEM-05](../README.md), scattered 0.67-0.71x; sequential is noise) |
+| ⑦ | False sharing / cache line padding | How large is the penalty? Is 64 bytes enough? | CON-01 | ✅ Adopted ([CON-03](../README.md), up to 29.7x; 128 bytes required) |
+| ⑦ | `Memory<T>` `.Span` cost and array interop | Hoisting, backing-store dependence, `TryGetArray` | BUF-04 | ✅ Adopted ([BUF-08](../README.md), 2.96x per element) |
+| ⑦ | `Unsafe.BitCast` (.NET 8+) | Does it cost anything over `Unsafe.As<TFrom,TTo>`? | JIT-03 / SEQ-02 | ✅ Adopted (identical codegen → made the safe default in TYP-05 / JIT-03 / SEQ-02) |
+| ⑦ | `MemoryMarshal.Cast` cost and traps | Against manual reinterpretation; truncation and alignment | BIT-04 / R-09 | ✅ Adopted as notes (quick reference, BIT-04, R-09 conditions) |
+| ⑦ | Fixed-width intrinsics (shuffle) | Effect of a lane permutation `Vector<T>` cannot express | VEC-01 | ✅ Adopted ([VEC-02](../README.md), 0.46x; the raw-ISA advantage is disproved as placement) |
+| ⑦ | `MemoryManager<T>` / `NativeMemory` | Cost of exposing an unmanaged region as `Memory<T>` | BUF-04 / R-13 | ✅ Adopted (lives in BUF-08) |
+| ⑦ | `AreSame` / `ByteOffset` / `Overlaps` | Index recovery from a ref; cost of alias checking | R-02 | ❌ Index recovery rejected (R-21). Alias checking moved to the quick reference |
+| ⑦ | `Unsafe.Unbox<T>` | Can an existing box be updated without reallocating? | STK-05 | ✅ Adopted (STK-05 extension, 0.18x and zero allocation) |
+| ⑦ | `MemoryMarshal.TryGetArray` | Copy-free bridge to `byte[]`-based APIs | BUF-04 | ✅ Adopted (lives in BUF-08, 4,120 → 0 B allocated) |
 
 ---

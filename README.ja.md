@@ -45,6 +45,7 @@
 | [MEM-02](#-mem-02-struct-要素配列--ref-アクセスデータ指向レイアウト) | struct 要素配列 + ref アクセス | 要素ごとのヒープ確保と間接参照の排除 | ✅ | [実装](src/PerformancePatterns/Typ/TypeMap.cs) |
 | [MEM-03](#-mem-03-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より引き締まったスライスのコード生成 | ✅ | [検証済](benchmarks/results/MEM-03-SliceStyle.md) |
 | [MEM-04](#-mem-04-構造体引数の-in--ref-渡し戦略) | 構造体引数の in / ref 渡し | 大きな構造体の値コピー回避 | ✅ | [検証済](benchmarks/results/MEM-04-StructPass.md) |
+| [MEM-05](#-mem-05-struct-レイアウトの最適化サイズフィールド順) | struct レイアウトの最適化 | サイズ・フィールド順によるフットプリント削減 | ✅ | [検証済](benchmarks/results/MEM-05-StructLayout.md) |
 | [STK-01](#-stk-01-ref-structスタック専用型) | ref struct(スタック専用型) | ヒープエスケープの型レベル禁止 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-spant--readonlyspant-によるゼロコピーアクセス) | Span\<T\> / ReadOnlySpan\<T\> | ゼロコピーの型付きビュー | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [STK-03](#-stk-03-struct-iterator-パターン) | struct iterator パターン | foreach の仮想呼び出し・ヒープ確保除去 | ✅ | [実装](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -54,6 +55,7 @@
 | [STK-07](#-stk-07-遅延アロケーションと共有シングルトン) | 遅延アロケーションと共有シングルトン | 使うまで確保しない・空を共有する | ✅ | [検証済](benchmarks/results/STK-07-LazyAllocation.md) |
 | [STK-08](#-stk-08-inlinearray-による構造体内固定長バッファ) | InlineArray | 構造体内固定長バッファ(.NET 8+) | ✅ | [検証済](benchmarks/results/STK-08-InlineArray.md) |
 | [STK-09](#-stk-09-params-readonlyspant) | params ReadOnlySpan\<T\> | 可変長引数の配列確保除去(C# 13) | ✅ | [検証済](benchmarks/results/STK-09-ParamsSpan.md) |
+| [STK-11](#-stk-11-ref-フィールドカーソルによる構造読み) | ref フィールドカーソル | 幅の違うフィールドの逐次読み出し | ✅ | [検証済](benchmarks/results/STK-11-RefFieldStructRead.md) |
 | [BUF-01](#-buf-01-arraypoolt-によるバッファ再利用) | ArrayPool\<T\> | 使い捨てバッファの GC 圧力削減 | ✅ | [実装](src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
 | [BUF-02](#-buf-02-ibufferwritert--getspan--advance-パターン) | IBufferWriter\<T\> + GetSpan / Advance | 出力バッファへの直接書き込み | ✅ | [実装](src/PerformancePatterns/Buf/PooledBufferWriter.cs) |
 | [BUF-03](#-buf-03-bufferwriterslimtスタックファースト書き込み) | BufferWriterSlim\<T\> | スタックファーストのバッファ書き込み | ✅ | [実装](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
@@ -61,6 +63,7 @@
 | [BUF-05](#-buf-05-一時バッファの段階戦略stackalloc--arraypool-統合) | 一時バッファの段階戦略 | stackalloc/プールの閾値切替統合 | ✅ | [実装](src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
 | [BUF-06](#-buf-06-gcallocateuninitializedarray-によるゼロ初期化スキップ) | GC.AllocateUninitializedArray | 大配列確保のゼロ初期化スキップ | ✅ | [検証済](benchmarks/results/BUF-06-UninitializedArray.md) |
 | [BUF-07](#-buf-07-objectpool-による参照型インスタンスの再利用) | ObjectPool | 参照型インスタンスの再利用 | ✅ | [検証済](benchmarks/results/BUF-07-ObjectPool.md) |
+| [BUF-08](#-buf-08-memoryt-の取り扱いspan-解決コストと配列橋渡し) | Memory\<T\> の取り扱い | .Span 解決コストと配列への無コピー橋渡し | ✅ | [検証済](benchmarks/results/BUF-08-MemoryAccess.md) |
 | [JIT-01](#️-jit-01-aggressiveinlining--aggressiveoptimization) | AggressiveInlining / AggressiveOptimization | インライン展開・最適化の強制 | ✅ | [検証済](benchmarks/results/JIT-01-Inlining.md) |
 | [JIT-02](#️-jit-02-iequatablet-制約による分岐除去) | IEquatable\<T\> 制約による分岐除去 | 比較の仮想ディスパッチ除去 | ✅ | [検証済](benchmarks/results/TYP-02-BitwiseComparer.md) |
 | [JIT-03](#️-jit-03-typeoft-分岐によるジェネリック特殊化) | typeof(T) 分岐特殊化 | ジェネリック変換の分岐除去 | ✅ | [検証済](benchmarks/results/JIT-03-TypeofBranch.md) |
@@ -85,6 +88,7 @@
 | [BIT-04](#-bit-04-xxhash3-による汎用ハッシュ) | XxHash3 | 非暗号ハッシュの高速化 | ✅ | [検証済](benchmarks/results/BIT-04-XxHash3.md) |
 | [BIT-05](#-bit-05-可変長キー探索の順序保存ダイジェスト) | 順序保存キーダイジェスト | 二分探索のプローブをキー本体に触れず決着 | ✅ | [検証済](benchmarks/results/BIT-05-OrderedDigestSearch.md) |
 | [VEC-01](#-vec-01-明示的-simdvectort--vector256) | 明示的 SIMD | Vector\<T\> / Vector256 による一括処理 | ✅ | [検証済](benchmarks/results/VEC-01-VectorSum.md) |
+| [VEC-02](#-vec-02-固定幅組み込み関数バイトシャッフル) | 固定幅組み込み関数 | Vector\<T\> で書けないレーン置換 | ✅ | [検証済](benchmarks/results/VEC-02-VectorShuffle.md) |
 | [SEQ-01](#-seq-01-spantokenizert) | SpanTokenizer\<T\> | 汎用スパン分割(ゼロアロケーション) | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [SEQ-02](#-seq-02-stream-構造体-io) | Stream 構造体 I/O | 構造体の直接バイナリ読み書き | ✅ | [検証済](benchmarks/results/SEQ-02-StructStreamIo.md) |
 | [SEQ-03](#-seq-03-遅延評価シーケンス処理batch--segment--traverse) | Batch / Segment / Traverse | 低アロケーションのシーケンス処理 | ✅ | [実装](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -96,6 +100,7 @@
 | [COL-04](#️-col-04-少数要素ルックアップの戦略選択) | 少数要素ルックアップ戦略 | 規模・形状に応じた実装選択 | ✅ | [実装](src/PerformancePatterns/Col/SampledNameTable.cs) |
 | [COL-05](#️-col-05-ienumerable-引数の具象型ディスパッチ) | IEnumerable 具象型ディスパッチ | List/配列入力の Span パス化 | ✅ | [検証済](benchmarks/results/COL-05-EnumerableDispatch.md) |
 | [COL-06](#️-col-06-コレクション変換の形状特化) | コレクション変換の形状特化 | 生成先の確保・コピー戦略の最適化 | ✅ | [検証済](benchmarks/results/COL-06-CollectionConvert.md) |
+| [COL-07](#️-col-07-getvaluerefornullref-による存在確認つき-ref-取得) | GetValueRefOrNullRef | 存在確認つき更新の探索 1 回化 | ✅ | [検証済](benchmarks/results/COL-07-ValueRefLookup.md) |
 | [TXT-01](#-txt-01-ルックアップテーブルによる整形変換) | ルックアップテーブル整形 | 固定書式整形のテーブル化 | ✅ | [実装](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#-txt-02-文字列構築の-stackalloc-ファースト化) | 文字列構築の stackalloc ファースト | StringBuilder 代替の低アロケーション構築 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [TXT-03](#-txt-03-try-パターンによる例外回避) | Try パターン | 例外を制御フローに使わない | ✅ | [検証済](benchmarks/results/TXT-03-TryPattern.md) |
@@ -116,6 +121,7 @@
 | [ASY-07](#-asy-07-ストリーミング-io) | ストリーミング I/O | 全体バッファリングの回避 | ✅ | [検証済](benchmarks/results/ASY-07-StreamBuffering.md) |
 | [CON-01](#-con-01-interlocked-によるワンショットガード) | Interlocked ワンショットガード | Dispose・初期化のロックレス 1 回実行 | ✅ | [検証済](benchmarks/results/CON-01-DisposeGuard.md) |
 | [CON-02](#-con-02-ピン留め資源の参照カウント) | ピン留め資源の参照カウント | 連続実行ごとの retain と決定的解放 | ✅ | [検証済](benchmarks/results/CON-02-RefCount.md) |
+| [CON-03](#-con-03-false-sharing-とキャッシュラインパディング) | false sharing パディング | 並行カウンタのキャッシュライン分離 | ✅ | [検証済](benchmarks/results/CON-03-FalseSharing.md) |
 | [SYS-01](#️-sys-01-低コストの時刻経過時間取得) | 低コスト時刻取得 | DateTime.UtcNow 回避 | ✅ | [検証済](benchmarks/results/SYS-01-Timestamp.md) |
 | [DAT-01](#️-dat-01-db-アクセスの列解決最適化) | DB アクセスの列解決最適化 | 序数キャッシュ・1 パス列解決 | ✅ | [検証済](benchmarks/results/DAT-01-OrdinalResolve.md) |
 | [GEN-01](#-gen-01-emit-生成コードの高速化戦略) | Emit 生成コードの高速化戦略 | 生成デリゲートのインライン展開等 | ❌ | [検証済](benchmarks/results/GEN-01-EmitStrategy.md) |
@@ -165,7 +171,7 @@ public bool MoveNext()
 **効果:**
 
 - 実測例: class 要素の生成+走査 63.6ns / 664B に対し、struct 要素 + プール配列は 9.8ns / 0B(16 要素)。要素数を増やしてもコストがほぼ一定
-- 走査中心の処理でも約 1.5 倍 + アロケーションゼロ(要素が連続配置されキャッシュ効率が上がる)
+- 走査そのものは速くならない(確保直後の class 配列とは実測で 3% 以内)。利得は**要素ごとのヒープ確保の排除**と、ヒープが経年しても崩れない連続配置にある
 
 **AOT:** ✅ 問題なし
 
@@ -197,11 +203,11 @@ for (var i = 0; i < entries.Length; i++)
 
 ### 💾 MEM-03: Slice(offset, length) による明示的スライス
 
-**目的:** Span の切り出しに範囲演算子 `span[offset..]` ではなく `span.Slice(offset, length)` を使い、スライス生成コストを削減する。
+**目的:** Span の切り出しに範囲演算子 `span[offset..]` ではなく `span.Slice(offset, length)` を使い、スライス生成のコードを引き締める(**時間差はない** — 判断軸はコードサイズと可読性)。
 
 **効果:**
 
-- 実測例: 同じ書き込み API でもスライス方法の違いだけで 1.2〜1.5 倍程度の差が出る(繰り返しのバイナリ書き込み)。コードサイズも縮小(137B → 87B)
+- **時間差は実測で分解できない**(信頼区間重複)。得られるのは反復あたり 1 命令ぶん引き締まったコード(15 vs 14 命令、103 vs 100 B)であって、速度ではない
 - 範囲演算子は「残り全部」の長さ計算と検証が入るのに対し、長さ明示の `Slice` は必要な検証のみになる
 
 **AOT:** ✅ 問題なし
@@ -280,6 +286,69 @@ public void Draw(in MutableContext context) => context.Value.Use();
 
 ---
 
+### 💾 MEM-05: struct レイアウトの最適化(サイズ・フィールド順)
+
+**目的:** 構造体そのものを小さくして、配列走査のフットプリントと引数コピーを同時に削る。MEM-02(struct 配列 + ref アクセス)と MEM-04(16 バイト超は `in`)の**上流**にある選択肢。
+
+**効果:**
+
+- 同じ 4 フィールドでも宣言順だけで 32 バイトと 24 バイトに分かれる。**散在アクセスで 0.67〜0.71 倍**
+- 逐次走査では差が出ない(プリフェッチャがフットプリント差を吸収する)。効くのはランダム・散在アクセス
+- サイズが下がれば MEM-04 の「16 バイト超は `in`」という判断自体を回避できる(値渡しのコピーも軽くなる)
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// ❌ 長短交互の宣言順。C# の struct はメタデータ上 既定で Sequential なのでパディングが残る(32 バイト)
+internal struct Padded
+{
+    public long Id;      // offset 0
+    public int Kind;     // offset 8  (+4 パディング)
+    public long Value;   // offset 16
+    public int Flags;    // offset 24 (+4 パディング)
+}
+
+// ✅ 広い順に自分で並べる(24 バイト)
+internal struct Packed
+{
+    public long Id;      // offset 0
+    public long Value;   // offset 8
+    public int Kind;     // offset 16
+    public int Flags;    // offset 20
+}
+
+// ✅ 並べ替えをランタイムに任せる(24 バイト。外部形式と結びつかない内部型に限る)
+[StructLayout(LayoutKind.Auto)]
+internal struct Auto
+{
+    public long Id;
+    public int Kind;
+    public long Value;
+    public int Flags;
+}
+```
+
+**ユースケース:** ハッシュ表のエントリ、パーサーのトークン列、カラムメタデータ、値型コンポーネントの配列 — ライブラリ内部で大量に並べる struct 全般。
+
+**実測結果(net10 / x86-64-v3、16 バイト × 16,384 要素):** サイズは `Unsafe.SizeOf` で確定 — **Padded 32 B / Packed 24 B / Auto 24 B**。
+
+| 走査 | Padded(32 B) | Packed(24 B) | Auto(24 B) |
+|---|---:|---:|---:|
+| 逐次 | 14,840 ns(1.00) | 14,742 ns(0.995) | 14,345 ns(0.968) |
+| **散在** | **26,213 ns(1.00)** | **18,516 ns(0.71)** | **17,662 ns(0.67)** |
+
+逐次は信頼区間が重なり分解できない。散在は非重複で **0.67〜0.71 倍**。値渡しも 2.034 → 1.854 ns(エラーバー非重複)。→ [測定結果](benchmarks/results/MEM-05-StructLayout.md)
+
+**注意:**
+
+- **生成コードは 3 型とも同一**(逐次 65 B / 散在 93 B)。差はコードではなく**データ側**にあるため、「信頼区間が重なり生成コードも一致 → 差なし」という本書の誤差判定規則は**ここには適用されない**。逐次で差が出ないのはプリフェッチの効果であって、レイアウトが無意味という意味ではない
+- `LayoutKind.Auto` は**外部形式と結びつく型に使ってはいけない**。バイナリ I/O・相互運用のレイアウトは SEQ-02 のとおり `Sequential` + `Pack` で固定する
+- 参照型フィールドを含む struct はランタイムが独自にレイアウトを決めるため、本手法の主対象は unmanaged なフィールド構成
+
+---
+
 ## 🥞 STK: スタック活用・ゼロアロケーション型設計
 
 ### 🥞 STK-01: ref struct(スタック専用型)
@@ -315,6 +384,8 @@ public ref struct SpanTokenizer<T> where T : IEquatable<T>
 
 - フィールドとしてクラスに保持できない、`await` / `yield` をまたげない等の制約がある(C# 13 以降は一部緩和)
 - C# 13 からは ref struct のインターフェース実装と `allows ref struct` 制約が使用可能
+- **`scoped`(C# 11)は、呼び出し側に課される escape 制約を外すための修飾子。** 引数に付けると「この参照はメソッドの外へ逃げない」という契約になる。**生成コードには一切影響しない** — caller / callee とも命令列が完全一致することを確認済みなので、性能理由で付けるものでも避けるものでもない → [測定結果](benchmarks/results/LAB-ScopedRef.md)
+- **`[UnscopedRef]`(C# 11)は、struct のメンバーが `ref this.field` を返せるようにする属性。** 付けないと CS8170 でコンパイルできない。ただし**性能パターンではない** — ref 返しアクセサは get/set ペアに対して 1.07 倍・コード 85 → 88 B で、どの軸にも改善がない([R-20](docs/rejected-patterns.md))
 
 ---
 
@@ -477,6 +548,23 @@ public static object Box(int value) => value switch
 
 **注意:** ジェネリック制約(`where T : struct` + インターフェース制約)で呼び出し全体をボックス化なしに設計できるなら、そちらが根本対策(JIT-02 参照)。
 
+**既に存在するボックスを更新する場合(`Unsafe.Unbox<T>`):** 本パターンは「ボックス化させない」ための設計だが、`object` フィールド・`Dictionary<K, object>`・相互運用境界などから**既にボックス化された値が渡ってくる**場合は話が別になる。アンボックス → コピーを更新 → 再ボックスの形は更新のたびに 1 アロケーションを払うため、`Unsafe.Unbox<T>` で箱の中身を直接更新する。
+
+```csharp
+// ❌ 更新ごとに新しいボックスが生まれる(256 回の更新で 8,192 B)
+var value = (Counter)boxes[i];
+value.Count++;
+boxes[i] = value;
+
+// ✅ 既存の箱の中身への ref を取る。割り当てゼロ、しかも箱の同一性が保たれる
+ref var value = ref Unsafe.Unbox<Counter>(boxes[i]);
+value.Count++;
+```
+
+**実測結果(net10 / x86-64-v3、256 個の boxed struct の更新):** 再ボックス形 1,601.5 ns / 582 B / **8,192 B 割り当て** に対し、`Unsafe.Unbox` は **286.5 ns(0.18 倍)/ 251 B / 0 B**。時間・コードサイズ・割り当ての 3 軸すべてで改善する。→ [測定結果](benchmarks/results/LAB-UnboxInPlace.md)
+
+**`Unsafe.Unbox` の注意:** 型が一致しない場合は `InvalidCastException` になる(`Unsafe.As` と違って型チェックはある)が、boxed でない参照を渡した場合の挙動は未定義。**自分がボックス化したものに限って**使う。
+
 **暗黙ボックス化の主な発生源(レビュー観点):**
 
 - struct の interface 型変数・引数への代入(`IComparer<T> c = myStructComparer`)
@@ -633,6 +721,88 @@ public static void Trace(params ReadOnlySpan<string> values)
 **実測結果(net10 / x86-64-v4、引数 3 個):** `params T[]` 4.46 ns / 48 B → `params ReadOnlySpan<T>` **1.10 ns / 0 B(0.25 倍)**。呼び出し構文はそのままでアロケーションが消える。→ [測定結果](benchmarks/results/STK-09-ParamsSpan.md)
 
 **注意:** ライブラリの公開 API で `params T[]` から置き換える場合、既存の「配列を明示的に渡す呼び出し」との互換のためオーバーロード併設を検討する。
+
+---
+
+### 🥞 STK-11: ref フィールドカーソルによる構造読み
+
+**目的:** 幅の違うフィールドを順に読む逐次パースで、カーソル位置を index ではなく **`ref` そのもの**(C# 11 の ref フィールド)で保持する。
+
+**効果:**
+
+- 呼び出し側に index 演算を直書きする形に対して **0.75 倍**、コードも 163 → **111 B**
+- ref フィールドまで踏み込まなくても、**残りを再スライスする形で 0.81 倍**・128 B に届く
+
+**AOT:** ✅ 問題なし
+
+**適用範囲(R-12 との線引きが本パターンの要点):**
+
+| 形状 | 判定 | 理由 |
+|---|:---:|---|
+| 全要素走査(同じ型を N 個読む) | ❌ [R-12](docs/rejected-patterns.md) | 索引形は境界チェック除去 + 自動ベクトル化が効く。ref 化は 1.21 倍遅い |
+| **フィールド粒度の構造読み**(幅の違うフィールドを順に読む) | ✅ 本パターン | ループが数え上げにならず索引形の利点が働かない |
+
+**実装例:**
+
+```csharp
+// レコード形式: [byte tag][ushort length][length バイトのペイロード]
+internal ref struct FieldRefReader
+{
+    private readonly ref byte end;
+
+    private ref byte current;
+
+    public FieldRefReader(ReadOnlySpan<byte> source)
+    {
+        current = ref MemoryMarshal.GetReference(source);
+        end = ref Unsafe.Add(ref current, source.Length);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryReadHeader(out byte tag, out int length)
+    {
+        if (!Unsafe.IsAddressLessThan(ref current, ref end))
+        {
+            tag = 0;
+            length = 0;
+            return false;
+        }
+
+        tag = current;
+        length = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref current, 1));
+        current = ref Unsafe.Add(ref current, 3);
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<byte> ReadPayload(int length)
+    {
+        var payload = MemoryMarshal.CreateReadOnlySpan(ref current, length);
+        current = ref Unsafe.Add(ref current, length);
+        return payload;
+    }
+}
+```
+
+**ユースケース:** 独自プロトコルのフレーム解析、可変長レコードのバイナリ読み出し、TLV 形式のデコーダ。
+
+**実測結果(net10 / x86-64-v3、512 レコードの解析):**
+
+| 方式 | 時間 | 比率 | コードサイズ |
+|---|---:|---|---:|
+| index 演算を呼び出し側に直書き(基準) | 1,038.8 ns | 1.00 | 163 B |
+| span + position のカーソル型 | 994.0 ns | 0.96 | 153 B |
+| **残りを再スライスするカーソル型** | **842.3 ns** | **0.81** | **128 B** |
+| **ref フィールドカーソル** | **782.5 ns** | **0.75** | **111 B** |
+
+信頼区間非重複(761〜836 vs 988〜1,095 ns)。**段階として、まず再スライス型に置き換えるだけで 0.81 倍が得られる。** ref フィールドまで踏み込む価値は残り 0.06 倍とコードサイズ分。→ [測定結果](benchmarks/results/STK-11-RefFieldStructRead.md)
+
+**注意:**
+
+- **全要素走査には使わない。** R-12 のとおり索引形に負ける
+- ref フィールドは `ref struct` にしか置けず、`await` / `yield` をまたげない
+- `Unsafe.ReadUnaligned` はマシンのバイト順で読む。外部形式のエンディアンを固定するなら `BinaryPrimitives` を使う(SEQ-02 と同じ注意)
+- 終端判定は `Unsafe.IsAddressLessThan`。終端 ref の計算を誤ると判定が常に真になり、JIT が判定ごと除去して「異常に速い偽の結果」になる。必ず Verify で正しさを固定する(測定手法の落とし穴 3)
 
 ---
 
@@ -924,6 +1094,108 @@ public static void Return(StringBuilder builder)
 
 ---
 
+### 🧺 BUF-08: Memory\<T\> の取り扱い(Span 解決コストと配列橋渡し)
+
+**目的:** `Memory<T>` は「`await` をまたげる `Span<T>`」ではない。`.Span` は裏の実体(配列 / `string` / `MemoryManager<T>`)を解決するプロパティ呼び出しであり、ループ内で触ると効いてくる。
+
+**効果:**
+
+- 要素ごとに `.Span` を解決すると、ループ外へ 1 回ホイストした場合の **3.67 倍**
+- チャンク単位でも `memory.Slice(...).Span` はホイスト済み `Span` の `Slice` に対して 1.10〜1.13 倍
+- `MemoryMarshal.TryGetArray` で「`byte[]` + offset + count しか受け取らない API」への**無コピー橋渡し**(割り当て 4,120 → 0 B)
+- `MemoryManager<T>` はアンマネージド領域を `Memory<T>` として公開する唯一の手段
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// ❌ ループ内で毎回 .Span を解決する
+for (var offset = 0; offset < length; offset += ChunkSize)
+{
+    Process(memory.Slice(offset, ChunkSize).Span);
+}
+
+// ✅ 1 回だけ解決してからスライスする
+var span = memory.Span;
+for (var offset = 0; offset < length; offset += ChunkSize)
+{
+    Process(span.Slice(offset, ChunkSize));
+}
+
+// ✅ byte[] + offset + count を要求する旧 API へはコピーせず橋渡しする
+if (MemoryMarshal.TryGetArray<byte>(memory, out var segment))
+{
+    legacy.Write(segment.Array!, segment.Offset, segment.Count);
+}
+else
+{
+    var buffer = memory.ToArray();   // 配列裏でない場合はコピーが残る
+    legacy.Write(buffer, 0, buffer.Length);
+}
+```
+
+```csharp
+// アンマネージド領域を Memory<T> として公開する
+internal sealed unsafe class NativeMemoryManager<T> : MemoryManager<T>
+    where T : unmanaged
+{
+    private readonly int length;
+
+    private T* pointer;
+
+    public NativeMemoryManager(int length)
+    {
+        this.length = length;
+        pointer = (T*)NativeMemory.Alloc((nuint)length, (nuint)sizeof(T));
+    }
+
+    public override Span<T> GetSpan() => new(pointer, length);
+
+    public override MemoryHandle Pin(int elementIndex = 0) => new(pointer + elementIndex);
+
+    public override void Unpin()
+    {
+        // アンマネージド領域は動かないので解除するものがない
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (pointer is not null)
+        {
+            NativeMemory.Free(pointer);
+            pointer = null;
+        }
+    }
+}
+```
+
+**ユースケース:** 非同期 I/O のバッファ処理、`byte[]` 前提の既存 API との接続、mmap やネイティブ相互運用領域の公開。
+
+**実測結果(net10 / x86-64-v3、4,096 バイト):**
+
+| 方式 | 時間 | 比率 | コードサイズ | 割り当て |
+|---|---:|---|---:|---:|
+| `.Span` ホイスト + チャンク Slice(基準) | 1.281 μs | 1.00 | 248 B | 0 B |
+| `memory.Slice(...).Span` をチャンクごと | 1.409 μs | 1.10 | 268 B | 0 B |
+| `.Span` ホイスト + 要素アクセス | 1.030 μs | 0.81 | 201 B | 0 B |
+| **`memory.Span[i]` を要素ごと** | **3.783 μs** | **2.96** | 178 B | 0 B |
+| MemoryManager 裏・ホイスト | 1.244 μs | 0.97 | 297 B | 0 B |
+| MemoryManager 裏・チャンクごと解決 | 1.441 μs | 1.13 | **518 B** | 0 B |
+| `ToArray()` + 旧 API(基準) | 1.715 μs | 1.00 | 889 B | **4,120 B** |
+| **`TryGetArray` + 旧 API** | **1.545 μs** | **0.90** | **414 B** | **0 B** |
+
+**裏の実体はホイスト後には影響しない**(1.244 ≒ 1.281 μs)が、`.Span` を解決するコードは MemoryManager 裏で 1.7 倍(518 vs 297 B)になる。ループ内で触ると効いてくるのはこの部分。→ [測定結果](benchmarks/results/BUF-08-MemoryAccess.md)
+
+**注意:**
+
+- 同期スコープで完結するなら、そもそも `Span<T>` を受け取る API にする(BUF-05)。`Memory<T>` が必要なのは非同期境界をまたぐときだけ(BUF-04)
+- `TryGetArray` は `MemoryManager` 裏・`string` 裏では false を返す。**コピー退避の経路を必ず用意する**
+- `MemoryManager<T>` は `IDisposable` を明示実装しているため、`manager.Dispose()` は protected な `Dispose(bool)` に解決されてコンパイルエラーになる。`((IDisposable)manager).Dispose()` と書く
+- ネイティブ確保は GC 対象外なので R-13(POH バッファ)の確保コストの議論は当てはまらないが、解放責任は自分で持つことになる
+
+---
+
 ## ⚙️ JIT: JIT 最適化支援
 
 ### ⚙️ JIT-01: AggressiveInlining / AggressiveOptimization
@@ -1026,6 +1298,8 @@ public static T Convert<T>(int value)
 **実測結果(net10 / x86-64-v4、int[1024] の合計):** typeof(T) 分岐つきジェネリック 212.4 ns vs 手書き int 版 213.7 ns — **分岐コストはゼロ**(コードサイズ 35 vs 32 B でほぼ同一。JIT がインスタンス化ごとに `typeof(T) == typeof(int)` を定数へ畳み込み、分岐を除去する)。フォールバック経路の正しさは Verify で確認。→ [測定結果](benchmarks/results/JIT-03-TypeofBranch.md)
 
 **関連する知見:** `typeof(X)` を `static readonly Type` フィールドにキャッシュする最適化は無意味(JIT が `typeof` 自体を定数化するため、実測で速度・コードサイズとも完全に同値)。可読性を優先してよい。
+
+**再解釈の書き方:** 上の実装例は `Unsafe.As<int, T>(ref value)` を使っているが、**同サイズの値型どうしなら `Unsafe.BitCast<int, T>(value)` を既定にする。** 生成コードは完全に一致する(ジェネリック形で 21 B、`T = int` では再解釈自体が消える)一方、`BitCast` はサイズ不一致をコンパイル時/実行時に拒否する。`Unsafe.As<TFrom, TTo>` は**サイズが異なる再解釈**(先頭の一部だけを見る、より大きな型として読む)に用途を限定する。→ [測定結果](benchmarks/results/LAB-BitCast.md)
 
 ---
 
@@ -1580,6 +1854,7 @@ public T Resolve<T>()
 
 - 型対応の保証が崩れると `InvalidCastException` にならず黙って壊れる(未定義動作)。登録 API 側で型安全を担保し、`Unsafe.As` は private 境界に閉じ込める
 - Debug ビルドでは通常キャスト + `Debug.Assert` で検証し、Release のみ `Unsafe.As` にする構成も有効
+- **値型どうしの再解釈には `Unsafe.As<TFrom, TTo>` ではなく `Unsafe.BitCast` を使う。** 本パターン(`Unsafe.As<T>(object)`)は参照型のキャストであって別物だが、`Unsafe.As` という名前で両者を混同しやすい。同サイズ値型のビット再解釈は生成コードが同一のまま安全側に倒せる(JIT-03 / [測定結果](benchmarks/results/LAB-BitCast.md))
 
 ---
 
@@ -1817,7 +2092,7 @@ while (mask != 0UL)
 **効果:**
 
 - XxHash3 は長い入力でスループットが高く、`HashToUInt64` / `Hash` の静的 API で使える
-- `char` 列は `MemoryMarshal.Cast<char, byte>` で byte として再解釈でき、この変換は**実測でゼロコスト**(`fixed` ポインタと差がない)
+- `char` 列は `MemoryMarshal.Cast<char, byte>` で byte として再解釈でき、この変換は**実測でゼロコスト**(`fixed` ポインタと差がない)。ただし `Cast` は**要素サイズが違うと長さが変わり端数を黙って切り捨てる**、かつ**アラインメント検査を行わない**(Arm で `DataMisalignedException` になりうる)ため、byte 列の長さが要素サイズの倍数であることを呼び出し側で保証する
 - `string.GetHashCode` はプロセスごとにランダム化されるため、**永続化・プロセス間で安定した値が必要な場合は使えない**。XxHash3 は安定
 
 **AOT:** ✅ 問題なし(NuGet: System.IO.Hashing)
@@ -1952,6 +2227,79 @@ for (; i < span.Length; i++)
 
 ---
 
+### 🧮 VEC-02: 固定幅組み込み関数(バイトシャッフル)
+
+**目的:** `Vector<T>` では表現できないレーン置換を `Vector128` のシャッフルで行う。VEC-01 が「固定幅へ落とすのはアルゴリズムが特定レーン構成を要求する場合のみ」と書いた、その**落とした先**。
+
+**効果:**
+
+- `uint` のエンディアン反転(純粋なレーン置換)でスカラーループ比 **0.46 倍**
+- シャッフルが使えない場合でも `Vector<T>` の算術形(シフトとマスクで置換を組み立てる)は 0.50 倍まで到達する。ただしコードは 1.75 倍(333 vs 190 B)
+
+**AOT:** ✅ 問題なし(`IsSupported` / `IsHardwareAccelerated` ガードとスカラーフォールバックを必ず用意する)
+
+**実装例:**
+
+```csharp
+// バイト位置の入れ替えは Vector<T> では書けない。定数マスクを与えた Vector128.Shuffle を使う
+private static readonly Vector128<byte> ReverseMask = Vector128.Create(
+    (byte)3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
+
+public static void ReverseEndianness(ReadOnlySpan<uint> source, Span<uint> destination)
+{
+    var i = 0;
+    if (Vector128.IsHardwareAccelerated)
+    {
+        ref var srcHead = ref MemoryMarshal.GetReference(source);
+        ref var dstHead = ref MemoryMarshal.GetReference(destination);
+        var lanes = Vector128<uint>.Count;
+        for (; i <= source.Length - lanes; i += lanes)
+        {
+            var loaded = Vector128.LoadUnsafe(ref srcHead, (nuint)i);
+            Vector128.Shuffle(loaded.AsByte(), ReverseMask).AsUInt32().StoreUnsafe(ref dstHead, (nuint)i);
+        }
+    }
+
+    for (; i < source.Length; i++)   // 端数はスカラーで
+    {
+        destination[i] = BinaryPrimitives.ReverseEndianness(source[i]);
+    }
+}
+```
+
+**ユースケース:** エンディアン変換、ニブル展開(Hex / Base 系エンコード)、バイト単位のテーブル引き、固定パターンの並べ替え。
+
+**実測結果(net10 / x86-64-v3(Zen 3 / AVX2)、`uint` × 1,021 のエンディアン反転):**
+
+| 実装 | 時間 | 比率 | コードサイズ |
+|---|---:|---|---:|
+| スカラー(`BinaryPrimitives`)(基準) | 266.46 ns | 1.00 | 145 B |
+| **`Vector128.Shuffle`(移植可能)** | **121.53 ns** | **0.46** | 190 B |
+| `Ssse3.Shuffle`(生の ISA 組み込み関数) | 64.35 ns | 0.24 | 190 B |
+| `Vector<T>` の算術形(シャッフルなし) | 131.78 ns | 0.50 | 333 B |
+
+→ [測定結果](benchmarks/results/VEC-02-VectorShuffle.md)
+
+**⚠️ `Ssse3.Shuffle` の 0.24 倍は API の差ではない — 生の ISA 組み込み関数に落とす理由はない:**
+
+両者は**逆アセンブリが完全一致**する(ともに 190 B、同じ `vpshufb`。差は定数マスクのアドレスのみ)。測定上の 1.76 倍はホットループの配置による。
+
+| 形 | ループ開始 | ループ範囲 | 64 バイト境界 |
+|---|---|---|---|
+| `Ssse3.Shuffle` | `…9F5C` | `9F5C`〜`9F78` | `[9F40, 9F80)` に**収まる** |
+| `Vector128.Shuffle` | `…9FBC` | `9FBC`〜`9FD8` | `9FC0` を**跨ぐ** |
+
+**バイト単位で同一のメソッド複製を追加して確定させた** — 複製はそれぞれ元と同じアドレス・同じ時間になった(`Vector128…B` 124.41 ns @`…9FBC` / `Ssse3…B` 65.69 ns @`…9F5C`)。宣言順の入れ替えでは配置は動かない。したがって**既定は移植可能な `Vector128.Shuffle`** とする。
+
+**注意:**
+
+- まず BCL のベクトル化済み API を探す(VEC-01 の設計指針)。本パターンは「BCL に該当がなく、かつ `Vector<T>` でも書けない」場合だけの選択肢
+- 端数処理・非対応 CPU フォールバックのテストを必ず用意する。実装例の要素数を**ベクトル幅の倍数にしない**ことで端数経路が常に走るようにする
+- `Vector128.Shuffle` はインデックスを正規化する(範囲外は 0)。定数マスクなら JIT が畳むため、この安全性はコストにならない
+- **本項の測定は x86-64-v3(AVX2)機で取得している。** 本書の他項目は x86-64-v4(AVX-512)機のため、絶対値の直接比較はできない
+
+---
+
 ## 📜 SEQ: 逐次読み書き・シーケンス処理
 
 ### 📜 SEQ-01: SpanTokenizer\<T\>
@@ -2028,6 +2376,8 @@ public static void Write<T>(this Stream stream, in T value) where T : unmanaged
 **本カタログ中で最大の改善幅**。フィールド単位 I/O は呼び出しごとにバッファ境界チェックと書式処理を通るのに対し、一括再解釈は 1 回の memcpy になる。→ [測定結果](benchmarks/results/SEQ-02-StructStreamIo.md)
 
 **注意:** メモリレイアウトがそのまま外部形式になるため、`[StructLayout(LayoutKind.Sequential, Pack = 1)]` 等でレイアウトを固定し、エンディアン・パディングを設計として明示すること。異環境互換が必要な場合は `BinaryPrimitives` による明示変換を使う。
+
+**補足(`Unsafe.As` と `Unsafe.BitCast` の使い分け):** 上の実装例は `T` を byte 列として見る(サイズの異なる再解釈)ため `Unsafe.As<T, byte>` が正しい。一方、**同サイズの値型どうしを入れ替えるだけなら `Unsafe.BitCast` を既定にする** — 生成コードは同一でありながらサイズ不一致を拒否する。→ [測定結果](benchmarks/results/LAB-BitCast.md)
 
 ---
 
@@ -2422,6 +2772,59 @@ List 詰め直し(16 要素 / 256 要素):
 → [測定結果](benchmarks/results/COL-06-CollectionConvert.md)
 
 **注意:** `MoveToImmutable` は **Count と Capacity が完全一致している必要**がある(不足・超過で例外)。件数が確定しない場合は `ToImmutable()` を使う。
+
+---
+
+### 🗃️ COL-07: GetValueRefOrNullRef による存在確認つき ref 取得
+
+**目的:** 「あれば更新、なければ何もしない」という辞書操作を、ハッシュ探索 **1 回**で済ませる。COL-01 の `GetValueRefOrAddDefault`(挿入も行う形)に対する、**挿入しない**版。
+
+**効果:**
+
+- 更新経路が `TryGetValue` + インデクサ書き戻し(探索 2 回)に対して **0.48〜0.62 倍**
+- **コードサイズが 8,270 → 1,080 B。** インデクサの setter は挿入経路(`TryInsert` / `Resize` / ハッシュヘルパー)ごと呼び出し側へ展開されるが、ref を返す形はそれを必要としない
+- 効いているのは値のコピー削減ではなく**探索の 1 回化**(8 バイト値でも 32 バイト値でも比率が同じ)
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// ❌ 探索 2 回。しかもインデクサ setter が挿入経路ごとインライン展開される
+if (map.TryGetValue(key, out var value))
+{
+    map[key] = value + 1;
+}
+
+// ✅ 探索 1 回。既存スロットへの ref を受けてその場で更新する
+ref var slot = ref CollectionsMarshal.GetValueRefOrNullRef(map, key);
+if (!Unsafe.IsNullRef(ref slot))
+{
+    slot++;
+}
+```
+
+**ユースケース:** ヒットカウント・統計の加算、既存エントリだけを対象にした一括更新、キャッシュのタイムスタンプ更新。
+
+**実測結果(net10 / x86-64-v3、1,024 件の辞書に 256 回プローブ):**
+
+| プローブ | 方式 | 時間 | 2 プローブ形との比 | コードサイズ |
+|---|---|---:|---|---:|
+| 全ヒット | `TryGetValue` + インデクサ更新 | 4.997 μs | 1.00 | **8,270 B**(10 メソッド) |
+| 全ヒット | **`GetValueRefOrNullRef` 更新** | **2.401 μs** | **0.48** | **1,080 B**(2 メソッド) |
+| 半分ミス | `TryGetValue` + インデクサ更新 | 3.185 μs | 1.00 | 8,051 B |
+| 半分ミス | **`GetValueRefOrNullRef` 更新** | **1.967 μs** | **0.62** | 895 B |
+| 32 バイト値 | `TryGetValue` + インデクサ更新 | 5.028 μs | 1.00 | 3,294 B |
+| 32 バイト値 | **`GetValueRefOrNullRef` 更新** | **2.560 μs** | **0.51** | 1,088 B |
+
+**読み取りのみなら差はない。** `TryGetValue` 比 0.98〜1.00 倍で信頼区間が重なり、命令数も一致(全ヒットで 199 vs 199)、コードサイズは +16 / −14 / −4 B と増減が一貫しない。→ [測定結果](benchmarks/results/COL-07-ValueRefLookup.md)
+
+**注意:**
+
+- **読み取りだけなら `TryGetValue` のままでよい。** 本パターンの利得は read-modify-write の統合にある
+- ref を保持している間に辞書を変更しない(内部配列の差し替えで ref が古い領域を指す。COL-01 と同じ制約)
+- 挿入も必要なら `GetValueRefOrAddDefault`(COL-01)。「なければ挿入」と「なければ何もしない」で API を使い分ける
+- `ContainsKey` + インデクサの形は探索 2 回になるうえ、アナライザ(CA1854)が拒否する。比較対象にすらならない
 
 ---
 
@@ -3200,6 +3603,59 @@ foreach (var row in rows)
 
 ---
 
+### 🔒 CON-03: false sharing とキャッシュラインパディング
+
+**目的:** ワーカーごとのカウンタが同一キャッシュラインに載ることで発生する、キャッシュ無効化の往復を断つ。
+
+**効果:**
+
+- 隣接スロットへの並行書き込みは 2 ワーカーで 7.4 倍、**8 ワーカーで 29.7 倍**のコストを払う
+- **64 バイトのパディングでは足りない。** 8 ワーカーで 128 バイト版が 64 バイト版の 2.86 倍速い
+- `Interlocked` にしても罰則は消えず、むしろ増幅する
+
+**AOT:** ✅ 問題なし
+
+**実装例:**
+
+```csharp
+// ❌ ワーカーごとのカウンタが 1〜2 本のキャッシュラインに同居する
+private readonly long[] counters = new long[workerCount];
+
+// ✅ 1 スロット = 128 バイト。隣接ラインのプリフェッチまで考慮した幅
+[StructLayout(LayoutKind.Explicit, Size = 128)]
+internal struct PaddedCounter
+{
+    [FieldOffset(0)]
+    public long Value;
+}
+
+private readonly PaddedCounter[] counters = new PaddedCounter[workerCount];
+
+// 配列だけで済ませるなら、ストライドを空けても等価
+private readonly long[] strided = new long[workerCount * 16];   // 16 * 8 = 128 バイト間隔
+```
+
+**ユースケース:** ワーカーごとの統計カウンタ、シャーディングしたヒット数、リングバッファの head / tail、並列集計の中間バッファ。
+
+**実測結果(net10 / x86-64-v3(Zen 3、12 物理 / 24 論理)、各ワーカー 50,000 回書き込み):**
+
+| ワーカー | 隣接(基準) | 64 バイト | **128 バイト** | 隣接 + Interlocked | 128 バイト + Interlocked |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 516.51 μs | 69.43 μs(0.14) | **66.86 μs(0.13)** | 646.38 μs(1.28) | 415.88 μs(0.82) |
+| 4 | 853.96 μs | 93.73 μs(0.11) | **92.94 μs(0.11)** | 1,680.32 μs(1.97) | 444.70 μs(0.52) |
+| 8 | 1,565.20 μs | 150.59 μs(0.10) | **52.66 μs(0.03)** | 6,612.19 μs(4.23) | 673.50 μs(0.43) |
+
+**本書中で最大の改善幅。** 2 ワーカーでも既に 7.4 倍の罰則があり、8 ワーカーでは 29.7 倍(1,565.20 / 52.66)。→ [測定結果](benchmarks/results/CON-03-FalseSharing.md)
+
+**注意:**
+
+- **既定は 128 バイト。** 2 / 4 ワーカーでは 64 バイトと同等だが、8 ワーカーで 64 バイト版が 150.59 μs、128 バイト版が 52.66 μs と 2.86 倍開く。隣接キャッシュラインのプリフェッチがあるため、BCL 自身も 128 バイトでパディングしている
+- **`Interlocked` は罰則を隠さない。** 8 ワーカーで隣接 interlocked は隣接 volatile の 4.23 倍、パディング版との比は 9.8 倍。カウンタ配列に `Interlocked` を使う設計では本パターンが**前提条件**になる(単一変数を対象とする CON-01 には影響しない)
+- 時間はワーカー数に比例するため、**比率は同一ワーカー数の中でのみ**意味を持つ
+- メモリと引き換えである。ワーカー数ぶんの 128 バイトを払う価値があるのは、実際に並行して書かれるカウンタだけ
+- キャッシュライン幅はハードウェア依存。本項の実測は Zen 3(64 バイトライン + 隣接ラインプリフェッチ)での値
+
+---
 ## 🖥️ SYS: システム・OS 機能
 
 ### 🖥️ SYS-01: 低コストの時刻・経過時間取得
@@ -3458,6 +3914,9 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | R-16 | 手書きの桁順整形トリック(右詰め→シフト・逆順書き込み) | TryFormat + Fill の 2.5〜4.8 倍遅い |
 | R-17 | デリゲート Invoke の Call 置換(Callvirt 回避) | 生成コード完全一致を JIT 確認(net10) |
 | R-18 | 符号なしオーバーフローによる範囲チェックの手書き | JIT が 2 比較を自動融合、生成コード実質同一 |
+| R-19 | パターンとしての「P/Invoke 高速化」(LibraryImport / SuppressGCTransition) | LibraryImport は標準の宣言方法、SuppressGCTransition は利得なし |
+| R-20 | `[UnscopedRef]` による ref 返しアクセサ(性能目的) | get/set ペア比 1.07 倍・コード 85 → 88 B で改善なし |
+| R-21 | `Unsafe.ByteOffset` による ref からの index 復元 | index を持ち回る形の 1.45 倍・コードも大きい(R-02 と同じ結論) |
 
 ---
 
@@ -3539,6 +3998,12 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | コレクション変換の確保・コピー最適化 | COL-06 |
 | 文字列生成のゼロアロケーション化 | TXT-07 |
 | 多数候補の文字検索 | TXT-08(候補 2〜3 個は専用オーバーロード) |
+| 並行カウンタのキャッシュライン分離 | CON-03 |
+| struct のサイズ・フィールド順の最適化 | MEM-05 |
+| Memory\<T\> をループで扱う | BUF-08 |
+| 辞書エントリの存在確認つき更新 | COL-07 |
+| Vector\<T\> で書けないレーン置換 | VEC-02 |
+| 可変長レコードのフィールド粒度読み | STK-11 |
 | 固定長フィールドの整形・トリム | TXT-09 |
 | コンパイル時確定の文字列集合の判定 | TXT-10(64 件超・実行時確定は COL-04 / BIT-01) |
 | boxed 値の文字列化 | TXT-11(高速パスは少数の型に絞る) |
@@ -3565,21 +4030,29 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 
 | API | 用途 | 関連パターン |
 |---|---|---|
-| `Unsafe.Add(ref r, i)` | ref からのオフセットアクセス(境界チェックなし) | R-02(構造上の用途のみ) |
+| `Unsafe.Add(ref r, i)` | ref からのオフセットアクセス(境界チェックなし) | STK-11(構造読み)/ R-02(全要素走査は不採用) |
 | `Unsafe.As<T>(object)` | 型チェック省略キャスト(参照型) | TYP-05 |
 | `Unsafe.As<TFrom, TTo>(ref v)` | ref の再解釈(ジェネリック特殊化・ビット再解釈) | JIT-03 / SEQ-02 |
 | `Unsafe.ReadUnaligned / WriteUnaligned` | アラインメント非保証位置の unmanaged 読み書き | SEQ-01 / SEQ-02 / BUF-02 |
 | `Unsafe.SkipInit(out v)` | out 変数の初期化スキップ | MEM-01 / SEQ-02 |
 | `Unsafe.SizeOf<T>()` | unmanaged 型のサイズ(JIT 定数) | SEQ-01 / SEQ-02 |
-| `Unsafe.IsAddressLessThan` | ref 同士の位置比較(終端判定) | R-02(構造上の用途のみ) |
-| `Unsafe.BitCast<TFrom, TTo>`(.NET 8+) | 同サイズ値型の安全なビット再解釈(As の安全版) | SEQ-02 / TYP-02 |
-| `MemoryMarshal.GetReference(span)` | Span 先頭への ref 取得 | R-02(構造上の用途のみ) |
-| `MemoryMarshal.GetArrayDataReference(array)` | 配列先頭への ref 取得 | R-02(構造上の用途のみ) |
-| `MemoryMarshal.Cast<TFrom, TTo>(span)` | Span の要素型再解釈(ゼロコスト) | TYP-02 / 拡充候補 XxHash3 |
+| `Unsafe.IsAddressLessThan` | ref 同士の位置比較(終端判定) | STK-11(構造読み)/ R-02(全要素走査は不採用) |
+| `Unsafe.AreSame(ref a, ref b)` | 2 つの ref が同一位置かの判定(別名検査) | 早見表のみ([測定結果](benchmarks/results/LAB-RefIdentity.md)) |
+| `Unsafe.ByteOffset(ref a, ref b)` | ref 間のバイト距離。index の復元は**割に合わない**([R-21](docs/rejected-patterns.md)) | R-21(不採用) |
+| `MemoryExtensions.Overlaps(span, other)` | 2 つの Span が範囲として重なるかの判定 | 早見表のみ(`AreSame` より 1.40 倍重い) |
+| `Unsafe.BitCast<TFrom, TTo>`(.NET 8+) | 同サイズ値型のビット再解釈(**サイズ不一致を拒否する `As` の安全版。生成コードは同一**) | TYP-05 / JIT-03 / SEQ-02 / TYP-02 |
+| `Unsafe.Unbox<T>(object)` | 既存ボックスの中身への ref 取得(再ボックスなしの更新) | STK-05 |
+| `MemoryMarshal.GetReference(span)` | Span 先頭への ref 取得 | STK-11 / VEC-02(SIMD ロード)/ R-02(手動走査は不採用) |
+| `MemoryMarshal.GetArrayDataReference(array)` | 配列先頭への ref 取得 | R-02(不採用。正の用途は本書にない) |
+| `MemoryMarshal.Cast<TFrom, TTo>(span)` | Span の要素型再解釈(ゼロコスト。**要素サイズが違うと長さが変わり端数は切り捨て。アラインメント検査なし**) | TYP-02 / BIT-04 / [罠](benchmarks/results/LAB-SpanReinterpret.md) |
 | `MemoryMarshal.AsBytes(span)` | Span の byte ビュー化 | TYP-02 |
-| `MemoryMarshal.CreateSpan(ref r, len)` | ref からの Span 構築 | SEQ-02 |
+| `MemoryMarshal.TryGetArray(memory)` | Memory から配列セグメントを無コピーで取り出す | BUF-08 |
+| `MemoryManager<T>` | アンマネージド領域の Memory 化 | BUF-08 |
+| `MemoryMarshal.CreateSpan(ref r, len)` | ref からの Span 構築 | SEQ-02 / STK-11 |
 | `CollectionsMarshal.AsSpan(list)` | List 内部配列の Span 化 | COL-01 |
 | `CollectionsMarshal.GetValueRefOrAddDefault` | 辞書エントリへの ref 取得 | COL-01 |
+| `CollectionsMarshal.GetValueRefOrNullRef` | 既存エントリのみへの ref 取得(`Unsafe.IsNullRef` と対) | COL-07 |
+| `Unsafe.IsNullRef(ref r)` | ref が null かの判定(optional ref の受け取り) | COL-07 |
 | `RuntimeHelpers.IsReferenceOrContainsReferences<T>()` | 参照有無の型別分岐(JIT 定数) | JIT-05 |
 
 **共通の注意:** これらは境界チェック・型安全性を自分で保証する API 群。公開 API の入力検証を通過した後の内部実装に閉じて使い、Debug ビルドでの `Debug.Assert` 併用を推奨する。

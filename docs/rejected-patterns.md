@@ -108,7 +108,7 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 📉 **Measured — why it is rejected:** Either the same speed as reinterpretation via `MemoryMarshal.Cast` / `Unsafe.As`, or slower by the fixed overhead. The gain does not justify the cost of introducing an unsafe context (auditing, safety).
 
-✅ **Do this instead:** Write Span / ref based code. For reinterpretation use `MemoryMarshal.Cast` (measured zero-cost; in the BIT-04 re-measurement Cast beats fixed with non-overlapping CIs at 8 and 512 characters — precisely because no pinning is needed); for unmanaged reads and writes see SEQ-02 (struct I/O over Stream).
+✅ **Do this instead:** Write Span / ref based code. For reinterpretation use `MemoryMarshal.Cast` (measured zero-cost; in the BIT-04 re-measurement Cast beats fixed with non-overlapping CIs at 8 and 512 characters — precisely because no pinning is needed); for unmanaged reads and writes see SEQ-02 (struct I/O over Stream). **Note though that `Cast` changes the length when element sizes differ and silently truncates the remainder, and performs no alignment check** (`DataMisalignedException` on Arm). Giving up `fixed` means the caller now guarantees those two things → [LAB-SpanReinterpret.md](../benchmarks/results/LAB-SpanReinterpret.md)
 
 🔗 **Measurement record:** [BIT-04-XxHash3.md](../benchmarks/results/BIT-04-XxHash3.md) (includes the Cast vs fixed comparison)
 
@@ -221,6 +221,30 @@ Manual walking also has a high defect rate (several real bugs were found during 
 📉 **Measured — why it is rejected:** `[LibraryImport]` is the standard way to declare P/Invoke since .NET 7, not an optimization — for a blittable signature it generates the same call as `DllImport` (1.13 vs 1.14 ns), so there is nothing to compare; adopt it as the default for its source-generated, AOT/trimming-safe marshalling. `[SuppressGCTransition]` measured **1.26x (slower)** — the plain transition already costs only ~0.06 ns over an equivalent managed call, leaving nothing for the attribute to skip. With no measurable speed win and strict correctness constraints (sub-microsecond, non-blocking, no callbacks, no exceptions; violations cause process-wide GC delays), it does not qualify as a general speed pattern.
 
 ✅ **Do this instead:** declare P/Invoke with `[LibraryImport]` as a matter of course (AOT/trimming support, not speed). Apply `[SuppressGCTransition]` only to calls that satisfy its constraints AND show a measured win in the target environment; it also halves call-site code size (70 vs 163 B), which can matter for inlining.
+
+---
+
+### R-20: Ref-returning accessor via `[UnscopedRef]` (for performance)
+
+🎯 **Goal:** Return an internal struct slot as `[UnscopedRef] public ref long GetSlot(int index)` so that a getter + setter pair collapses into a single access.
+
+📉 **Measured / why it is rejected:** the get/set pair measures 0.5013 ns against 0.5349 ns for the ref-returning form (**1.07x**, overlapping confidence intervals). The disassembly genuinely differs — the ref form folds the loop body into a single `add [r8],r10` read-modify-write — but it pays an extra `lea` for the address, so the **instruction count stays the same 7 and the code grows from 85 to 88 B**. No axis improves: not time, not code size, not instruction count.
+
+✅ **Do this instead:** write the plain getter / setter (when the storage is an `[InlineArray]`, indexed access inlines and two accesses cost the same). **`[UnscopedRef]` itself is not unnecessary** — it is required for any struct member that returns `ref this.field`, and without it the member does not compile (CS8170). What is rejected is only the motive "add it because it is faster" (see the STK-01 caveats).
+
+🔗 **Measurement:** [LAB-ScopedRef.md](../benchmarks/results/LAB-ScopedRef.md)
+
+---
+
+### R-21: Recovering an index from a ref with `Unsafe.ByteOffset`
+
+🎯 **Goal:** Iterate with `foreach (ref var item in span)` and, when an index is needed, derive it from `Unsafe.ByteOffset(ref first, ref item) / sizeof(T)` instead of carrying one.
+
+📉 **Measured / why it is rejected:** a plain indexed `for` carrying the index measures 560.1 ns against 811.0 ns for the recovery form (**1.45x**, non-overlapping confidence intervals), and code size grows from 64 to 82 B. Same reason as R-02: the indexed form is the shape the JIT handles best, and rewriting around refs makes the index expensive.
+
+✅ **Do this instead:** if you need an index, use an indexed `for` and carry it. Reserve `Unsafe.ByteOffset` for cases where the distance itself is the answer (computing an offset inside a buffer, for example).
+
+🔗 **Measurement:** [LAB-RefIdentity.md](../benchmarks/results/LAB-RefIdentity.md)
 
 ---
 
