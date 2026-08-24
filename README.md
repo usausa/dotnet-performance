@@ -290,13 +290,14 @@ public void Draw(in MutableContext context) => context.Value.Use();
 
 ### 💾 MEM-05: Struct layout optimization (size and field order)
 
-**Goal:** Make the struct itself smaller, which cuts both the footprint of an array walk and the cost of passing it by value. This sits **upstream** of MEM-02 (array of structs + ref access) and MEM-04 (pass by `in` above 16 bytes).
+**Goal:** Choose the struct's size deliberately — smaller to cut the footprint of an array walk, or a multiple of the widest vector move to cut the cost of passing it by value. **Those two pull in opposite directions**, and the choice sits **upstream** of MEM-02 (array of structs + ref access) and MEM-04 (pass by `in` above 16 bytes).
 
 **Effect:**
 
-- The same four fields come out as either 32 or 24 bytes depending on declaration order alone. **0.67-0.71x on scattered access**
-- Sequential traversal shows no difference: the prefetcher absorbs the footprint gap. The win is on random / scattered access
-- Once the type is smaller, the MEM-04 question ("is this over 16 bytes, do I need `in`?") can disappear entirely, because the by-value copy also gets cheaper
+- The same four fields come out as either 32 or 24 bytes depending on declaration order alone
+- **What pays is crossing a cache-capacity boundary, not the byte count itself.** 0.67-0.71x on scattered access where only the smaller layout fits in L2; no measurable difference where both fit (0.99-1.00x on a machine with twice the L2)
+- Sequential traversal shows no difference on either machine: the prefetcher absorbs the footprint gap
+- **Shrinking does not make the by-value copy cheaper.** 24 bytes is not a multiple of the widest vector move, so the copy splits into 4 instructions where 32 bytes takes 2 — and which of the two wins reverses between microarchitectures
 
 **AOT:** ✅ No issues
 
@@ -334,14 +335,15 @@ internal struct Auto
 
 **Use cases:** Hash table entries, parser token arrays, column metadata, arrays of value-type components — any struct a library lays out in bulk.
 
-**Measured (net10 / x86-64-v3, 16 bytes x 16,384 elements):** sizes confirmed with `Unsafe.SizeOf` — **Padded 32 B / Packed 24 B / Auto 24 B**.
+**Measured (net10 / x86-64-v4, 16,384 elements = 512 KB padded against 384 KB packed):** sizes confirmed with `Unsafe.SizeOf` — **Padded 32 B / Packed 24 B / Auto 24 B**.
 
 | Traversal | Padded (32 B) | Packed (24 B) | Auto (24 B) |
 |---|---:|---:|---:|
-| Sequential | 14,840 ns (1.00) | 14,742 ns (0.995) | 14,345 ns (0.968) |
-| **Scattered** | **26,213 ns (1.00)** | **18,516 ns (0.71)** | **17,662 ns (0.67)** |
+| Sequential | 13,185 ns (1.00) | 13,180 ns (1.00) | 13,116 ns (0.995) |
+| Scattered | 14,061 ns (1.00) | 13,875 ns (0.99) | 14,031 ns (1.00) |
+| **Scattered, x86-64-v3** | **26,213 ns (1.00)** | **18,516 ns (0.71)** | **17,662 ns (0.67)** |
 
-The sequential rows have overlapping confidence intervals and cannot be resolved. The scattered rows do not overlap: **0.67-0.71x**. By-value passing also moves, 2.034 → 1.854 ns (error bars do not overlap). → [Measurement](benchmarks/results/MEM-05-StructLayout.md)
+**Both machines run byte-identical code (65 B sequential / 93 B scattered); what differs is the L2.** 512 KB against 384 KB straddles the 512 KB per-core L2 of the x86-64-v3 machine and fits entirely inside the 1 MB L2 of the x86-64-v4 one — so the win is decisive on the first and absent on the second (0.99-1.00x, CIs overlapping in two runs). By-value passing reverses as well: **1.292 vs 1.535 ns here in favour of the 32 B form**, against 2.034 vs 1.854 ns in favour of 24 B on x86-64-v3. → [Measurement](benchmarks/results/MEM-05-StructLayout.md)
 
 **Caveats:**
 
@@ -563,7 +565,7 @@ ref var value = ref Unsafe.Unbox<Counter>(boxes[i]);
 value.Count++;
 ```
 
-**Measured (net10 / x86-64-v3, updating 256 boxed structs):** the rebox form is 1,601.5 ns / 582 B / **8,192 B allocated**, against **286.5 ns (0.18x) / 251 B / 0 B** for `Unsafe.Unbox`. All three axes — time, code size, allocation — improve. → [Measurement](benchmarks/results/LAB-UnboxInPlace.md)
+**Measured (net10 / x86-64-v4, updating 256 boxed structs):** the rebox form is 1,024.9 ns / 582 B / **8,192 B allocated**, against **171.2 ns (0.17x) / 251 B / 0 B** for `Unsafe.Unbox`. All three axes — time, code size, allocation — improve, and **the ratio barely moves between machines (0.18x on x86-64-v3) because what disappears is an allocation, not instructions**. Decide the aliasing question first, though: in-place update preserves box identity, so every other reference to that box sees the change. → [Measurement](benchmarks/results/LAB-UnboxInPlace.md)
 
 **Caveat for `Unsafe.Unbox`:** a type mismatch raises `InvalidCastException` (unlike `Unsafe.As`, the type is checked), but passing a reference that is not a box is undefined. Restrict it to **boxes you created yourself**.
 
@@ -732,8 +734,8 @@ public static void Trace(params ReadOnlySpan<string> values)
 
 **Effect:**
 
-- **0.75x** against index arithmetic written out at the call site, and the code is smaller too: 163 → **111 B**
-- Even without reaching for ref fields, the re-slicing form gets to **0.81x** at 128 B
+- **0.81x** against index arithmetic written out at the call site, and the code is smaller too: 163 → **111 B** (0.75x on x86-64-v3 with byte-identical code — the ratio shrinks on wider cores, the ranking does not)
+- Even without reaching for ref fields, the re-slicing form gets to **0.86x** at 128 B
 
 **AOT:** ✅ No issues
 
@@ -788,16 +790,16 @@ internal ref struct FieldRefReader
 
 **Use cases:** Frame parsing for custom protocols, variable-length binary records, TLV decoders.
 
-**Measured (net10 / x86-64-v3, parsing 512 records):**
+**Measured (net10 / x86-64-v4, parsing 512 records):**
 
 | Form | Time | Ratio | Code size |
 |---|---:|---|---:|
-| Index arithmetic written at the call site (baseline) | 1,038.8 ns | 1.00 | 163 B |
-| Cursor holding span + position | 994.0 ns | 0.96 | 153 B |
-| **Cursor that re-slices the remainder** | **842.3 ns** | **0.81** | **128 B** |
-| **ref field cursor** | **782.5 ns** | **0.75** | **111 B** |
+| Index arithmetic written at the call site (baseline) | 789.4 ns | 1.00 | 163 B |
+| Cursor holding span + position | 776.4 ns | 0.98 | 153 B |
+| **Cursor that re-slices the remainder** | **676.2 ns** | **0.86** | **128 B** |
+| **ref field cursor** | **641.6 ns** | **0.81** | **111 B** |
 
-Confidence intervals do not overlap (761-836 vs 988-1,095 ns). **As a staged move, switching to the re-slicing cursor alone already buys 0.81x.** Going all the way to ref fields is worth the remaining 0.06x plus the code size. → [Measurement](benchmarks/results/STK-11-RefFieldStructRead.md)
+Confidence intervals do not overlap (629-654 vs 786-793 ns). **As a staged move, switching to the re-slicing cursor alone already buys 0.86x.** The code sizes are byte-identical on x86-64-v3, where the same comparison measured **0.75x** — what this removes is per-field address arithmetic, and a wider core hides more of it, so expect the ratio to shrink on newer hardware while the ranking holds. → [Measurement](benchmarks/results/STK-11-RefFieldStructRead.md)
 
 **Caveats:**
 
@@ -1174,20 +1176,20 @@ internal sealed unsafe class NativeMemoryManager<T> : MemoryManager<T>
 
 **Use cases:** Buffer handling in async I/O, connecting to existing `byte[]`-based APIs, exposing mmap or native interop regions.
 
-**Measured (net10 / x86-64-v3, 4,096 bytes):**
+**Measured (net10 / x86-64-v4, 4,096 bytes):**
 
-| Form | Time | Ratio | Code size | Allocated |
-|---|---:|---|---:|---:|
-| `.Span` hoisted + chunk Slice (baseline) | 1.281 μs | 1.00 | 248 B | 0 B |
-| `memory.Slice(...).Span` per chunk | 1.409 μs | 1.10 | 268 B | 0 B |
-| `.Span` hoisted + element access | 1.030 μs | 0.81 | 201 B | 0 B |
-| **`memory.Span[i]` per element** | **3.783 μs** | **2.96** | 178 B | 0 B |
-| MemoryManager backed, hoisted | 1.244 μs | 0.97 | 297 B | 0 B |
-| MemoryManager backed, resolved per chunk | 1.441 μs | 1.13 | **518 B** | 0 B |
-| `ToArray()` + legacy API (baseline) | 1.715 μs | 1.00 | 889 B | **4,120 B** |
-| **`TryGetArray` + legacy API** | **1.545 μs** | **0.90** | **414 B** | **0 B** |
+| Form | Resolutions | Time | Ratio | Code size | Allocated |
+|---|---:|---:|---|---:|---:|
+| `.Span` hoisted + chunk Slice (baseline) | 1 | 843.5 ns | 1.00 | 248 B | 0 B |
+| `memory.Slice(...).Span` per chunk | 256 | 887.1 ns | 1.05 | 268 B | 0 B |
+| `.Span` hoisted + element access | 1 | 842.3 ns | 1.00 | 201 B | 0 B |
+| **`memory.Span[i]` per element** | 4,096 | **2,626.7 ns** | **3.11** | 178 B | 0 B |
+| MemoryManager backed, hoisted | 1 | 802.8 ns | 0.95 | 297 B | 0 B |
+| MemoryManager backed, resolved per chunk | 256 | 892.2 ns | 1.06 | **518 B** | 0 B |
+| `ToArray()` + legacy API (baseline) | — | 1,095.8 ns | 1.00 | 934 B | **4,120 B** |
+| **`TryGetArray` + legacy API** | — | **922.8 ns** | **0.84** | **414 B** | **0 B** |
 
-**The backing store does not matter once `.Span` is hoisted** (1.244 ≒ 1.281 μs), but the code that resolves `.Span` is 1.7x larger for the MemoryManager case (518 vs 297 B). That is the part that shows up inside a loop. → [Measurement](benchmarks/results/BUF-08-MemoryAccess.md)
+**The penalty is per `.Span` resolution, and the core hides it in proportion to the work behind it.** The same 4,096 bytes cost 3.11x at one resolution per element and 1.05x at one per 16-byte chunk — so when an `await` forces you to keep `Memory<T>`, size the chunk by how much work each resolution feeds. **MemoryManager backing is not a throughput penalty** (0.95x hoisted here, 0.97x on x86-64-v3); its cost is the resolution code, 518 vs 297 B, which only matters where the resolution is not hoisted. → [Measurement](benchmarks/results/BUF-08-MemoryAccess.md)
 
 **Caveats:**
 
@@ -2283,34 +2285,34 @@ public static void ReverseEndianness(ReadOnlySpan<uint> source, Span<uint> desti
 
 **Use cases:** Endianness conversion, nibble expansion (hex / Base-N encoders), byte-level table lookup, fixed permutation patterns.
 
-**Measured (net10 / x86-64-v3 (Zen 3 / AVX2), endianness reversal of 1,021 `uint` values):**
+**Measured (net10 / x86-64-v4, endianness reversal of 1,021 `uint` values):**
 
 | Implementation | Time | Ratio | Code size |
 |---|---:|---|---:|
-| Scalar (`BinaryPrimitives`) (baseline) | 266.46 ns | 1.00 | 145 B |
-| **`Vector128.Shuffle` (portable)** | **121.53 ns** | **0.46** | 190 B |
-| `Ssse3.Shuffle` (raw ISA intrinsic) | 64.35 ns | 0.24 | 190 B |
-| `Vector<T>` arithmetic form (no shuffle) | 131.78 ns | 0.50 | 333 B |
+| Scalar (`BinaryPrimitives`) (baseline) | 213.05 ns | 1.00 | 145 B |
+| **`Vector128.Shuffle` (portable)** | **62.51 ns** | **0.29** | 190 B |
+| `Ssse3.Shuffle` (raw ISA intrinsic) | 61.06 ns | 0.29 | 190 B |
+| `Vector<T>` arithmetic form (no shuffle) | 93.88 ns | 0.44 | 321 B |
 
 → [Measurement](benchmarks/results/VEC-02-VectorShuffle.md)
 
-**⚠️ The 0.24x for `Ssse3.Shuffle` is not an API difference — there is no performance reason to drop to raw ISA intrinsics:**
+**⚠️ There is no performance reason to drop to raw ISA intrinsics — and the x86-64-v3 figure that suggested otherwise was code placement:**
 
-The two forms produce **byte-identical disassembly** (190 B each, the same `vpshufb`; only the address of the constant mask differs). The measured 1.76x comes from where the hot loop lands.
+The two forms produce **byte-identical disassembly** (59 instructions / 190 B each, the same `vpshufb`) on both machines. On x86-64-v3 they measured 121.53 vs 64.35 ns — a reproducible **1.76x** — because the portable form's hot loop straddled a 64-byte instruction-fetch boundary (`9FBC`-`9FD8` across `9FC0`) while the ISA form's fitted inside one (`9F5C`-`9F78`); byte-identical duplicate methods each reproduced their original's address and time, and swapping the declaration order did not move the placement.
 
-| Form | Loop start | Loop range | 64-byte boundary |
-|---|---|---|---|
-| `Ssse3.Shuffle` | `…9F5C` | `9F5C`-`9F78` | **fits inside** `[9F40, 9F80)` |
-| `Vector128.Shuffle` | `…9FBC` | `9FBC`-`9FD8` | **straddles** `9FC0` |
+| | x86-64-v3 | x86-64-v4 run 1 | x86-64-v4 run 2 |
+|---|---:|---:|---:|
+| `Vector128.Shuffle` | 121.53 ns | 62.51 ns | 64.69 ns |
+| `Ssse3.Shuffle` | 64.35 ns | 61.06 ns | 62.21 ns |
+| Gap | **1.76x, CIs disjoint** | 1.02x, CIs disjoint | **1.04x, CIs overlap** |
 
-**Confirmed by adding byte-identical duplicate methods:** each duplicate reproduced its original's address and time (`Vector128…B` 124.41 ns at `…9FBC`, `Ssse3…B` 65.69 ns at `…9F5C`). Swapping the declaration order does not move the placement. So **default to the portable `Vector128.Shuffle`**.
+**On this machine the portable form lands well and the gap collapses to 1-4%, which the second run cannot even resolve** — the 121.53 ns was the anomaly, not the 64.35 ns. So **default to the portable `Vector128.Shuffle`**, and treat any large gap between byte-identical code as a placement finding to re-measure rather than a result to quote (pitfall 10).
 
 **Caveats:**
 
 - Look for a vectorized BCL API first (VEC-01's design guidance). This pattern is only for "no BCL API exists, and `Vector<T>` cannot express it either"
 - Always test the tail and the unsupported-CPU fallback. Making the element count **not** a multiple of the vector width keeps the tail path live on every run
 - `Vector128.Shuffle` normalizes indices (out of range gives 0). With a constant mask the JIT folds it, so that safety costs nothing
-- **This section was measured on an x86-64-v3 (AVX2) machine.** The rest of this book was measured on x86-64-v4 (AVX-512), so absolute values are not directly comparable
 
 ---
 
@@ -2795,7 +2797,7 @@ List refill (16 elements / 256 elements):
 
 **Effect:**
 
-- The update path runs at **0.48-0.62x** against `TryGetValue` + indexer write-back (two probes)
+- The update path runs at **0.44-0.59x** against `TryGetValue` + indexer write-back (two probes)
 - **Code size drops from 8,270 to 1,080 B.** The indexer setter drags the whole insert path (`TryInsert` / `Resize` / hash helpers) into the caller; the ref-returning form needs none of it
 - The gain is **the single probe**, not the avoided value copy — the ratio is the same for an 8-byte and a 32-byte value
 
@@ -2820,18 +2822,18 @@ if (!Unsafe.IsNullRef(ref slot))
 
 **Use cases:** Hit counters and statistics, bulk updates restricted to existing entries, refreshing cache timestamps.
 
-**Measured (net10 / x86-64-v3, 256 probes into a 1,024-entry dictionary):**
+**Measured (net10 / x86-64-v4, 256 probes into a 1,024-entry dictionary):**
 
 | Probe | Form | Time | vs the two-probe form | Code size |
 |---|---|---:|---|---:|
-| All hit | `TryGetValue` + indexer update | 4.997 μs | 1.00 | **8,270 B** (10 methods) |
-| All hit | **`GetValueRefOrNullRef` update** | **2.401 μs** | **0.48** | **1,080 B** (2 methods) |
-| Half miss | `TryGetValue` + indexer update | 3.185 μs | 1.00 | 8,051 B |
-| Half miss | **`GetValueRefOrNullRef` update** | **1.967 μs** | **0.62** | 895 B |
-| 32-byte value | `TryGetValue` + indexer update | 5.028 μs | 1.00 | 3,294 B |
-| 32-byte value | **`GetValueRefOrNullRef` update** | **2.560 μs** | **0.51** | 1,088 B |
+| All hit | `TryGetValue` + indexer update | 3.769 μs | 1.00 | **8,351 B** |
+| All hit | **`GetValueRefOrNullRef` update** | **1.654 μs** | **0.44** | **1,155 B** |
+| Half miss | `TryGetValue` + indexer update | 2.286 μs | 1.00 | 8,124 B |
+| Half miss | **`GetValueRefOrNullRef` update** | **1.347 μs** | **0.59** | 967 B |
+| 32-byte value | `TryGetValue` + indexer update | 3.552 μs | 1.00 | 3,364 B |
+| 32-byte value | **`GetValueRefOrNullRef` update** | **1.809 μs** | **0.51** | 1,159 B |
 
-**For read-only lookups there is no difference.** 0.98-1.00x against `TryGetValue` with overlapping confidence intervals, identical instruction counts (199 vs 199 on all hit), and code size that moves both ways (+16 / -14 / -4 B). → [Measurement](benchmarks/results/COL-07-ValueRefLookup.md)
+**On the read path the gain is one folded memory operand per field the loop reads out of the slot** — the ref form reads the slot as `add rsi,[r13]` where `TryGetValue` emits a `mov` and an `add`. Reading a single field is therefore a tie on both machines (0.99-1.04x, overlapping CIs, measured twice), while reading two fields out of a 32-byte value resolves at **0.93-0.94x on x86-64-v4** (disjoint CIs in two runs) against 1.00x on x86-64-v3. **Count the field reads, not the value's size** — and treat an older core's "no difference" as unresolved rather than settled. → [Measurement](benchmarks/results/COL-07-ValueRefLookup.md)
 
 **Caveats:**
 
@@ -3627,8 +3629,8 @@ foreach (var row in rows)
 
 **Effect:**
 
-- Writing to adjacent slots concurrently costs 7.4x at 2 workers and **29.7x at 8 workers**
-- **64 bytes of padding is not enough.** At 8 workers the 128-byte form is 2.86x faster than the 64-byte form
+- Writing to adjacent slots concurrently costs **4.0-7.4x at 2 workers and 5.4-29.7x at 8**, depending on the machine
+- **Padding is unconditional; the size is not.** 64 bytes is not enough on x86-64-v3 (128 bytes is 2.86x faster at 8 workers) and is fully sufficient on x86-64-v4 — pick the size from the target's prefetch granularity, and default to 128 bytes when it is unknown
 - Making the writes `Interlocked` does not remove the penalty, it amplifies it
 
 **AOT:** ✅ No issues
@@ -3655,20 +3657,23 @@ private readonly long[] strided = new long[workerCount * 16];   // 16 * 8 = 128-
 
 **Use cases:** Per-worker statistics counters, sharded hit counts, ring buffer head / tail, intermediate buffers for parallel aggregation.
 
-**Measured (net10 / x86-64-v3 (Zen 3, 12 physical / 24 logical), 50,000 writes per worker):**
+**Measured (net10 / x86-64-v4 (Zen 5, 12 physical / 24 logical), 50,000 writes per worker):**
 
-| Workers | Adjacent (baseline) | 64 bytes | **128 bytes** | Adjacent + Interlocked | 128 bytes + Interlocked |
+| Workers | Adjacent (baseline) | **64 bytes** | 128 bytes | Adjacent + Interlocked | 128 bytes + Interlocked |
 |---:|---:|---:|---:|---:|---:|
-| 2 | 516.51 μs | 69.43 μs (0.14) | **66.86 μs (0.13)** | 646.38 μs (1.28) | 415.88 μs (0.82) |
-| 4 | 853.96 μs | 93.73 μs (0.11) | **92.94 μs (0.11)** | 1,680.32 μs (1.97) | 444.70 μs (0.52) |
-| 8 | 1,565.20 μs | 150.59 μs (0.10) | **52.66 μs (0.03)** | 6,612.19 μs (4.23) | 673.50 μs (0.43) |
+| 2 | 151.12 μs | **33.78 μs (0.22)** | 46.01 μs (0.30) | 891.01 μs (5.90) | 557.32 μs (3.69) |
+| 4 | 495.02 μs | **38.43 μs (0.08)** | 104.93 μs (0.21) | 2,413.44 μs (4.88) | 830.15 μs (1.68) |
+| 8 | 756.31 μs | 138.88 μs (0.18) | 139.13 μs (0.18) | 4,354.64 μs (5.76) | 1,046.98 μs (1.38) |
 
-**The largest improvement in this book.** Even 2 workers already pay 7.4x, and 8 workers pay 29.7x (1,565.20 / 52.66). → [Measurement](benchmarks/results/CON-03-FalseSharing.md)
+**Among the largest improvements in this book, on every machine measured**: 4.0-4.5x at 2 workers and 5.4-12.9x at 4-8 workers here, 7.4x and 29.7x on x86-64-v3. Measured twice, because thread scheduling makes this benchmark's noise larger than the effects being compared on the padded rows. → [Measurement](benchmarks/results/CON-03-FalseSharing.md)
 
 **Caveats:**
 
-- **Default to 128 bytes.** At 2 and 4 workers it ties with 64 bytes, but at 8 workers 64 bytes measures 150.59 μs against 52.66 μs — a 2.86x gap. Adjacent line prefetching is why the BCL itself pads to 128
-- **`Interlocked` does not hide the penalty.** At 8 workers adjacent interlocked is 4.23x the adjacent volatile baseline, and 9.8x its padded counterpart. Any design that puts `Interlocked` on an array of counters has this pattern as a **precondition** (CON-01 targets a single variable and is unaffected)
+- **The padding is not the conditional part — the size is.** Every configuration measured on either machine is 4-13x better than adjacent slots, so never skip the pad because the right size is unclear
+- **Pick the size from the target's prefetch granularity, not from the cache line size.** On x86-64-v3, 64 bytes is not enough: at 8 workers it measures 150.59 μs against 52.66 μs for 128 bytes (2.86x), because a prefetcher that pulls **cache line pairs** makes two adjacent 64 B lines behave as one contended granule — which is why the BCL itself pads to 128. On x86-64-v4 there is no pair effect at any worker count: 64 and 128 tie at 8 workers, and 64 bytes is 1.4-2.7x **faster** at 2 and 4
+- **Default to 128 bytes when the target is unknown**, because the two failure modes are not symmetric: over-padding costs footprint and some low-contention throughput, while under-padding brings the full false-sharing penalty back at high contention
+- **Measure at your real worker count.** The two sizes converge as contention rises, so a low-worker benchmark shows over-padding at its worst and a high-worker one shows under-padding at its worst
+- **`Interlocked` does not hide the penalty.** At 8 workers adjacent interlocked is 5.76x the adjacent volatile baseline and 4.2x its padded counterpart. Any design that puts `Interlocked` on an array of counters has this pattern as a **precondition** (CON-01 targets a single variable and is unaffected)
 - Time scales with the worker count, so **ratios are only meaningful inside one worker count**
 - This trades memory for throughput. Paying 128 bytes per worker is only worth it for counters that really are written concurrently
 - Cache line width is hardware dependent. These numbers are from Zen 3 (64-byte lines plus adjacent line prefetching)
@@ -3933,8 +3938,8 @@ Techniques measured and judged to have no effect or to be counterproductive. **D
 | R-17 | Substituting Call for a delegate Invoke (to avoid Callvirt) | JIT codegen confirmed byte-identical (net10) |
 | R-18 | Hand-written unsigned-overflow range checks | The JIT already fuses the two comparisons; codegen is effectively identical |
 | R-19 | "P/Invoke speed-up" as a pattern (LibraryImport / SuppressGCTransition) | LibraryImport is the standard declaration form; SuppressGCTransition shows no gain |
-| R-20 | Ref-returning accessor via `[UnscopedRef]` (for performance) | 1.07x against a get/set pair with code growing 85 → 88 B; no axis improves |
-| R-21 | Recovering an index from a ref with `Unsafe.ByteOffset` | 1.45x against carrying the index, and larger code (same conclusion as R-02) |
+| R-20 | Ref-returning accessor via `[UnscopedRef]` (for performance) | 1.02-1.07x against a get/set pair, CIs overlapping on both machines; no axis improves (the code-size delta is alignment padding) |
+| R-21 | Recovering an index from a ref with `Unsafe.ByteOffset` | 1.45-1.52x against carrying the index, and larger code (same conclusion as R-02) |
 
 ---
 

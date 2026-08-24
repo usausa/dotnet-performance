@@ -91,7 +91,7 @@ A pattern catalog for building libraries that work under Native AOT and trimming
 
 **Problem:** Runtime failure once trimming removes the member. Flagged by warning IL2026.
 
-**Mitigation:** generate static accessors with a Source Generator / register delegates up front in `Action<T, TValue>` form / move to an interface contract. When the target is a known non-public member, `[UnsafeAccessor]` (TYP-03 in the [README](../README.md#️-typ-03-unsafeaccessor非公開メンバーへの直接アクセス)) is a reflection-free, AOT-compatible alternative.
+**Mitigation:** generate static accessors with a Source Generator / register delegates up front in `Action<T, TValue>` form / move to an interface contract. When the target is a known non-public member, `[UnsafeAccessor]` (TYP-03 in the [README](../README.md#️-typ-03-unsafeaccessor-direct-access-to-non-public-members)) is a reflection-free, AOT-compatible alternative.
 
 ### AOTP-07: String-based type resolution and dynamic assembly loading
 

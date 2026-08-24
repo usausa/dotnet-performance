@@ -239,7 +239,9 @@ A u8 literal does have the advantage that the table address becomes a link-time 
 
 🎯 **Goal:** Return an internal struct slot as `[UnscopedRef] public ref long GetSlot(int index)` so that a getter + setter pair collapses into a single access.
 
-📉 **Measured / why it is rejected:** the get/set pair measures 0.5013 ns against 0.5349 ns for the ref-returning form (**1.07x**, overlapping confidence intervals). The disassembly genuinely differs — the ref form folds the loop body into a single `add [r8],r10` read-modify-write — but it pays an extra `lea` for the address, so the **instruction count stays the same 7 and the code grows from 85 to 88 B**. No axis improves: not time, not code size, not instruction count.
+📉 **Measured / why it is rejected:** on x86-64-v4 the get/set pair measures 0.3881 ns against 0.3943 ns for the ref-returning form (**1.02x**, overlapping confidence intervals — and the ref form's own interval is seven times wider). x86-64-v3 measured 1.07x, also overlapping. The disassembly genuinely differs — the ref form folds the loop body into a single `add [r8],r10` read-modify-write — but it pays an extra `lea` for the address, so **the instruction count is identical for both forms** (9 on x86-64-v4, recorded as 7 on x86-64-v3). No axis improves on either machine.
+
+⚠️ **The code-size figure is not evidence here.** It flips sign between machines — 85 → 88 B on x86-64-v3, 85 → **81 B** on x86-64-v4 — and the flip is **alignment padding, not code**: the get/set form carries 14 B of nops before its loop head and the ref form 9 B, leaving 71 vs 72 B of real code. The JIT's loop-head padding moves by more than 10 B between machines, so a delta of that size says nothing until the nops are subtracted or the instructions counted.
 
 ✅ **Do this instead:** write the plain getter / setter (when the storage is an `[InlineArray]`, indexed access inlines and two accesses cost the same). **`[UnscopedRef]` itself is not unnecessary** — it is required for any struct member that returns `ref this.field`, and without it the member does not compile (CS8170). What is rejected is only the motive "add it because it is faster" (see the STK-01 caveats).
 
@@ -251,7 +253,7 @@ A u8 literal does have the advantage that the table address becomes a link-time 
 
 🎯 **Goal:** Iterate with `foreach (ref var item in span)` and, when an index is needed, derive it from `Unsafe.ByteOffset(ref first, ref item) / sizeof(T)` instead of carrying one.
 
-📉 **Measured / why it is rejected:** a plain indexed `for` carrying the index measures 560.1 ns against 811.0 ns for the recovery form (**1.45x**, non-overlapping confidence intervals), and code size grows from 64 to 82 B. Same reason as R-02: the indexed form is the shape the JIT handles best, and rewriting around refs makes the index expensive.
+📉 **Measured / why it is rejected:** a plain indexed `for` carrying the index measures 333.3 ns against 507.7 ns for the recovery form (**1.52x**, non-overlapping confidence intervals), and code size grows from 64 to 82 B (22 → 27 instructions). x86-64-v3 measured 1.45x with byte-identical code sizes, so **the margin grows on the newer core instead of shrinking** — the recovery adds a subtract and a shift **per element on the dependent chain**, which is work a wider core cannot hide (contrast STK-11, whose win narrows on the same machines because the work it removes is independent). Same reason as R-02: the indexed form is the shape the JIT handles best, and rewriting around refs makes the index expensive.
 
 ✅ **Do this instead:** if you need an index, use an indexed `for` and carry it. Reserve `Unsafe.ByteOffset` for cases where the distance itself is the answer (computing an offset inside a buffer, for example).
 

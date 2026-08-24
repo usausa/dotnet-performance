@@ -1,46 +1,78 @@
 # VEC-02: Fixed-width intrinsics (byte shuffle), the case Vector<T> cannot express
 
-- Verdict: adopted
-- Byte shuffle beats the scalar loop by 0.46x (portable Vector128.Shuffle) on uint endianness reversal
-- The width-agnostic Vector<T> arithmetic form reaches almost the same speed (0.50x) without any shuffle, but
-  its code is 1.75x larger (333 vs 190 B)
-- Ssse3.Shuffle measuring 0.24x is NOT an API difference. The two forms compile to a byte-identical
-  instruction stream (190 B, same vpshufb). The 1.76x gap is code placement:
-    Ssse3 loop     at ...9F5C, spans 9F5C-9F78, fits inside the 64 B window [9F40, 9F80)
-    Vector128 loop at ...9FBC, spans 9FBC-9FD8, straddles the 64 B boundary at 9FC0
-  Confirmed by adding byte-identical duplicate methods: each duplicate reproduced its original's address and
-  time (Vector128...B 124.41 ns at ...9FBC, Ssse3...B 65.69 ns at ...9F5C). Swapping the declaration order
-  does not move the placement
-- Therefore: default to the portable Vector128.Shuffle. There is no performance reason to drop to raw ISA
-  intrinsics here
-- The element count is 1021, deliberately not a multiple of the vector width, so the scalar tail is exercised
+- Verdict: adopted. Re-measured twice on x86-64-v4 (Zen 5)
+- Byte shuffle beats the scalar loop by **0.28-0.29x** on uint endianness reversal (x86-64-v3: 0.46x for the
+  portable form - see below for why that number was depressed)
+- The width-agnostic `Vector<T>` arithmetic form reaches 0.42-0.44x without any shuffle, but its code is 1.7x
+  larger (321 vs 190 B)
+- The element count is 1,021, deliberately not a multiple of the vector width, so the scalar tail is exercised
+
+## `Vector128.Shuffle` vs `Ssse3.Shuffle`: the x86-64-v3 gap was placement, and this run proves it
+
+| | x86-64-v3 | x86-64-v4 run 1 | x86-64-v4 run 2 |
+|---|---:|---:|---:|
+| `Vector128.Shuffle` (portable) | 121.53 ns | 62.51 ns | 64.69 ns |
+| `Ssse3.Shuffle` (raw ISA) | 64.35 ns | 61.06 ns | 62.21 ns |
+| Gap | **1.76x, CIs disjoint** | 1.02x, CIs disjoint | **1.04x, CIs overlap** |
+
+The two forms compile to a **byte-identical instruction stream** (59 instructions / 190 B, the same `vpshufb`)
+on both machines. On x86-64-v3 the portable form's hot loop straddled a 64-byte instruction-fetch boundary
+(`9FBC`-`9FD8` across `9FC0`) while the ISA form's fitted inside one (`9F5C`-`9F78`), and duplicate methods
+reproduced each original's address and time. **On this machine the portable form lands well and the gap
+collapses to 1-4%, which run 2 cannot even resolve** - the 121.53 ns figure was the anomaly, not the 64.35 ns
+one. Nothing about the API changed.
+
+## What to weigh
+
+1. **Default to the portable `Vector128.Shuffle`.** Two machines and three runs now agree there is no API-level
+   difference against the raw ISA intrinsic, and the portable form carries the CPU-support fallback for free
+2. **A gap this large between byte-identical code is a placement finding, not a result.** Before quoting one,
+   re-measure in a second process and check the loop addresses in the DisassemblyDiagnoser output
+   (`printInstructionAddresses`); see pitfall 10 in the methodology
+3. **Reach for a shuffle only when no BCL API exists and `Vector<T>` cannot express the permutation.** The
+   arithmetic form here is within 1.5x of the shuffle without needing fixed-width intrinsics at all, at the cost
+   of 1.7x the code
+4. **Keep the tail and the unsupported-CPU fallback exercised.** The element count is deliberately not a
+   multiple of the vector width so every run walks the scalar tail
+
+## x86-64-v4 run 1
+
 ```
+
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.9168/25H2/2025Update/HudsonValley2)
-AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
 .NET SDK 10.0.400
-  [Host]              : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v3
-  MediumRun-.NET 10.0 : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v3
+  [Host]              : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v4
 
 Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
 LaunchCount=2  WarmupCount=10  
 
 ```
-| Method                  | Mean      | Error    | StdDev   | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
-|------------------------ |----------:|---------:|---------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
-| ScalarReverse           | 266.46 ns | 6.626 ns | 9.502 ns | 261.26 ns | 255.79 ns | 284.31 ns | 282.63 ns |  1.00 |    0.05 |     145 B |         - |          NA |
-| Vector128ShuffleReverse | 121.53 ns | 3.171 ns | 4.746 ns | 120.53 ns | 115.74 ns | 131.07 ns | 126.84 ns |  0.46 |    0.02 |     190 B |         - |          NA |
-| Ssse3ShuffleReverse     |  64.35 ns | 1.692 ns | 2.532 ns |  65.89 ns |  60.43 ns |  67.80 ns |  66.73 ns |  0.24 |    0.01 |     190 B |         - |          NA |
-| VectorArithmeticReverse | 131.78 ns | 3.787 ns | 5.668 ns | 130.26 ns | 125.80 ns | 144.25 ns | 140.23 ns |  0.50 |    0.03 |     333 B |         - |          NA |
+| Method                  | Mean      | Error    | StdDev   | Min       | Max       | P90       | Ratio | Code Size | Allocated | Alloc Ratio |
+|------------------------ |----------:|---------:|---------:|----------:|----------:|----------:|------:|----------:|----------:|------------:|
+| ScalarReverse           | 213.05 ns | 0.474 ns | 0.710 ns | 211.92 ns | 214.38 ns | 214.08 ns |  1.00 |     145 B |         - |          NA |
+| Vector128ShuffleReverse |  62.51 ns | 0.476 ns | 0.713 ns |  61.50 ns |  63.89 ns |  63.49 ns |  0.29 |     190 B |         - |          NA |
+| Ssse3ShuffleReverse     |  61.06 ns | 0.512 ns | 0.751 ns |  60.07 ns |  62.54 ns |  62.01 ns |  0.29 |     190 B |         - |          NA |
+| VectorArithmeticReverse |  93.88 ns | 0.716 ns | 1.072 ns |  92.03 ns |  95.54 ns |  95.10 ns |  0.44 |     321 B |         - |          NA |
 
-## Placement probe: byte-identical duplicate methods
+## x86-64-v4 run 2
 
-Vector128ShuffleReverseB and Ssse3ShuffleReverseB are copies of the two originals with nothing changed but
-the method name. Each duplicate reproduces its original both in address and in time, which is what rules out
-an API difference and leaves code placement as the cause.
+```
 
-| Method                   | Mean      | Error    | StdDev   | Min       | Max       | P90       | Code Size | Allocated |
-|------------------------- |----------:|---------:|---------:|----------:|----------:|----------:|----------:|----------:|
-| Vector128ShuffleReverse  | 123.84 ns | 4.409 ns | 6.600 ns | 116.02 ns | 136.70 ns | 129.39 ns |     190 B |         - |
-| Ssse3ShuffleReverse      |  70.49 ns | 2.105 ns | 3.150 ns |  66.31 ns |  75.04 ns |  74.36 ns |     190 B |         - |
-| Ssse3ShuffleReverseB     |  65.69 ns | 2.167 ns | 3.243 ns |  60.58 ns |  72.83 ns |  69.50 ns |     190 B |         - |
-| Vector128ShuffleReverseB | 124.41 ns | 3.518 ns | 5.266 ns | 115.98 ns | 132.97 ns | 130.51 ns |     190 B |         - |
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.9168/25H2/2025Update/HudsonValley2)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+.NET SDK 10.0.400
+  [Host]              : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v4
+
+Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
+LaunchCount=2  WarmupCount=10  
+
+```
+| Method                  | Mean      | Error    | StdDev   | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|------------------------ |----------:|---------:|---------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| ScalarReverse           | 222.33 ns | 4.428 ns | 6.208 ns | 216.91 ns | 243.98 ns | 229.16 ns |  1.00 |    0.04 |     145 B |         - |          NA |
+| Vector128ShuffleReverse |  64.69 ns | 2.912 ns | 4.269 ns |  61.43 ns |  78.04 ns |  70.87 ns |  0.29 |    0.02 |     190 B |         - |          NA |
+| Ssse3ShuffleReverse     |  62.21 ns | 1.365 ns | 1.822 ns |  60.20 ns |  67.04 ns |  64.34 ns |  0.28 |    0.01 |     190 B |         - |          NA |
+| VectorArithmeticReverse |  93.41 ns | 0.696 ns | 0.998 ns |  91.81 ns |  95.61 ns |  94.76 ns |  0.42 |    0.01 |     321 B |         - |          NA |
