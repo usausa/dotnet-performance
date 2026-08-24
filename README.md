@@ -3204,15 +3204,21 @@ public static int GetIndex(ReadOnlySpan<char> name) => name switch
 
 **Use cases:** Name-to-index resolution emitted by a Source Generator (DB columns, property names, JSON keys), enum name resolution, protocol header dispatch.
 
-**Where it does not apply - matching that needs a conversion:** the gain above is against a **plain** `Equals` chain, one where the probe is compared exactly as it arrives. **It does not hold once the input has to be converted first.** On the DB column-name shape (`OrdinalIgnoreCase`), upper-casing the probe so a plain switch can be used measures **4.5-7.8x slower at 8 columns and still 1.76-1.89x at 24**.
+**Where it does not apply - matching that needs a conversion:** the gain above is against a **plain** `Equals` chain, one where the probe is compared exactly as it arrives. **It does not hold once the input has to be converted first.** On the DB column-name shape (`OrdinalIgnoreCase`), upper-casing the probe so a plain switch can be used measures **4.5-10.0x slower at 8 columns and 1.35-2.91x at 24** - it lost in all 12 conditions measured (3 conversion forms x 2 column counts x 2 naming conventions).
 
-| Approach (per column) | 8 cols | 24 cols |
+| Approach (per column, PascalCase) | 8 cols | 24 cols |
 |---|---:|---:|
-| Current (chain / sampling hash) | **1.93 ns** | **5.38 ns** |
-| Plain switch, no case handling (reference) | 4.29 ns | 4.27 ns |
-| `Ascii.ToUpper` (SIMD) + span switch | 9.04 ns | 9.48 ns |
+| Current (chain / sampling hash) | **0.95 ns** | 3.55 ns |
+| Plain switch, no case handling (reference) | 3.42 ns | **3.24 ns** |
+| `Ascii.ToUpper` (SIMD) + span switch | 6.00 ns | 6.43 ns |
+| `MemoryExtensions.ToUpperInvariant` + span switch | 6.41 ns | 6.91 ns |
+| `string.ToUpperInvariant()` + string switch | 9.49 ns | 10.33 ns (+976 B) |
 
-**Normalization adds about 4.8-5.2 ns per column and the SIMD version is no cheaper.** The cost is structural - fold every character into a buffer, then read every character again in the switch - so no API choice avoids it, and it exceeds the switch's own dispatch gain (4.3 ns per column, size-independent). **When a conversion is required, use the hash form** with upper-cased sampling plus an `OrdinalIgnoreCase` confirm, where only 3 characters are converted.
+**Normalization adds 2.6-3.2 ns per column, and the SIMD form only shaves 6-7% off that.** The cost is structural - fold every character into a buffer, then read every character again in the switch - so no API choice avoids it, and it exceeds the switch's own dispatch gain (about 3.3 ns per column, size-independent). **When a conversion is required, use the hash form** with upper-cased sampling plus an `OrdinalIgnoreCase` confirm, where only 3 characters are converted.
+
+**The headline is not that `OrdinalIgnoreCase` is expensive** - it is the cheapest thing in the table. What costs is the conversion introduced to avoid needing it. snake_case reproduces every row within a few percent. → [Measurement](benchmarks/results/LAB-ColumnMatch.md) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Lab/ColumnMatchBenchmark.cs)
+
+**The plain-switch row is a reference value, not a like-for-like comparison** - in that benchmark only the converted variants and the plain switch are reached through a `Func<string,int>` per column, while the generated forms are fully inlined. At 24 columns that handicap works against the plain switch and it still wins (0.91x PascalCase, 0.98x snake_case with overlapping CIs, code 2,212 vs 3,261 B), so **at that size an ordinal switch is a sound generated shape wherever case sensitivity is acceptable**. At 8 columns the handicap is roughly the size of the gap, so the chain-vs-switch question is not decidable from it.
 
 **Caution:** The switch is **ordinal (case-sensitive)**. **Key length is not a criterion** (no reversal even at 58-62 characters). Expect **around 0.5x against a chain at 16 keys** - a real win, but not an order-of-magnitude one.
 
@@ -3759,7 +3765,7 @@ if (reader.Read())
 }
 ```
 
-**Choosing a column-name matching strategy:** Switch between a chain of `String.Equals(OrdinalIgnoreCase)` (few columns) and a sampling-hash switch (moderate to many) based on the column count (COL-04 / BIT-01). Codegen knows the column count at generation time, so it can emit the right one. Where case-sensitive matching is acceptable, a plain switch is fastest up to 64 entries (TXT-10).
+**Choosing a column-name matching strategy:** Switch between a chain of `String.Equals(OrdinalIgnoreCase)` (few columns) and a sampling-hash switch (moderate to many) based on the column count (COL-04 / BIT-01). Codegen knows the column count at generation time, so it can emit the right one. Where case-sensitive matching is acceptable, emit a **plain ordinal switch** instead - fastest up to 64 entries (TXT-10), and at 24 columns it measures 0.91-0.98x of the sampling-hash switch with a third less code. **Never normalise the probe to make that switch usable:** upper-casing first costs 2.6-3.2 ns per column and loses to the case-insensitive form in every condition measured (4.5-10.0x at 8 columns, 1.35-2.91x at 24) → [LAB-ColumnMatch](benchmarks/results/LAB-ColumnMatch.md).
 
 **Choosing a CommandBehavior:**
 

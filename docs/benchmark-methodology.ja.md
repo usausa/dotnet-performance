@@ -262,5 +262,6 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ⑦ | `AreSame` / `ByteOffset` / `Overlaps` | ref からの index 復元、別名検査のコスト | R-02 | ❌ index 復元は不採用(R-21)。別名検査は早見表へ |
 | ⑦ | `Unsafe.Unbox<T>` | 既存ボックスを再確保せず更新できるか | STK-05 | ✅ 収録(STK-05 拡張、0.17〜0.18 倍・割り当てゼロ。消えるのが割り当てなので比率は機械非依存) |
 | ⑦ | `MemoryMarshal.TryGetArray` | `byte[]` 前提 API への無コピー橋渡し | BUF-04 | ✅ 収録(BUF-08 に同居、割り当て 4,120 → 0 B) |
+| ⑧ | 序数 switch を使うためのプローブ正規化(列名照合) | 先に大文字化する形は `Equals(OrdinalIgnoreCase)` / サンプリングハッシュ switch に勝てるか | TXT-10 / GEN-02 | ⚠️ **判定は二分。** 変換は**不採用** — 測定 12 条件すべてで負け(8 列 4.5〜10.0 倍、24 列 1.35〜2.91 倍)、列あたり 2.6〜3.2 ns を足す。**変換なし**の序数 switch は 24 列の生成形として採用(PascalCase 0.91 倍 / snake_case 0.98 倍、コード 2,212 対 3,261 B)。8 列はベンチマークのハーネス非対称により判定不能 → [LAB-ColumnMatch](../benchmarks/results/LAB-ColumnMatch.md) |
 
 ---

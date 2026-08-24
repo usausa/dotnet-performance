@@ -262,5 +262,6 @@ Differences that measurement could not resolve, listed together with the result 
 | ⑦ | `AreSame` / `ByteOffset` / `Overlaps` | Index recovery from a ref; cost of alias checking | R-02 | ❌ Index recovery rejected (R-21). Alias checking moved to the quick reference |
 | ⑦ | `Unsafe.Unbox<T>` | Can an existing box be updated without reallocating? | STK-05 | ✅ Adopted (STK-05 extension, 0.17-0.18x and zero allocation; the ratio is machine independent because what is removed is an allocation) |
 | ⑦ | `MemoryMarshal.TryGetArray` | Copy-free bridge to `byte[]`-based APIs | BUF-04 | ✅ Adopted (lives in BUF-08, 4,120 → 0 B allocated) |
+| ⑧ | Normalising the probe to enable an ordinal switch (column-name matching) | Does upper-casing the probe first beat `Equals(OrdinalIgnoreCase)` / the sampling-hash switch? | TXT-10 / GEN-02 | ⚠️ **Split verdict.** The conversion is **rejected** - it loses in 12 of 12 conditions (4.5-10.0x at 8 columns, 1.35-2.91x at 24) and costs 2.6-3.2 ns per column. The **un-converted** ordinal switch is adopted as a generated shape at 24 columns (0.91x PascalCase / 0.98x snake_case, code 2,212 vs 3,261 B); at 8 columns the benchmark's harness cannot decide it → [LAB-ColumnMatch](../benchmarks/results/LAB-ColumnMatch.md) |
 
 ---
