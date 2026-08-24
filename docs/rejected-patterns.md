@@ -110,6 +110,17 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 ✅ **Do this instead:** Write Span / ref based code. For reinterpretation use `MemoryMarshal.Cast` (measured zero-cost; in the BIT-04 re-measurement Cast beats fixed with non-overlapping CIs at 8 and 512 characters — precisely because no pinning is needed); for unmanaged reads and writes see SEQ-02 (struct I/O over Stream). **Note though that `Cast` changes the length when element sizes differ and silently truncates the remainder, and performs no alignment check** (`DataMisalignedException` on Arm). Giving up `fixed` means the caller now guarantees those two things → [LAB-SpanReinterpret.md](../benchmarks/results/LAB-SpanReinterpret.md)
 
+📌 **Dropping the pinning on a static table (confirmed while applying this):** A shape like `fixed (ushort* pTable = StaticTable)` **pins a read-only static array on every call**, and that pinning is pure overhead. In the generated code the pinned version carries **two pinned GC slots** (one for the Span as well), does an indirect static-field load plus an `add` for the array header, and zeroes both slots on return — every call.
+
+There are two ways to remove it, and the **element width decides which**.
+
+| Approach | When | Measured (`FormatInt32`) |
+|---|---|---|
+| **`MemoryMarshal.GetArrayDataReference`** + `Unsafe.Add` | Keep the read width (default choice) | 4.861 → **4.386 ns (0.90x, non-overlapping CIs)** |
+| A u8 literal byte table | Only when the table was **already read byte by byte** | Replacing a `ushort` read gives 7.751 → 8.636 ns at `Int32.MaxValue` (**1.11x regression**) |
+
+A u8 literal does have the advantage that the table address becomes a link-time constant hoisted out of the loop, but **one `ushort` read turns into two `byte` reads plus an index doubling**, and for inputs with many digits the inner loop cost outweighs it. → see "do not change the access width" under TXT-01
+
 🔗 **Measurement record:** [BIT-04-XxHash3.md](../benchmarks/results/BIT-04-XxHash3.md) (includes the Cast vs fixed comparison)
 
 ---

@@ -161,6 +161,8 @@ public bool MoveNext()
 
 - プロジェクトに `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` が必要(unsafe コードを書かなくても属性の使用に必要)
 - 未初期化領域を読まないよう、書き込み前の読み取りがないことを保証する。`Unsafe.SkipInit(out value)` との併用も検討
+- **Source Generator が生成コードへ出力する場合は条件付きにする。** 必要な `AllowUnsafeBlocks` は**利用側プロジェクト**の設定なので、無条件に出力すると未設定の利用者が全員 CS0227 でビルドできなくなる。生成器は設定の有無を見て出し分ける。判定手段は 2 つあり、パイプラインが `Compilation` に依存してよければ `CompilationProvider` から `compilation.Options is CSharpCompilationOptions { AllowUnsafe: true }` を取り出す(`bool` に落とせばキャッシュはオプション変更時にしか無効化されない)。`Compilation` 非依存を保ちたい場合は `.targets` に `<CompilerVisibleProperty Include="AllowUnsafeBlocks" />` を置き、`AnalyzerConfigOptions` から `build_property.AllowUnsafeBlocks` を読む
+- **生成コードでは「その経路が本当に stackalloc するか」も条件に含める。** 分岐によって作業バッファを持たない経路には付けても意味がない
 
 ---
 
@@ -1322,6 +1324,7 @@ public static T Convert<T>(int value)
 
 - ホットメソッドが小さくなり、JIT のインライン化判断が通りやすくなる
 - `throw` を含むメソッドはインライン化されないため、スローをヘルパーに分離するとホット側がインライン可能になる
+- **ただしこの論拠は `[MethodImpl(AggressiveInlining)]` 付きのメソッドには当たらない。** 強制インラインなのでインライン化の可否は問題にならず、効くのは別の理由 —**例外構築のコードが呼び出し先ごとに複製されなくなる**こと。`[AggressiveInlining]` + 引数検証ラッパーという形でも、分離すれば呼び出し先が **125 B → 81 B(−35%)**、時間も 1.219 → 1.160 ns(0.95 倍、信頼区間非重複)になる。**論拠が当たらないからといって適用対象から外さない**
 - BCL の ThrowHelper / `ArgumentNullException.ThrowIfNull` と同じ設計
 
 **AOT:** ✅ 問題なし
@@ -2866,6 +2869,10 @@ private static ReadOnlySpan<byte> HexTable => "0123456789ABCDEF"u8;
 **ユースケース:** 日時・数値の固定書式化、Hex/Base 系エンコーダ、プロトコル定数出力。
 
 **補足:** `static ReadOnlySpan<byte>` プロパティ + u8 リテラル(または `new byte[] {...}` 直返し)はコンパイラがデータセクション直参照に変換するため、静的テーブルの定義方法として常にこれを既定とする。
+
+**注意(アクセス幅を変えてはいけない):** 既存テーブルを u8 リテラル化するときは、**読み出し幅が変わらないか**を必ず確認する。`ushort[100]` の 2 桁ペアテーブル(上位=十の位・下位=一の位)を 200 バイトの u8 テーブルに置き換えると、**1 回の 2 バイト読みが 2 回の 1 バイト読み + 添字の 2 倍算**に変わる。実測では短い数値では差が出ないが、桁数が増えると内側ループのコストが効いて **1.11 倍の劣化**になった(`FormatInt32` の `Int32.MaxValue` で 7.751 → 8.636 ns)。
+
+読み出し幅を保ったまま静的配列の `fixed` ピン留めだけを外したい場合は、u8 リテラルではなく **`MemoryMarshal.GetArrayDataReference`** を使う。同じ実測で 4.861 → **4.386 ns(0.90 倍、信頼区間非重複)**。u8 リテラル化が効くのは `FastDateTimeByteHelper` のように**元からバイト単位で読んでいる**テーブルに限る。→ [R-09](docs/rejected-patterns.ja.md)
 
 **リポジトリ内実装:** [Utf8DateTimeFormatter.cs](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) / [テスト](tests/PerformancePatterns.Tests/Txt/Utf8DateTimeFormatterTest.cs) / [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Txt/Utf8DateTimeFormatterBenchmark.cs) / [測定結果](benchmarks/results/TXT-01-Utf8DateTimeFormatter.md)
 

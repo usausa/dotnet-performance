@@ -161,6 +161,8 @@ public bool MoveNext()
 
 - The project needs `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` (required just to use the attribute, even without writing unsafe code)
 - Guarantee that nothing reads before writing, so uninitialized memory is never read. Consider combining it with `Unsafe.SkipInit(out value)`
+- **A source generator emitting it into generated code must do so conditionally.** The required `AllowUnsafeBlocks` is a setting on the **consuming** project, so emitting it unconditionally breaks the build (CS0227) for every consumer that has not set it. The generator has to check first. There are two ways: if the pipeline may depend on the `Compilation`, take `compilation.Options is CSharpCompilationOptions { AllowUnsafe: true }` from `CompilationProvider` (reducing it to a `bool` keeps the cache alive until the option itself changes). To keep the pipeline `Compilation`-free, add `<CompilerVisibleProperty Include="AllowUnsafeBlocks" />` to the `.targets` and read `build_property.AllowUnsafeBlocks` from `AnalyzerConfigOptions`
+- **In generated code, also condition on whether that path actually stackallocs.** Branches that carry no scratch buffer gain nothing from the attribute
 
 ---
 
@@ -1322,6 +1324,7 @@ public static T Convert<T>(int value)
 
 - The hot method gets smaller, making the JIT's inlining decision more likely to go your way
 - Methods containing `throw` are never inlined, so moving the throw into a helper makes the hot side inlinable
+- **That rationale does not apply to methods marked `[MethodImpl(AggressiveInlining)]`.** Inlining is forced there, so whether it is allowed never comes up; the benefit comes from something else — **the exception construction stops being duplicated into every call site**. Even for an `[AggressiveInlining]` argument-validation wrapper, separating the throw takes the call site from **125 B to 81 B (−35%)** and the time from 1.219 to 1.160 ns (0.95x, non-overlapping confidence intervals). **A rationale that does not apply is not a reason to skip the pattern**
 - The same design used by the BCL's ThrowHelper and `ArgumentNullException.ThrowIfNull`
 
 **AOT:** ✅ No issues
@@ -2866,6 +2869,10 @@ private static ReadOnlySpan<byte> HexTable => "0123456789ABCDEF"u8;
 **Use cases:** Fixed-format date/time and numeric output, hex and Base-family encoders, protocol constant output.
 
 **Notes:** A `static ReadOnlySpan<byte>` property with a u8 literal (or a directly returned `new byte[] {...}`) is turned by the compiler into a direct data-section reference, so make this the default way to define static tables.
+
+**Caveat (do not change the access width):** Before converting an existing table to a u8 literal, check that the **read width stays the same**. Replacing a `ushort[100]` two-digit pair table (high byte = tens, low byte = ones) with a 200-byte u8 table turns **one 2-byte read into two 1-byte reads plus an index doubling**. Measurements show no difference for short numbers, but as the digit count grows the inner loop dominates and it becomes a **1.11x regression** (`FormatInt32` with `Int32.MaxValue`: 7.751 → 8.636 ns).
+
+To drop the `fixed` pinning on a static array while keeping the read width, use **`MemoryMarshal.GetArrayDataReference`** rather than a u8 literal. In the same measurement that gave 4.861 → **4.386 ns (0.90x, non-overlapping confidence intervals)**. Converting to a u8 literal pays off only for tables that were **already read byte by byte**, like `FastDateTimeByteHelper`. → [R-09](docs/rejected-patterns.md)
 
 **Implementation in this repo:** [Utf8DateTimeFormatter.cs](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) / [Tests](tests/PerformancePatterns.Tests/Txt/Utf8DateTimeFormatterTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Txt/Utf8DateTimeFormatterBenchmark.cs) / [Results](benchmarks/results/TXT-01-Utf8DateTimeFormatter.md)
 

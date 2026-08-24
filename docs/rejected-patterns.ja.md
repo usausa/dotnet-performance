@@ -110,6 +110,17 @@
 
 ✅ **代わりにやること:** Span / ref ベースで書く。再解釈は `MemoryMarshal.Cast`(ゼロコスト実測済み。BIT-04 の再測定では 8 / 512 文字で fixed より Cast が信頼区間非重複で速い — pinning が不要なぶん)、unmanaged 読み書きは SEQ-02(Stream 構造体 I/O)。**ただし `Cast` は要素サイズが異なると長さが変わって端数を黙って切り捨て、アラインメント検査も行わない**(Arm で `DataMisalignedException`)。`fixed` を捨てる代わりにこの 2 点は呼び出し側で保証する → [LAB-SpanReinterpret.md](../benchmarks/results/LAB-SpanReinterpret.md)
 
+📌 **静的テーブルのピン留めを外す場合(実適用で確認):** `fixed (ushort* pTable = StaticTable)` のように**読み取り専用の静的配列を呼び出しごとにピン留め**している形は、ピン留めが純粋な overhead になる。生成コードを見ると、ピン留め版は Span 用と合わせて**ピン留め GC スロットを 2 個**持ち、静的フィールドの間接ロードと配列ヘッダ分の `add`、復帰時の両スロットのゼロクリアを毎回行っている。
+
+外し方は 2 つあり、**要素幅で選び分ける**。
+
+| 方法 | 適用条件 | 実測(`FormatInt32`) |
+|---|---|---|
+| **`MemoryMarshal.GetArrayDataReference`** + `Unsafe.Add` | 読み出し幅を保ちたい(既定) | 4.861 → **4.386 ns(0.90 倍、信頼区間非重複)** |
+| u8 リテラルのバイトテーブル | **元からバイト単位で読んでいる**場合のみ | `ushort` 読みを置き換えると `Int32.MaxValue` で 7.751 → 8.636 ns(**1.11 倍の劣化**) |
+
+u8 リテラルはテーブルのアドレスがリンク時定数になりループ外へ巻き上がる利点があるが、**`ushort` の 1 回読みが `byte` の 2 回読み + 添字の 2 倍算に変わる**ため、桁数の多い入力で内側ループのコストが上回る。→ TXT-01 の「アクセス幅を変えてはいけない」
+
 🔗 **測定記録:** [BIT-04-XxHash3.md](../benchmarks/results/BIT-04-XxHash3.md)(Cast vs fixed の比較を含む)
 
 ---
