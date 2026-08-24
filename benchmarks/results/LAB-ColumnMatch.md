@@ -1,117 +1,95 @@
 # LAB-ColumnMatch: normalizing the probe vs matching case-insensitively (TXT-10 counter-case)
 
-- Verdict: **converting the probe never pays - it loses in all 12 conditions measured.** The un-converted
-  ordinal switch is a viable generated form at 24 columns; at 8 columns this benchmark cannot decide it
+- Verdict: **converting the probe never pays - it loses in all 12 conditions measured.** For the match itself
+  the crossover is at column count: the `Equals(OrdinalIgnoreCase)` chain wins at 8 columns (0.84x) and the
+  plain ordinal switch wins at 24 (0.91x), both measured like for like
 - Shape: resolve a DB reader's column names to ordinals under SQL identifier rules (OrdinalIgnoreCase). The
   generated form is a guarded `Equals(OrdinalIgnoreCase)` chain at 8 columns and a sampling-hash switch at 24;
   the alternative is to upper-case the probe first so a plain ordinal switch can be used
-- Measured on x86-64-v4 (Zen 5, .NET 10.0.11): 4 classes x 5 variants x 2 casings = 40 cases. The 24-column
-  snake_case rows were re-measured after an unstable first run (100.93 ns +/- 11.37 did not reproduce: 84.42
-  +/- 0.82)
+- Measured on x86-64-v4 (Zen 5, .NET 10.0.11). First pass: 4 classes x 5 variants x 2 casings = 40 cases. The
+  24-column snake_case rows were re-measured after an unstable first run (100.93 ns +/- 11.37 -> 84.42 +/- 0.82),
+  and the 8-column classes were re-run with a sixth variant after the harness fix below
 - **The headline is not "IgnoreCase is expensive".** `string.Equals(name, "Id", OrdinalIgnoreCase)` is the
   cheapest thing here. What costs is the *conversion* introduced to avoid needing it
 
-## Measurement validity: which comparisons this benchmark supports
+## The harness fix, and why the first reading of the 8-column rows was wrong
 
-**Only the baseline is inlined.** `GeneratedChain` / `GeneratedHash` compile to a 2-instruction tail call into a
-fully inlined body (210 instructions / 989 B for the 8-column chain). The four alternatives go through
-`ResolveByMatcher(names, static x => ...)`, paying a **`Func<string,int>` indirect call per column** plus a
-non-inlined call into the matcher (`MatchXxxLabels`, 119 instructions / 503-563 B); each call site is
-80 instructions / 293 B.
+The 24-column classes always ran their baseline through the same harness as the variants
+(`GeneratedHash() => ResolveByMatcher(names, static x => MatchHash(x))`), so those rows were like for like from
+the start. **The 8-column classes did not:** `GeneratedChain() => ResolveChain(names)` is a direct call that
+inlines into a 210-instruction body, while every variant went through `ResolveByMatcher` - a `Func<string,int>`
+indirect call per column plus a non-inlined call into the matcher.
 
-| Comparison | Valid? |
-|---|---|
-| One alternative against another (= what the conversion costs) | ✅ all four share the same harness |
-| Baseline vs an alternative at 24 columns **where the alternative wins** | ✅ the handicap works against the winner, so the win is a lower bound |
-| Baseline vs an alternative at 8 columns | ❌ the 3.0-3.6x for the un-converted switch cannot be separated from the 8 delegate calls plus 8 non-inlined calls it pays |
+`ChainViaMatcher` was added to the two 8-column classes: the same chain, reached through the harness.
 
-**`PlainSpanSwitch` resolves nothing under `AllUpper`** - it has no case handling, and Verify only checks it
-under `AsDeclared`. Those rows look fast because they bail out early; they are excluded from every comparison
-below.
+| 8 columns, AsDeclared | Chain, direct (inlined) | Chain, via the harness | Harness cost |
+|---|---:|---:|---:|
+| PascalCase | 8.427 ns | 25.895 ns | +17.5 ns (**2.18 ns/column**) |
+| snake_case | 9.365 ns | 24.625 ns | +15.3 ns (**1.91 ns/column**) |
 
-## 1. What the conversion costs (same harness, `AsDeclared`)
+**The harness costs more than the difference it was hiding**, which is why the first pass read the plain switch
+as 3.0-3.6x slower than the chain when the real figure is 1.17-1.19x. Any comparison where only some variants
+pay a delegate call is worthless at this scale.
 
-| Columns / naming | `PlainSpanSwitch` (no conversion) | `Ascii.ToUpper` + span switch | `ToUpperInvariant` + span switch | `string.ToUpperInvariant()` + string switch |
+## 1. The match itself, like for like (all variants through the harness)
+
+| Per column | 8 cols, Pascal | 8 cols, snake | 24 cols, Pascal | 24 cols, snake |
 |---|---:|---:|---:|---:|
-| 8 / PascalCase | 27.39 ns | 48.01 (**1.75x**) | 51.31 (1.87x) | 75.95 (2.77x) + 304 B |
-| 8 / snake_case | 26.48 ns | 47.98 (**1.81x**) | 52.80 (1.99x) | 81.96 (3.10x) + 328 B |
-| 24 / PascalCase | 77.85 ns | 154.40 (**1.98x**) | 165.88 (2.13x) | 247.99 (3.19x) + 976 B |
-| 24 / snake_case | 84.42 ns (run 2) | 169.95 (**2.01x**) | 171.18 (2.03x) | 244.44 (2.90x) + 1,008 B |
+| `Equals(OrdinalIgnoreCase)` chain | **3.24 ns** | **3.08 ns** | - | - |
+| Sampling-hash switch (generated at 24) | - | - | 3.55 ns | 3.61 ns |
+| Plain ordinal switch, no case handling | 3.86 ns | 3.61 ns | **3.24 ns** | **3.52 ns** |
 
-- **The conversion costs 1.75-2.13x of the match itself** when done over a span, and 2.77-3.19x plus an
-  allocation when done through `string.ToUpperInvariant()`
-- The ASCII-specialised conversion is the cheapest of the three in every condition, consistent with TXT-06
+| Chain / hash vs plain ordinal switch | Ratio | CIs |
+|---|---:|---|
+| 8 cols, PascalCase | switch is **1.19x** slower | disjoint (25.43-26.36 vs 30.50-31.22 ns) |
+| 8 cols, snake_case | switch is **1.17x** slower | disjoint (24.31-24.94 vs 28.61-29.10 ns) |
+| 24 cols, PascalCase | switch is **0.91x** | disjoint |
+| 24 cols, snake_case | switch is **0.98x** | overlap - a tie |
+
+**The crossover is the chain's shape:** a chain checks the probe against the literals in declaration order, so
+its cost per probe grows with the column count (about 4.5 comparisons on average at 8 columns, 12.5 at 24),
+while a switch is flat - 3.24-3.86 ns per column at both sizes. That is exactly the boundary the catalog already
+draws between a chain and a sampling-hash switch, now measured on both sides of it.
+
+## 2. What the conversion costs (same harness, `AsDeclared`)
+
+| Columns / naming | Plain switch (no conversion) | `Ascii.ToUpper` + span switch | `ToUpperInvariant` + span switch | `string.ToUpperInvariant()` + string switch |
+|---|---:|---:|---:|---:|
+| 8 / PascalCase | 30.86 ns | 52.59 (**1.70x**) | 58.07 (1.88x) | 77.38 (2.51x) + 304 B |
+| 8 / snake_case | 28.86 ns | 54.09 (**1.87x**) | 59.62 (2.07x) | 88.07 (3.05x) + 328 B |
+| 24 / PascalCase | 77.85 ns | 154.40 (**1.98x**) | 165.88 (2.13x) | 247.99 (3.19x) + 976 B |
+| 24 / snake_case | 84.42 ns | 169.95 (**2.01x**) | 171.18 (2.03x) | 244.44 (2.90x) + 1,008 B |
+
+- **The conversion costs 1.70-2.13x of the match itself** over a span, and 2.51-3.19x plus an allocation through
+  `string.ToUpperInvariant()`. Against the generated form it is 2.0-3.0x at 8 columns and 1.35-2.91x at 24 -
+  **12 of 12 conditions lose**
+- The ASCII-specialised conversion is the cheapest of the three in every condition, consistent with TXT-06, but
+  it only shaves 6-11% off the span-based one - not enough to change any decision
 - `string.ToUpperInvariant()` allocates only when the input is not already upper case: 304-1,008 B under
   `AsDeclared`, **zero** under `AllUpper`, where the BCL returns the same instance. That is also why its
-  `AllUpper` timings (118-125 ns at 24 columns) are so much better than its `AsDeclared` ones
-
-## 2. Against the generated form: every converted variant loses
-
-| Columns | Baseline | Converted variants |
-|---|---:|---|
-| 8 | `GeneratedChain` 7.60 / 8.73 ns | **4.5-10.0x** |
-| 24 | `GeneratedHash` 85.18 / 85.23 ns | **1.35-2.91x** |
-
-12 of 12 conditions (3 conversion forms x 4 classes) lose, and the harness handicap is not what decides it -
-the margins are far larger than the ~20 ns of delegate and call overhead it can explain.
-
-## 3. Can the un-converted ordinal switch replace the generated form?
-
-| Columns / naming | Generated | `PlainSpanSwitch` | Verdict |
-|---|---:|---:|---|
-| 24 / PascalCase | 85.18 ns | **77.85 ns (0.91x)** | CIs disjoint - a win, and a lower bound |
-| 24 / snake_case | 86.59 ns | 84.42 ns (0.98x) | CIs overlap - a tie |
-| 8 / PascalCase | 7.60 ns | 27.39 ns (3.61x) | not decidable here (harness) |
-| 8 / snake_case | 8.73 ns | 26.48 ns (3.03x) | not decidable here (harness) |
-
-At 24 columns the plain switch also carries **1/1.5 the code**: 2,212-2,241 B against 3,254-3,294 B.
+  `AllUpper` timings are so much better than its `AsDeclared` ones
+- **`PlainSpanSwitch` resolves nothing under `AllUpper`** - it has no case handling, and Verify only checks it
+  under `AsDeclared`. Those rows look fast because they bail out early and are excluded from every comparison
 
 ## What to weigh
 
-1. **If the reader's spelling is guaranteed to match the baked literals, emit a plain ordinal switch.** At 24
-   columns it is at least as fast as the sampling-hash switch while paying a handicap the generated form does
-   not, and its code is a third smaller. This is the same conclusion TXT-10 reaches for fixed key sets
-2. **If case-insensitive matching is required, keep the comparison case-insensitive.** Do not convert the probe
-   to make a case-sensitive switch usable: that costs 1.75-2.13x of the match, or 2.77-3.19x plus an allocation,
-   and loses to the generated form in every condition measured
-3. **When a conversion is genuinely unavoidable, use the ASCII-specialised one** (`Ascii.ToUpper` into a
-   stack buffer). It is the cheapest of the three everywhere, and `string.ToUpperInvariant()` is the only form
-   that allocates
-4. **The column count decides the generated *shape*, not this question.** Chain at 8, sampling hash at 24, plain
-   switch when case sensitivity is acceptable - the "do not normalise first" rule holds across all of them
-5. **To settle the 8-column case, the benchmark needs a delegate-dispatched baseline** (a `GeneratedChain`
-   variant reached through `ResolveByMatcher`) so that all five variants pay the same call overhead. Until then
-   the 8-column baseline column is a reference point, not a comparison
+1. **Keep the comparison case-insensitive. Never normalise the probe to make a case-sensitive switch usable.**
+   It costs 1.70-2.13x of the match and loses to the generated form in every condition measured.
+   `Equals(..., OrdinalIgnoreCase)` is the cheapest primitive in the whole table
+2. **Pick the match shape by column count, which is what the catalog already says:** the chain wins at 8 columns
+   (0.84x against a plain switch), the switch wins at 24 (0.91x against the sampling hash). The reason is
+   structural - a chain is O(columns) per probe, a switch is flat - so the boundary moves with the count, not
+   with the naming convention (PascalCase and snake_case agree within a few percent everywhere)
+3. **Where case sensitivity is acceptable at 24+ columns, a plain ordinal switch is the better generated shape**:
+   0.91x and a third less code (2,212 vs 3,261 B) against the sampling-hash form
+4. **When a conversion is genuinely unavoidable, convert as few characters as possible** - upper-cased sampling
+   plus an `OrdinalIgnoreCase` confirm touches 3 characters instead of all of them. Full-probe normalisation is
+   structural cost: fold every character into a buffer, then read every character again in the switch
+5. **Methodology: make every variant pay the same call shape before reading any ratio.** The harness asymmetry
+   here was worth 1.9-2.2 ns per column and inverted the 8-column conclusion. Verify proved the variants
+   returned equal results, which is not the same as proving they are equally *shaped*
 
-## x86-64-v4 - 8 columns, PascalCase
-
-```
-
-BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.9168/25H2/2025Update/HudsonValley2)
-AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
-.NET SDK 10.0.400
-  [Host]              : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v4
-  MediumRun-.NET 10.0 : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v4
-
-Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
-LaunchCount=2  WarmupCount=10  
-
-```
-| Method               | Casing     | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
-|--------------------- |----------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
-| **GeneratedChain**       | **AsDeclared** |  **7.601 ns** | **0.2226 ns** | **0.3262 ns** |  **7.235 ns** |  **8.328 ns** |  **8.096 ns** |  **1.00** |    **0.06** |     **999 B** |      **-** |         **-** |          **NA** |
-| UpperStringSwitch    | AsDeclared | 75.949 ns | 1.9579 ns | 2.6138 ns | 73.050 ns | 80.950 ns | 79.521 ns | 10.01 |    0.53 |   2,521 B | 0.0362 |     304 B |          NA |
-| UpperSpanSwitch      | AsDeclared | 51.308 ns | 0.3192 ns | 0.4578 ns | 50.343 ns | 52.146 ns | 51.817 ns |  6.76 |    0.28 |   1,800 B |      - |         - |          NA |
-| AsciiUpperSpanSwitch | AsDeclared | 48.007 ns | 0.7720 ns | 1.1072 ns | 46.820 ns | 50.739 ns | 49.985 ns |  6.33 |    0.29 |   1,576 B |      - |         - |          NA |
-| PlainSpanSwitch      | AsDeclared | 27.387 ns | 0.5527 ns | 0.8101 ns | 26.635 ns | 30.131 ns | 28.667 ns |  3.61 |    0.18 |     928 B |      - |         - |          NA |
-|                      |            |           |           |           |           |           |           |       |         |           |        |           |             |
-| **GeneratedChain**       | **AllUpper**   |  **7.756 ns** | **0.1744 ns** | **0.2611 ns** |  **7.483 ns** |  **8.504 ns** |  **8.154 ns** |  **1.00** |    **0.05** |   **1,002 B** |      **-** |         **-** |          **NA** |
-| UpperStringSwitch    | AllUpper   | 39.475 ns | 2.6834 ns | 3.9334 ns | 36.739 ns | 53.837 ns | 45.231 ns |  5.09 |    0.53 |   2,186 B |      - |         - |          NA |
-| UpperSpanSwitch      | AllUpper   | 51.356 ns | 1.1889 ns | 1.7427 ns | 48.871 ns | 56.333 ns | 52.555 ns |  6.63 |    0.31 |   1,787 B |      - |         - |          NA |
-| AsciiUpperSpanSwitch | AllUpper   | 46.678 ns | 1.1256 ns | 1.6144 ns | 44.447 ns | 49.367 ns | 48.441 ns |  6.02 |    0.28 |   1,579 B |      - |         - |          NA |
-| PlainSpanSwitch      | AllUpper   | 25.868 ns | 0.1278 ns | 0.1706 ns | 25.479 ns | 26.289 ns | 26.045 ns |  3.34 |    0.11 |     921 B |      - |         - |          NA |
-
-## x86-64-v4 - 8 columns, snake_case
+## x86-64-v4 - 8 columns, PascalCase (with ChainViaMatcher)
 
 ```
 
@@ -127,17 +105,49 @@ LaunchCount=2  WarmupCount=10
 ```
 | Method               | Casing     | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
 |--------------------- |----------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
-| **GeneratedChain**       | **AsDeclared** |  **8.734 ns** | **0.1036 ns** | **0.1518 ns** |  **8.415 ns** |  **9.135 ns** |  **8.897 ns** |  **1.00** |    **0.02** |   **1,024 B** |      **-** |         **-** |          **NA** |
-| UpperStringSwitch    | AsDeclared | 81.963 ns | 3.0924 ns | 4.4350 ns | 75.946 ns | 88.759 ns | 87.502 ns |  9.39 |    0.52 |   2,506 B | 0.0391 |     328 B |          NA |
-| UpperSpanSwitch      | AsDeclared | 52.798 ns | 0.3699 ns | 0.5537 ns | 51.844 ns | 54.038 ns | 53.510 ns |  6.05 |    0.12 |   1,786 B |      - |         - |          NA |
-| AsciiUpperSpanSwitch | AsDeclared | 47.978 ns | 0.2384 ns | 0.3494 ns | 47.443 ns | 48.573 ns | 48.350 ns |  5.49 |    0.10 |   1,583 B |      - |         - |          NA |
-| PlainSpanSwitch      | AsDeclared | 26.481 ns | 0.2744 ns | 0.4022 ns | 25.014 ns | 27.077 ns | 26.873 ns |  3.03 |    0.07 |     940 B |      - |         - |          NA |
+| **GeneratedChain**       | **AsDeclared** |  **8.427 ns** | **0.2998 ns** | **0.4300 ns** |  **7.717 ns** |  **9.473 ns** |  **9.056 ns** |  **1.00** |    **0.07** |   **1,002 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | AsDeclared | 77.380 ns | 2.4477 ns | 3.4314 ns | 73.014 ns | 83.784 ns | 81.515 ns |  9.20 |    0.60 |   2,541 B | 0.0362 |     304 B |          NA |
+| UpperSpanSwitch      | AsDeclared | 58.067 ns | 0.7419 ns | 1.1105 ns | 56.317 ns | 60.837 ns | 59.313 ns |  6.91 |    0.36 |   1,809 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | AsDeclared | 52.588 ns | 0.5470 ns | 0.8187 ns | 51.162 ns | 54.341 ns | 53.591 ns |  6.26 |    0.32 |   1,545 B |      - |         - |          NA |
+| PlainSpanSwitch      | AsDeclared | 30.859 ns | 0.3600 ns | 0.5388 ns | 29.775 ns | 31.899 ns | 31.446 ns |  3.67 |    0.19 |     941 B |      - |         - |          NA |
+| ChainViaMatcher      | AsDeclared | 25.895 ns | 0.4667 ns | 0.6986 ns | 24.754 ns | 27.334 ns | 26.686 ns |  3.08 |    0.17 |   1,053 B |      - |         - |          NA |
 |                      |            |           |           |           |           |           |           |       |         |           |        |           |             |
-| **GeneratedChain**       | **AllUpper**   |  **8.369 ns** | **0.1361 ns** | **0.1995 ns** |  **7.959 ns** |  **8.722 ns** |  **8.567 ns** |  **1.00** |    **0.03** |   **1,024 B** |      **-** |         **-** |          **NA** |
-| UpperStringSwitch    | AllUpper   | 37.696 ns | 0.7037 ns | 1.0314 ns | 35.160 ns | 40.390 ns | 38.599 ns |  4.51 |    0.16 |   2,199 B |      - |         - |          NA |
-| UpperSpanSwitch      | AllUpper   | 54.967 ns | 0.8691 ns | 1.3008 ns | 52.478 ns | 57.700 ns | 56.632 ns |  6.57 |    0.22 |   1,786 B |      - |         - |          NA |
-| AsciiUpperSpanSwitch | AllUpper   | 50.075 ns | 0.4165 ns | 0.6234 ns | 49.043 ns | 51.864 ns | 50.898 ns |  5.99 |    0.16 |   1,582 B |      - |         - |          NA |
-| PlainSpanSwitch      | AllUpper   | 25.372 ns | 0.3167 ns | 0.4440 ns | 24.777 ns | 26.508 ns | 25.909 ns |  3.03 |    0.09 |     958 B |      - |         - |          NA |
+| **GeneratedChain**       | **AllUpper**   |  **9.169 ns** | **0.1516 ns** | **0.2270 ns** |  **8.784 ns** |  **9.672 ns** |  **9.401 ns** |  **1.00** |    **0.03** |     **999 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | AllUpper   | 42.874 ns | 0.7669 ns | 1.1478 ns | 40.637 ns | 45.321 ns | 44.239 ns |  4.68 |    0.17 |   2,199 B |      - |         - |          NA |
+| UpperSpanSwitch      | AllUpper   | 58.331 ns | 0.6765 ns | 1.0126 ns | 56.625 ns | 60.252 ns | 59.539 ns |  6.37 |    0.19 |   1,796 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | AllUpper   | 52.334 ns | 0.7158 ns | 1.0714 ns | 50.766 ns | 54.993 ns | 53.566 ns |  5.71 |    0.18 |   1,592 B |      - |         - |          NA |
+| PlainSpanSwitch      | AllUpper   | 27.849 ns | 0.3665 ns | 0.5486 ns | 26.953 ns | 29.408 ns | 28.424 ns |  3.04 |    0.09 |     921 B |      - |         - |          NA |
+| ChainViaMatcher      | AllUpper   | 23.464 ns | 0.2681 ns | 0.3845 ns | 22.902 ns | 24.509 ns | 23.923 ns |  2.56 |    0.07 |   1,053 B |      - |         - |          NA |
+
+## x86-64-v4 - 8 columns, snake_case (with ChainViaMatcher)
+
+```
+
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.9168/25H2/2025Update/HudsonValley2)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+.NET SDK 10.0.400
+  [Host]              : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 10.0 : .NET 10.0.11 (10.0.11, 10.0.1126.37416), X64 RyuJIT x86-64-v4
+
+Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
+LaunchCount=2  WarmupCount=10  
+
+```
+| Method               | Casing     | Mean      | Error     | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
+|--------------------- |----------- |----------:|----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
+| **GeneratedChain**       | **AsDeclared** |  **9.365 ns** | **0.1327 ns** | **0.1904 ns** |  **9.388 ns** |  **8.989 ns** |  **9.618 ns** |  **9.575 ns** |  **1.00** |    **0.03** |   **1,024 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | AsDeclared | 88.072 ns | 1.2621 ns | 1.8891 ns | 87.892 ns | 83.206 ns | 91.934 ns | 90.735 ns |  9.41 |    0.27 |   2,516 B | 0.0391 |     328 B |          NA |
+| UpperSpanSwitch      | AsDeclared | 59.621 ns | 0.7160 ns | 1.0716 ns | 59.413 ns | 58.034 ns | 62.388 ns | 60.892 ns |  6.37 |    0.17 |   1,799 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | AsDeclared | 54.087 ns | 0.8540 ns | 1.2248 ns | 53.627 ns | 52.369 ns | 56.403 ns | 55.772 ns |  5.78 |    0.17 |   1,563 B |      - |         - |          NA |
+| PlainSpanSwitch      | AsDeclared | 28.858 ns | 0.2439 ns | 0.3575 ns | 28.742 ns | 28.289 ns | 29.620 ns | 29.354 ns |  3.08 |    0.07 |     959 B |      - |         - |          NA |
+| ChainViaMatcher      | AsDeclared | 24.625 ns | 0.3184 ns | 0.4766 ns | 24.676 ns | 23.632 ns | 25.520 ns | 25.220 ns |  2.63 |    0.07 |   1,074 B |      - |         - |          NA |
+|                      |            |           |           |           |           |           |           |           |       |         |           |        |           |             |
+| **GeneratedChain**       | **AllUpper**   |  **9.206 ns** | **0.2881 ns** | **0.4313 ns** |  **9.106 ns** |  **8.539 ns** |  **9.951 ns** |  **9.757 ns** |  **1.00** |    **0.07** |   **1,021 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | AllUpper   | 42.556 ns | 0.5993 ns | 0.8970 ns | 42.512 ns | 40.725 ns | 44.327 ns | 43.558 ns |  4.63 |    0.23 |   2,186 B |      - |         - |          NA |
+| UpperSpanSwitch      | AllUpper   | 61.150 ns | 0.6623 ns | 0.9285 ns | 61.200 ns | 59.571 ns | 64.065 ns | 62.057 ns |  6.66 |    0.32 |   1,799 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | AllUpper   | 55.751 ns | 0.5540 ns | 0.8292 ns | 55.587 ns | 53.722 ns | 57.920 ns | 56.628 ns |  6.07 |    0.29 |   1,544 B |      - |         - |          NA |
+| PlainSpanSwitch      | AllUpper   | 25.698 ns | 1.5517 ns | 2.3225 ns | 24.415 ns | 23.899 ns | 31.432 ns | 29.579 ns |  2.80 |    0.28 |     920 B |      - |         - |          NA |
+| ChainViaMatcher      | AllUpper   | 21.374 ns | 0.3161 ns | 0.4533 ns | 21.247 ns | 20.695 ns | 22.630 ns | 21.950 ns |  2.33 |    0.12 |   1,074 B |      - |         - |          NA |
 
 ## x86-64-v4 - 24 columns, PascalCase
 

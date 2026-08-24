@@ -1,4 +1,4 @@
-# STK-11: ref field cursor for field-granular structured reads
+# STK-10: ref field cursor for field-granular structured reads
 
 - Verdict: adopted
 - Re-measured on x86-64-v4 (Zen 5). Same ranking as the earlier x86-64-v3 (Zen 3) run, and the code sizes are

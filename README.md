@@ -55,7 +55,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [STK-07](#-stk-07-lazy-allocation-and-shared-singletons) | Lazy allocation and shared singletons | Allocate only when used; share the empty instance | ✅ | [Verified](benchmarks/results/STK-07-LazyAllocation.md) |
 | [STK-08](#-stk-08-fixed-length-buffers-inside-structs-with-inlinearray) | InlineArray | Fixed-length buffer inside a struct (.NET 8+) | ✅ | [Verified](benchmarks/results/STK-08-InlineArray.md) |
 | [STK-09](#-stk-09-params-readonlyspant) | params ReadOnlySpan\<T\> | Remove the array allocation for variadic arguments (C# 13) | ✅ | [Verified](benchmarks/results/STK-09-ParamsSpan.md) |
-| [STK-11](#-stk-11-ref-field-cursor-for-structured-reads) | ref field cursor | Sequential reads of differing field widths | ✅ | [Verified](benchmarks/results/STK-11-RefFieldStructRead.md) |
+| [STK-10](#-stk-10-ref-field-cursor-for-structured-reads) | ref field cursor | Sequential reads of differing field widths | ✅ | [Verified](benchmarks/results/STK-10-RefFieldStructRead.md) |
 | [BUF-01](#-buf-01-buffer-reuse-with-arraypoolt) | ArrayPool\<T\> | Reduce GC pressure from throwaway buffers | ✅ | [Implemented](src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
 | [BUF-02](#-buf-02-ibufferwritert--getspan--advance-pattern) | IBufferWriter\<T\> + GetSpan / Advance | Write directly into the output buffer | ✅ | [Implemented](src/PerformancePatterns/Buf/PooledBufferWriter.cs) |
 | [BUF-03](#-buf-03-bufferwriterslimt-stack-first-writing) | BufferWriterSlim\<T\> | Stack-first buffer writing | ✅ | [Implemented](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
@@ -728,7 +728,7 @@ public static void Trace(params ReadOnlySpan<string> values)
 
 ---
 
-### 🥞 STK-11: ref field cursor for structured reads
+### 🥞 STK-10: ref field cursor for structured reads
 
 **Goal:** In a sequential parse that reads fields of differing widths, hold the cursor position as **the ref itself** (C# 11 ref fields) rather than as an index.
 
@@ -799,7 +799,7 @@ internal ref struct FieldRefReader
 | **Cursor that re-slices the remainder** | **676.2 ns** | **0.86** | **128 B** |
 | **ref field cursor** | **641.6 ns** | **0.81** | **111 B** |
 
-Confidence intervals do not overlap (629-654 vs 786-793 ns). **As a staged move, switching to the re-slicing cursor alone already buys 0.86x.** The code sizes are byte-identical on x86-64-v3, where the same comparison measured **0.75x** — what this removes is per-field address arithmetic, and a wider core hides more of it, so expect the ratio to shrink on newer hardware while the ranking holds. → [Measurement](benchmarks/results/STK-11-RefFieldStructRead.md)
+Confidence intervals do not overlap (629-654 vs 786-793 ns). **As a staged move, switching to the re-slicing cursor alone already buys 0.86x.** The code sizes are byte-identical on x86-64-v3, where the same comparison measured **0.75x** — what this removes is per-field address arithmetic, and a wider core hides more of it, so expect the ratio to shrink on newer hardware while the ranking holds. → [Measurement](benchmarks/results/STK-10-RefFieldStructRead.md)
 
 **Caveats:**
 
@@ -3204,21 +3204,28 @@ public static int GetIndex(ReadOnlySpan<char> name) => name switch
 
 **Use cases:** Name-to-index resolution emitted by a Source Generator (DB columns, property names, JSON keys), enum name resolution, protocol header dispatch.
 
-**Where it does not apply - matching that needs a conversion:** the gain above is against a **plain** `Equals` chain, one where the probe is compared exactly as it arrives. **It does not hold once the input has to be converted first.** On the DB column-name shape (`OrdinalIgnoreCase`), upper-casing the probe so a plain switch can be used measures **4.5-10.0x slower at 8 columns and 1.35-2.91x at 24** - it lost in all 12 conditions measured (3 conversion forms x 2 column counts x 2 naming conventions).
+**Where it does not apply - matching that needs a conversion:** the gain above is against a **plain** `Equals` chain, one where the probe is compared exactly as it arrives. **It does not hold once the input has to be converted first.** On the DB column-name shape (`OrdinalIgnoreCase`), upper-casing the probe so a plain switch can be used lost in **all 12 conditions measured** (3 conversion forms x 2 column counts x 2 naming conventions): 2.0-3.0x at 8 columns and 1.35-2.91x at 24.
 
 | Approach (per column, PascalCase) | 8 cols | 24 cols |
 |---|---:|---:|
-| Current (chain / sampling hash) | **0.95 ns** | 3.55 ns |
-| Plain switch, no case handling (reference) | 3.42 ns | **3.24 ns** |
-| `Ascii.ToUpper` (SIMD) + span switch | 6.00 ns | 6.43 ns |
-| `MemoryExtensions.ToUpperInvariant` + span switch | 6.41 ns | 6.91 ns |
-| `string.ToUpperInvariant()` + string switch | 9.49 ns | 10.33 ns (+976 B) |
+| `Equals(OrdinalIgnoreCase)` chain | **3.24 ns** | - |
+| Sampling-hash switch | - | 3.55 ns |
+| Plain switch, no case handling | 3.86 ns | **3.24 ns** |
+| `Ascii.ToUpper` (SIMD) + span switch | 6.57 ns | 6.43 ns |
+| `MemoryExtensions.ToUpperInvariant` + span switch | 7.26 ns | 6.91 ns |
+| `string.ToUpperInvariant()` + string switch | 9.67 ns | 10.33 ns (+976 B) |
 
-**Normalization adds 2.6-3.2 ns per column, and the SIMD form only shaves 6-7% off that.** The cost is structural - fold every character into a buffer, then read every character again in the switch - so no API choice avoids it, and it exceeds the switch's own dispatch gain (about 3.3 ns per column, size-independent). **When a conversion is required, use the hash form** with upper-cased sampling plus an `OrdinalIgnoreCase` confirm, where only 3 characters are converted.
+**Normalization adds 2.7-3.2 ns per column, and the SIMD form only shaves 6-11% off that.** The cost is structural - fold every character into a buffer, then read every character again in the switch - so no API choice avoids it, and it exceeds the switch's own dispatch gain. **When a conversion is required, convert as few characters as possible:** the hash form with upper-cased sampling plus an `OrdinalIgnoreCase` confirm touches 3 characters instead of all of them.
 
-**The headline is not that `OrdinalIgnoreCase` is expensive** - it is the cheapest thing in the table. What costs is the conversion introduced to avoid needing it. snake_case reproduces every row within a few percent. → [Measurement](benchmarks/results/LAB-ColumnMatch.md) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Lab/ColumnMatchBenchmark.cs)
+**The headline is not that `OrdinalIgnoreCase` is expensive** - it is the cheapest primitive in the table. What costs is the conversion introduced to avoid needing it. snake_case reproduces every row within a few percent. → [Measurement](benchmarks/results/LAB-ColumnMatch.md) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Lab/ColumnMatchBenchmark.cs)
 
-**The plain-switch row is a reference value, not a like-for-like comparison** - in that benchmark only the converted variants and the plain switch are reached through a `Func<string,int>` per column, while the generated forms are fully inlined. At 24 columns that handicap works against the plain switch and it still wins (0.91x PascalCase, 0.98x snake_case with overlapping CIs, code 2,212 vs 3,261 B), so **at that size an ordinal switch is a sound generated shape wherever case sensitivity is acceptable**. At 8 columns the handicap is roughly the size of the gap, so the chain-vs-switch question is not decidable from it.
+**The plain switch is not universally the faster match - the crossover is the column count.** Measured like for like (every variant reached through the same per-column call), the chain wins at 8 columns and the switch wins at 24:
+
+| | 8 cols | 24 cols |
+|---|---|---|
+| Plain ordinal switch vs the generated form | **1.17-1.19x slower** | **0.91x** (PascalCase; snake_case ties at 0.98x) |
+
+A chain compares the probe against the literals in declaration order, so its cost grows with the column count (about 4.5 comparisons on average at 8, 12.5 at 24) while a switch stays flat. That is the same boundary this catalog already draws between a chain and a sampling-hash switch. Where case sensitivity is acceptable at 24+ columns the ordinal switch is the better generated shape - 0.91x with a third less code (2,212 vs 3,261 B).
 
 **Caution:** The switch is **ordinal (case-sensitive)**. **Key length is not a criterion** (no reversal even at 58-62 characters). Expect **around 0.5x against a chain at 16 keys** - a real win, but not an order-of-magnitude one.
 
@@ -3765,7 +3772,7 @@ if (reader.Read())
 }
 ```
 
-**Choosing a column-name matching strategy:** Switch between a chain of `String.Equals(OrdinalIgnoreCase)` (few columns) and a sampling-hash switch (moderate to many) based on the column count (COL-04 / BIT-01). Codegen knows the column count at generation time, so it can emit the right one. Where case-sensitive matching is acceptable, emit a **plain ordinal switch** instead - fastest up to 64 entries (TXT-10), and at 24 columns it measures 0.91-0.98x of the sampling-hash switch with a third less code. **Never normalise the probe to make that switch usable:** upper-casing first costs 2.6-3.2 ns per column and loses to the case-insensitive form in every condition measured (4.5-10.0x at 8 columns, 1.35-2.91x at 24) → [LAB-ColumnMatch](benchmarks/results/LAB-ColumnMatch.md).
+**Choosing a column-name matching strategy:** Switch between a chain of `String.Equals(OrdinalIgnoreCase)` (few columns) and a sampling-hash switch (moderate to many) based on the column count (COL-04 / BIT-01). Codegen knows the column count at generation time, so it can emit the right one. Where case-sensitive matching is acceptable, emit a **plain ordinal switch** instead - fastest up to 64 entries (TXT-10), and at 24 columns it measures 0.91-0.98x of the sampling-hash switch with a third less code. **Never normalise the probe to make that switch usable:** upper-casing first costs 2.7-3.2 ns per column and loses to the case-insensitive form in every condition measured (2.0-3.0x at 8 columns, 1.35-2.91x at 24) → [LAB-ColumnMatch](benchmarks/results/LAB-ColumnMatch.md).
 
 **Choosing a CommandBehavior:**
 
@@ -4032,7 +4039,7 @@ For the shape to emit per scenario and its evidence see the [generated code patt
 | Handling Memory\<T\> inside a loop | BUF-08 |
 | Existence-checked update of a dictionary entry | COL-07 |
 | Lane permutation Vector\<T\> cannot express | VEC-02 |
-| Field-granular reads of variable-length records | STK-11 |
+| Field-granular reads of variable-length records | STK-10 |
 | Formatting and trimming fixed-length fields | TXT-09 |
 | Matching against a compile-time string set | TXT-10 (COL-04 / BIT-01 above 64 entries or when the set is runtime-only) |
 | Converting a boxed value to string | TXT-11 (keep the fast path to a few types) |
@@ -4059,25 +4066,25 @@ The low-level APIs are spread across many patterns, so this table cross-referenc
 
 | API | Purpose | Related patterns |
 |---|---|---|
-| `Unsafe.Add(ref r, i)` | Offset access from a ref (no bounds check) | STK-11 (structured reads) / R-02 (rejected for whole-element walks) |
+| `Unsafe.Add(ref r, i)` | Offset access from a ref (no bounds check) | STK-10 (structured reads) / R-02 (rejected for whole-element walks) |
 | `Unsafe.As<T>(object)` | Cast that skips the type check (reference types) | TYP-05 |
 | `Unsafe.As<TFrom, TTo>(ref v)` | Reinterpreting a ref (generic specialization, bit reinterpretation) | JIT-03 / SEQ-02 |
 | `Unsafe.ReadUnaligned / WriteUnaligned` | unmanaged reads and writes at positions with no alignment guarantee | SEQ-01 / SEQ-02 / BUF-02 |
 | `Unsafe.SkipInit(out v)` | Skipping initialization of an out variable | MEM-01 / SEQ-02 |
 | `Unsafe.SizeOf<T>()` | Size of an unmanaged type (a JIT constant) | SEQ-01 / SEQ-02 |
-| `Unsafe.IsAddressLessThan` | Comparing the positions of two refs (end detection) | STK-11 (structured reads) / R-02 (rejected for whole-element walks) |
+| `Unsafe.IsAddressLessThan` | Comparing the positions of two refs (end detection) | STK-10 (structured reads) / R-02 (rejected for whole-element walks) |
 | `Unsafe.AreSame(ref a, ref b)` | Testing whether two refs point at the same location (alias check) | Quick reference only ([Measurement](benchmarks/results/LAB-RefIdentity.md)) |
 | `Unsafe.ByteOffset(ref a, ref b)` | Byte distance between two refs. Recovering an index this way **does not pay off** ([R-21](docs/rejected-patterns.md)) | R-21 (rejected) |
 | `MemoryExtensions.Overlaps(span, other)` | Testing whether two Spans intersect as ranges | Quick reference only (1.40x heavier than `AreSame`) |
 | `Unsafe.BitCast<TFrom, TTo>` (.NET 8+) | Bit reinterpretation of same-size value types (**the form of As that rejects a size mismatch. Identical generated code**) | TYP-05 / JIT-03 / SEQ-02 / TYP-02 |
 | `Unsafe.Unbox<T>(object)` | Getting a ref into an existing box (update without reboxing) | STK-05 |
-| `MemoryMarshal.GetReference(span)` | Getting a ref to the start of a Span | STK-11 / VEC-02 (SIMD loads) / R-02 (manual walking rejected) |
+| `MemoryMarshal.GetReference(span)` | Getting a ref to the start of a Span | STK-10 / VEC-02 (SIMD loads) / R-02 (manual walking rejected) |
 | `MemoryMarshal.GetArrayDataReference(array)` | Getting a ref to the start of an array | R-02 (rejected; this book has no positive use) |
 | `MemoryMarshal.Cast<TFrom, TTo>(span)` | Reinterpreting a Span's element type (zero cost; **the length changes when element sizes differ and the remainder is truncated. No alignment check**) | TYP-02 / BIT-04 / [traps](benchmarks/results/LAB-SpanReinterpret.md) |
 | `MemoryMarshal.AsBytes(span)` | Viewing a Span as bytes | TYP-02 |
 | `MemoryMarshal.TryGetArray(memory)` | Getting an array segment out of a Memory without copying | BUF-08 |
 | `MemoryManager<T>` | Publishing an unmanaged region as Memory | BUF-08 |
-| `MemoryMarshal.CreateSpan(ref r, len)` | Building a Span from a ref | SEQ-02 / STK-11 |
+| `MemoryMarshal.CreateSpan(ref r, len)` | Building a Span from a ref | SEQ-02 / STK-10 |
 | `CollectionsMarshal.AsSpan(list)` | Getting a Span over a List's internal array | COL-01 |
 | `CollectionsMarshal.GetValueRefOrAddDefault` | Getting a ref to a dictionary entry | COL-01 |
 | `CollectionsMarshal.GetValueRefOrNullRef` | Getting a ref to an existing entry only (pairs with `Unsafe.IsNullRef`) | COL-07 |

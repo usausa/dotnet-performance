@@ -16,7 +16,7 @@
 **Why the index-recovery margin does not shrink on a wider core:** the recovery adds a `ByteOffset` subtract and
 a shift **per element, on the dependent chain** that already carries the accumulation. That is work a wider core
 cannot hide - it grew from 1.45x to 1.52x rather than shrinking, which is the opposite of what happens to
-patterns whose extra work is independent (compare STK-11, where the margin narrowed).
+patterns whose extra work is independent (compare STK-10, where the margin narrowed).
 
 ## What to weigh
 

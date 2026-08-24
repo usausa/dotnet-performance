@@ -55,7 +55,7 @@
 | [STK-07](#-stk-07-遅延アロケーションと共有シングルトン) | 遅延アロケーションと共有シングルトン | 使うまで確保しない・空を共有する | ✅ | [検証済](benchmarks/results/STK-07-LazyAllocation.md) |
 | [STK-08](#-stk-08-inlinearray-による構造体内固定長バッファ) | InlineArray | 構造体内固定長バッファ(.NET 8+) | ✅ | [検証済](benchmarks/results/STK-08-InlineArray.md) |
 | [STK-09](#-stk-09-params-readonlyspant) | params ReadOnlySpan\<T\> | 可変長引数の配列確保除去(C# 13) | ✅ | [検証済](benchmarks/results/STK-09-ParamsSpan.md) |
-| [STK-11](#-stk-11-ref-フィールドカーソルによる構造読み) | ref フィールドカーソル | 幅の違うフィールドの逐次読み出し | ✅ | [検証済](benchmarks/results/STK-11-RefFieldStructRead.md) |
+| [STK-10](#-stk-10-ref-フィールドカーソルによる構造読み) | ref フィールドカーソル | 幅の違うフィールドの逐次読み出し | ✅ | [検証済](benchmarks/results/STK-10-RefFieldStructRead.md) |
 | [BUF-01](#-buf-01-arraypoolt-によるバッファ再利用) | ArrayPool\<T\> | 使い捨てバッファの GC 圧力削減 | ✅ | [実装](src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
 | [BUF-02](#-buf-02-ibufferwritert--getspan--advance-パターン) | IBufferWriter\<T\> + GetSpan / Advance | 出力バッファへの直接書き込み | ✅ | [実装](src/PerformancePatterns/Buf/PooledBufferWriter.cs) |
 | [BUF-03](#-buf-03-bufferwriterslimtスタックファースト書き込み) | BufferWriterSlim\<T\> | スタックファーストのバッファ書き込み | ✅ | [実装](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
@@ -728,7 +728,7 @@ public static void Trace(params ReadOnlySpan<string> values)
 
 ---
 
-### 🥞 STK-11: ref フィールドカーソルによる構造読み
+### 🥞 STK-10: ref フィールドカーソルによる構造読み
 
 **目的:** 幅の違うフィールドを順に読む逐次パースで、カーソル位置を index ではなく **`ref` そのもの**(C# 11 の ref フィールド)で保持する。
 
@@ -799,7 +799,7 @@ internal ref struct FieldRefReader
 | **残りを再スライスするカーソル型** | **676.2 ns** | **0.86** | **128 B** |
 | **ref フィールドカーソル** | **641.6 ns** | **0.81** | **111 B** |
 
-信頼区間非重複(629〜654 vs 786〜793 ns)。**段階として、まず再スライス型に置き換えるだけで 0.86 倍が得られる。** コードサイズは x86-64-v3 とバイト単位で一致し、そちらでは同じ比較が **0.75 倍**だった — これが削っているのはフィールドごとのアドレス計算で、広いコアほどよく隠せるため、**順位は保ったまま比率は新しい機ほど縮む**と見ておく。→ [測定結果](benchmarks/results/STK-11-RefFieldStructRead.md)
+信頼区間非重複(629〜654 vs 786〜793 ns)。**段階として、まず再スライス型に置き換えるだけで 0.86 倍が得られる。** コードサイズは x86-64-v3 とバイト単位で一致し、そちらでは同じ比較が **0.75 倍**だった — これが削っているのはフィールドごとのアドレス計算で、広いコアほどよく隠せるため、**順位は保ったまま比率は新しい機ほど縮む**と見ておく。→ [測定結果](benchmarks/results/STK-10-RefFieldStructRead.md)
 
 **注意:**
 
@@ -3204,21 +3204,28 @@ public static int GetIndex(ReadOnlySpan<char> name) => name switch
 
 **ユースケース:** Source Generator が出力する名前 → インデックス解決(DB 列名、プロパティ名、JSON キー)、enum の名前解決、プロトコルのヘッダディスパッチ。
 
-**適用できない条件 — 入力の変換が必要な照合:** 上の利得は「**素の** `Equals` 連鎖」に対するもので、プローブをそのまま比較できることが前提。**入力を変換してから照合する形では成立しない。** DB 列名照合(`OrdinalIgnoreCase`)で入力を大文字化してから素の switch に流す形を実測すると、**8 列で 4.5〜10.0 倍・24 列で 1.35〜2.91 倍の劣化**になる。測定した 12 条件(変換 3 形 × 列数 2 × 命名規則 2)すべてで負けた。
+**適用できない条件 — 入力の変換が必要な照合:** 上の利得は「**素の** `Equals` 連鎖」に対するもので、プローブをそのまま比較できることが前提。**入力を変換してから照合する形では成立しない。** DB 列名照合(`OrdinalIgnoreCase`)で入力を大文字化してから素の switch に流す形は、**測定した 12 条件すべてで負けた**(変換 3 形 × 列数 2 × 命名規則 2)— 8 列で 2.0〜3.0 倍、24 列で 1.35〜2.91 倍。
 
 | 方式(列あたり・PascalCase) | 8 列 | 24 列 |
 |---|---:|---:|
-| 現行(連鎖 / サンプリングハッシュ) | **0.95 ns** | 3.55 ns |
-| 素の switch(大小処理なし・参照値) | 3.42 ns | **3.24 ns** |
-| `Ascii.ToUpper`(SIMD)+ span switch | 6.00 ns | 6.43 ns |
-| `MemoryExtensions.ToUpperInvariant` + span switch | 6.41 ns | 6.91 ns |
-| `string.ToUpperInvariant()` + string switch | 9.49 ns | 10.33 ns(+976 B) |
+| `Equals(OrdinalIgnoreCase)` 連鎖 | **3.24 ns** | — |
+| サンプリングハッシュ switch | — | 3.55 ns |
+| 素の switch(大小処理なし) | 3.86 ns | **3.24 ns** |
+| `Ascii.ToUpper`(SIMD)+ span switch | 6.57 ns | 6.43 ns |
+| `MemoryExtensions.ToUpperInvariant` + span switch | 7.26 ns | 6.91 ns |
+| `string.ToUpperInvariant()` + string switch | 9.67 ns | 10.33 ns(+976 B) |
 
-**正規化の増分は 2.6〜3.2 ns/列で、SIMD 形でもそこから 6〜7% 削れるだけ。** 「全文字を畳んでバッファへ書き、switch 側でもう一度全文字を読む」という構造そのものの代償であり、API の選び方では回避できない。switch のディスパッチ利得(約 3.3 ns/列・規模非依存)を上回るため、**変換が要るなら大文字化サンプリング + `OrdinalIgnoreCase` 確定のハッシュ形を使う**(変換するのは 3 文字だけで済む)。
+**正規化の増分は 2.7〜3.2 ns/列で、SIMD 形でもそこから 6〜11% 削れるだけ。** 「全文字を畳んでバッファへ書き、switch 側でもう一度全文字を読む」という構造そのものの代償であり、API の選び方では回避できず、switch のディスパッチ利得を上回る。**変換が要るなら、変換する文字数を最小にする** — 大文字化サンプリング + `OrdinalIgnoreCase` 確定のハッシュ形なら 3 文字だけで済む。
 
 **要点は「`OrdinalIgnoreCase` が高い」ではない** — 表の中で最も安いのがそれで、高いのは「それを避けるために入れる変換」である。snake_case でも全行が数 % 以内で再現する。→ [測定結果](benchmarks/results/LAB-ColumnMatch.md) / [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Lab/ColumnMatchBenchmark.cs)
 
-**素の switch の行は参照値であって等価比較ではない** — このベンチマークでは変換形と素の switch だけが列ごとに `Func<string,int>` 経由で呼ばれ、生成形は完全にインライン展開される。24 列ではそのハンデが素の switch に不利な方向に働いてなお勝つ(PascalCase 0.91 倍、snake_case 0.98 倍で区間重複、コード 2,212 対 3,261 B)ので、**この規模では大小区別が許されるなら序数 switch は妥当な生成形**である。8 列ではハンデが差とほぼ同規模のため、連鎖 vs switch はこの測定では判定できない。
+**素の switch が常に速いわけではなく、境界は列数にある。** 等価条件で測ると(全バリアントを同じ列ごとの呼び出し経由に揃えた)、8 列では連鎖が勝ち、24 列では switch が勝つ。
+
+| | 8 列 | 24 列 |
+|---|---|---|
+| 素の序数 switch vs 生成形 | **1.17〜1.19 倍 遅い** | **0.91 倍**(PascalCase。snake_case は 0.98 倍で引き分け) |
+
+連鎖はプローブを宣言順にリテラルと突き合わせるため、コストが列数とともに増える(8 列で平均 4.5 回、24 列で 12.5 回の比較)一方、switch は平坦。これは本カタログが連鎖とサンプリングハッシュ switch の間に既に引いている境界と同じもの。24 列以上で大小区別が許されるなら序数 switch の方が良い生成形で、0.91 倍かつコードは 1/3 小さい(2,212 対 3,261 B)。
 
 **注意:** switch は **ordinal(大小区別)**。**キー長は判断材料にならない**(58〜62 文字でも逆転しない)。期待値は **16 件で連鎖比 0.5 倍前後**で、桁が変わる類の改善ではない。
 
@@ -3765,7 +3772,7 @@ if (reader.Read())
 }
 ```
 
-**列名照合の戦略選択:** 列数に応じて `String.Equals(OrdinalIgnoreCase)` の連鎖(少数)と サンプリングハッシュ switch(中〜多数)を使い分ける(COL-04 / BIT-01)。生成コードなら列数が生成時に分かるため出し分けられる。大小区別でよい照合なら**素の序数 switch** を出す — 64 件までは最速(TXT-10)で、24 列ではサンプリングハッシュ switch の 0.91〜0.98 倍・コードも 1/3 小さい。**その switch を使うためにプローブを正規化してはいけない:** 先に大文字化する形は列あたり 2.6〜3.2 ns を足し、測定した全条件で大小無視形に負ける(8 列で 4.5〜10.0 倍、24 列で 1.35〜2.91 倍)→ [LAB-ColumnMatch](benchmarks/results/LAB-ColumnMatch.md)。
+**列名照合の戦略選択:** 列数に応じて `String.Equals(OrdinalIgnoreCase)` の連鎖(少数)と サンプリングハッシュ switch(中〜多数)を使い分ける(COL-04 / BIT-01)。生成コードなら列数が生成時に分かるため出し分けられる。大小区別でよい照合なら**素の序数 switch** を出す — 64 件までは最速(TXT-10)で、24 列ではサンプリングハッシュ switch の 0.91〜0.98 倍・コードも 1/3 小さい。**その switch を使うためにプローブを正規化してはいけない:** 先に大文字化する形は列あたり 2.7〜3.2 ns を足し、測定した全条件で大小無視形に負ける(8 列で 2.0〜3.0 倍、24 列で 1.35〜2.91 倍)→ [LAB-ColumnMatch](benchmarks/results/LAB-ColumnMatch.md)。
 
 **CommandBehavior の選択:**
 
@@ -4032,7 +4039,7 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | Memory\<T\> をループで扱う | BUF-08 |
 | 辞書エントリの存在確認つき更新 | COL-07 |
 | Vector\<T\> で書けないレーン置換 | VEC-02 |
-| 可変長レコードのフィールド粒度読み | STK-11 |
+| 可変長レコードのフィールド粒度読み | STK-10 |
 | 固定長フィールドの整形・トリム | TXT-09 |
 | コンパイル時確定の文字列集合の判定 | TXT-10(64 件超・実行時確定は COL-04 / BIT-01) |
 | boxed 値の文字列化 | TXT-11(高速パスは少数の型に絞る) |
@@ -4059,25 +4066,25 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 
 | API | 用途 | 関連パターン |
 |---|---|---|
-| `Unsafe.Add(ref r, i)` | ref からのオフセットアクセス(境界チェックなし) | STK-11(構造読み)/ R-02(全要素走査は不採用) |
+| `Unsafe.Add(ref r, i)` | ref からのオフセットアクセス(境界チェックなし) | STK-10(構造読み)/ R-02(全要素走査は不採用) |
 | `Unsafe.As<T>(object)` | 型チェック省略キャスト(参照型) | TYP-05 |
 | `Unsafe.As<TFrom, TTo>(ref v)` | ref の再解釈(ジェネリック特殊化・ビット再解釈) | JIT-03 / SEQ-02 |
 | `Unsafe.ReadUnaligned / WriteUnaligned` | アラインメント非保証位置の unmanaged 読み書き | SEQ-01 / SEQ-02 / BUF-02 |
 | `Unsafe.SkipInit(out v)` | out 変数の初期化スキップ | MEM-01 / SEQ-02 |
 | `Unsafe.SizeOf<T>()` | unmanaged 型のサイズ(JIT 定数) | SEQ-01 / SEQ-02 |
-| `Unsafe.IsAddressLessThan` | ref 同士の位置比較(終端判定) | STK-11(構造読み)/ R-02(全要素走査は不採用) |
+| `Unsafe.IsAddressLessThan` | ref 同士の位置比較(終端判定) | STK-10(構造読み)/ R-02(全要素走査は不採用) |
 | `Unsafe.AreSame(ref a, ref b)` | 2 つの ref が同一位置かの判定(別名検査) | 早見表のみ([測定結果](benchmarks/results/LAB-RefIdentity.md)) |
 | `Unsafe.ByteOffset(ref a, ref b)` | ref 間のバイト距離。index の復元は**割に合わない**([R-21](docs/rejected-patterns.md)) | R-21(不採用) |
 | `MemoryExtensions.Overlaps(span, other)` | 2 つの Span が範囲として重なるかの判定 | 早見表のみ(`AreSame` より 1.40 倍重い) |
 | `Unsafe.BitCast<TFrom, TTo>`(.NET 8+) | 同サイズ値型のビット再解釈(**サイズ不一致を拒否する `As` の安全版。生成コードは同一**) | TYP-05 / JIT-03 / SEQ-02 / TYP-02 |
 | `Unsafe.Unbox<T>(object)` | 既存ボックスの中身への ref 取得(再ボックスなしの更新) | STK-05 |
-| `MemoryMarshal.GetReference(span)` | Span 先頭への ref 取得 | STK-11 / VEC-02(SIMD ロード)/ R-02(手動走査は不採用) |
+| `MemoryMarshal.GetReference(span)` | Span 先頭への ref 取得 | STK-10 / VEC-02(SIMD ロード)/ R-02(手動走査は不採用) |
 | `MemoryMarshal.GetArrayDataReference(array)` | 配列先頭への ref 取得 | R-02(不採用。正の用途は本書にない) |
 | `MemoryMarshal.Cast<TFrom, TTo>(span)` | Span の要素型再解釈(ゼロコスト。**要素サイズが違うと長さが変わり端数は切り捨て。アラインメント検査なし**) | TYP-02 / BIT-04 / [罠](benchmarks/results/LAB-SpanReinterpret.md) |
 | `MemoryMarshal.AsBytes(span)` | Span の byte ビュー化 | TYP-02 |
 | `MemoryMarshal.TryGetArray(memory)` | Memory から配列セグメントを無コピーで取り出す | BUF-08 |
 | `MemoryManager<T>` | アンマネージド領域の Memory 化 | BUF-08 |
-| `MemoryMarshal.CreateSpan(ref r, len)` | ref からの Span 構築 | SEQ-02 / STK-11 |
+| `MemoryMarshal.CreateSpan(ref r, len)` | ref からの Span 構築 | SEQ-02 / STK-10 |
 | `CollectionsMarshal.AsSpan(list)` | List 内部配列の Span 化 | COL-01 |
 | `CollectionsMarshal.GetValueRefOrAddDefault` | 辞書エントリへの ref 取得 | COL-01 |
 | `CollectionsMarshal.GetValueRefOrNullRef` | 既存エントリのみへの ref 取得(`Unsafe.IsNullRef` と対) | COL-07 |

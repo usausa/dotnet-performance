@@ -73,6 +73,12 @@ public class ColumnMatchPascal8Benchmark
     [Benchmark]
     public long PlainSpanSwitch() => ResolveByMatcher(names, static x => MatchDeclaredSpan(x));
 
+    // The same chain as the baseline, reached through the matcher harness so the per-column call
+    // overhead matches every other variant. The 24 column classes already run their baseline this way,
+    // so without this method the 8 column rows are the only ones that are not like for like.
+    [Benchmark]
+    public long ChainViaMatcher() => ResolveByMatcher(names, static x => MatchChain(x));
+
     public static void Verify()
     {
         foreach (var casing in new[] { ColumnCasing.AsDeclared, ColumnCasing.AllUpper })
@@ -88,6 +94,7 @@ public class ColumnMatchPascal8Benchmark
                 benchmark.UpperStringSwitch(),
                 benchmark.UpperSpanSwitch(),
                 benchmark.AsciiUpperSpanSwitch(),
+                benchmark.ChainViaMatcher(),
             ];
             foreach (var result in results)
             {
@@ -365,6 +372,12 @@ public class ColumnMatchSnake8Benchmark
     [Benchmark]
     public long PlainSpanSwitch() => ResolveByMatcher(names, static x => MatchDeclaredSpan(x));
 
+    // The same chain as the baseline, reached through the matcher harness so the per-column call
+    // overhead matches every other variant. The 24 column classes already run their baseline this way,
+    // so without this method the 8 column rows are the only ones that are not like for like.
+    [Benchmark]
+    public long ChainViaMatcher() => ResolveByMatcher(names, static x => MatchChain(x));
+
     public static void Verify()
     {
         foreach (var casing in new[] { ColumnCasing.AsDeclared, ColumnCasing.AllUpper })
@@ -380,6 +393,7 @@ public class ColumnMatchSnake8Benchmark
                 benchmark.UpperStringSwitch(),
                 benchmark.UpperSpanSwitch(),
                 benchmark.AsciiUpperSpanSwitch(),
+                benchmark.ChainViaMatcher(),
             ];
             foreach (var result in results)
             {
