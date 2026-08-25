@@ -161,7 +161,21 @@ public bool MoveNext()
 
 - The project needs `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` (required just to use the attribute, even without writing unsafe code)
 - Guarantee that nothing reads before writing, so uninitialized memory is never read. Consider combining it with `Unsafe.SkipInit(out value)`
-- **A source generator emitting it into generated code must do so conditionally.** The required `AllowUnsafeBlocks` is a setting on the **consuming** project, so emitting it unconditionally breaks the build (CS0227) for every consumer that has not set it. The generator has to check first. There are two ways: if the pipeline may depend on the `Compilation`, take `compilation.Options is CSharpCompilationOptions { AllowUnsafe: true }` from `CompilationProvider` (reducing it to a `bool` keeps the cache alive until the option itself changes). To keep the pipeline `Compilation`-free, add `<CompilerVisibleProperty Include="AllowUnsafeBlocks" />` to the `.targets` and read `build_property.AllowUnsafeBlocks` from `AnalyzerConfigOptions`
+- **A source generator emitting it into generated code needs a dedicated option plus an `AllowUnsafeBlocks` set by the package itself.** The required `AllowUnsafeBlocks` is a setting on the **consuming** project, so emitting it unconditionally breaks the build (CS0227) for every consumer that has not set it. But auto-detecting ("emit only if the consumer already enabled unsafe") means the attribute **never fires unless the consumer opts in explicitly** — in practice none of the target repositories' own test projects had it set, so it never fired once. The right shape is a `.props` / `.targets` shipped with the package that **defaults a dedicated option to `true` and sets `AllowUnsafeBlocks` under the same condition**:
+
+```xml
+<PropertyGroup>
+  <MyGenerator_SkipLocalsInit Condition="'$(MyGenerator_SkipLocalsInit)' == ''">true</MyGenerator_SkipLocalsInit>
+</PropertyGroup>
+<PropertyGroup Condition="'$(MyGenerator_SkipLocalsInit)' == 'true'">
+  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+</PropertyGroup>
+<ItemGroup>
+  <CompilerVisibleProperty Include="MyGenerator_SkipLocalsInit" />
+</ItemGroup>
+```
+
+  The generator only has to read `build_property.MyGenerator_SkipLocalsInit` from `AnalyzerConfigOptions`, keeping the pipeline `Compilation`-free. **Default the generator side to `false` when the value is absent**, so a project that never imported the `.props` / `.targets` does not hit CS0227. Consumers opt out with a single property
 - **In generated code, also condition on whether that path actually stackallocs.** Branches that carry no scratch buffer gain nothing from the attribute
 
 ---

@@ -161,7 +161,21 @@ public bool MoveNext()
 
 - プロジェクトに `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` が必要(unsafe コードを書かなくても属性の使用に必要)
 - 未初期化領域を読まないよう、書き込み前の読み取りがないことを保証する。`Unsafe.SkipInit(out value)` との併用も検討
-- **Source Generator が生成コードへ出力する場合は条件付きにする。** 必要な `AllowUnsafeBlocks` は**利用側プロジェクト**の設定なので、無条件に出力すると未設定の利用者が全員 CS0227 でビルドできなくなる。生成器は設定の有無を見て出し分ける。判定手段は 2 つあり、パイプラインが `Compilation` に依存してよければ `CompilationProvider` から `compilation.Options is CSharpCompilationOptions { AllowUnsafe: true }` を取り出す(`bool` に落とせばキャッシュはオプション変更時にしか無効化されない)。`Compilation` 非依存を保ちたい場合は `.targets` に `<CompilerVisibleProperty Include="AllowUnsafeBlocks" />` を置き、`AnalyzerConfigOptions` から `build_property.AllowUnsafeBlocks` を読む
+- **Source Generator が生成コードへ出力する場合は、専用オプション + パッケージ側での `AllowUnsafeBlocks` 設定にする。** 必要な `AllowUnsafeBlocks` は**利用側プロジェクト**の設定なので、無条件に出力すると未設定の利用者が全員 CS0227 でビルドできなくなる。かといって「利用側が設定していたら出す」という自動判定にすると、**利用者が明示的に設定しない限り一生効かない**(実際に、対象リポジトリのテストプロジェクトはどれも設定しておらず一度も発火しなかった)。パッケージが配布する `.props` / `.targets` で**専用オプションを既定 `true` にし、同じ条件で `AllowUnsafeBlocks` も立てる**のが正解:
+
+```xml
+<PropertyGroup>
+  <MyGenerator_SkipLocalsInit Condition="'$(MyGenerator_SkipLocalsInit)' == ''">true</MyGenerator_SkipLocalsInit>
+</PropertyGroup>
+<PropertyGroup Condition="'$(MyGenerator_SkipLocalsInit)' == 'true'">
+  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+</PropertyGroup>
+<ItemGroup>
+  <CompilerVisibleProperty Include="MyGenerator_SkipLocalsInit" />
+</ItemGroup>
+```
+
+  生成器は `AnalyzerConfigOptions` から `build_property.MyGenerator_SkipLocalsInit` を読むだけでよく、パイプラインは `Compilation` 非依存のまま保てる。**生成器側の既定は `false`(値が取れないとき)にする** — `.props` / `.targets` を取り込んでいないプロジェクトで CS0227 を出さないため。利用者はプロパティ 1 つで opt-out できる
 - **生成コードでは「その経路が本当に stackalloc するか」も条件に含める。** 分岐によって作業バッファを持たない経路には付けても意味がない
 
 ---
