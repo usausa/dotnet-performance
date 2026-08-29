@@ -3120,6 +3120,16 @@ SearchValues stays at about 4.5-5.5 ns **regardless of candidate count** (the ar
 
 **Caveats:** **For 2-3 candidates the dedicated overloads such as `IndexOfAny(char, char)` are faster** (measured; rejection list R-07). As the table above shows, SearchValues still beats the array overload even at 3 candidates, so use the dedicated overload whenever the count allows one and SearchValues otherwise — never the array overload.
 
+**When only a boolean is needed, use `ContainsAny`:** for checks that do not need the position (validation, deciding whether escaping is required), write `ContainsAny(values)` rather than `IndexOfAny(values) >= 0`. It skips extracting the lane position out of the matching vector.
+
+| Match position (256 chars) | `IndexOfAny(values) >= 0` | `ContainsAny(values)` | Ratio | Code size |
+|---|---:|---:|---:|---:|
+| Near the head (index 4) | 1.824 ns | **1.328 ns** | **0.73** | 566 → **399 B** |
+| Near the tail (index 248) | 7.018 ns | 7.563 ns | 1.08 (within noise) | 547 → **382 B** |
+| No match (full scan) | 6.438 ns | 5.826 ns | 0.90 (within noise) | 551 → **394 B** |
+
+**The earlier the data matches, the bigger the win** (an early match gives 0.73x with non-overlapping confidence intervals), and no case gets worse. **Code size is about 30% smaller in every case**, so `ContainsAny` is a fine default even where the time difference stays within noise. → [Results](benchmarks/results/TXT-08-ContainsAny.md)
+
 ---
 
 ### 🔤 TXT-09: Applied idioms for fixed-length formatting

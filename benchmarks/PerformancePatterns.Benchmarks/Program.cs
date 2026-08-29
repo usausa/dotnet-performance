@@ -145,6 +145,7 @@ public static class Program
                 typeof(ParamsSpanBenchmark),
                 typeof(StringBuildBenchmark),
                 typeof(SearchValuesBenchmark),
+                typeof(ContainsAnyBenchmark),
                 typeof(ImmutableBuildBenchmark),
                 typeof(ListReuseBenchmark),
                 typeof(StaticArtifactBenchmark),
@@ -573,6 +574,19 @@ public static class Program
         if (searchValues.IndexOfAnyArray() != searchValues.IndexOfAnySearchValues())
         {
             throw new InvalidOperationException("Verify failed. SearchValues");
+        }
+
+        // TXT-08: ContainsAny must agree with IndexOfAny(...) >= 0 at every match position
+        var containsAny = new ContainsAnyBenchmark();
+        containsAny.Setup();
+        if ((containsAny.IndexOfAny_Early() != containsAny.ContainsAny_Early()) ||
+            (containsAny.IndexOfAny_Late() != containsAny.ContainsAny_Late()) ||
+            (containsAny.IndexOfAny_Absent() != containsAny.ContainsAny_Absent()) ||
+            !containsAny.ContainsAny_Early() ||
+            !containsAny.ContainsAny_Late() ||
+            containsAny.ContainsAny_Absent())
+        {
+            throw new InvalidOperationException("Verify failed. ContainsAny");
         }
 
         // TYP-06: All three paths must return the same SQL
