@@ -3124,11 +3124,11 @@ SearchValues stays at about 4.5-5.5 ns **regardless of candidate count** (the ar
 
 | Match position (256 chars) | `IndexOfAny(values) >= 0` | `ContainsAny(values)` | Ratio | Code size |
 |---|---:|---:|---:|---:|
-| Near the head (index 4) | 1.824 ns | **1.328 ns** | **0.73** | 566 → **399 B** |
-| Near the tail (index 248) | 7.018 ns | 7.563 ns | 1.08 (within noise) | 547 → **382 B** |
-| No match (full scan) | 6.438 ns | 5.826 ns | 0.90 (within noise) | 551 → **394 B** |
+| Near the head (index 4) | 0.741 ns | **0.488 ns** | **0.66** | 560 → **401 B** |
+| Near the tail (index 248) | 3.733 ns | **3.224 ns** | **0.86** | 549 → **384 B** |
+| No match (full scan) | 3.434 ns | 3.546 ns | 1.03 (CIs overlap) | 553 → **396 B** |
 
-**The earlier the data matches, the bigger the win** (an early match gives 0.73x with non-overlapping confidence intervals), and no case gets worse. **Code size is about 30% smaller in every case**, so `ContainsAny` is a fine default even where the time difference stays within noise. → [Results](benchmarks/results/TXT-08-ContainsAny.md)
+**The earlier the data matches, the bigger the win** - 0.66x at index 4 and 0.86x at index 248, both with non-overlapping confidence intervals, and a tie when there is nothing to find. **Code size is about 30% smaller in every case**, and lands within 6 B of the same figures on an x86-64-v3 machine, so that axis does not depend on the core. On x86-64-v3 the two later rows were inside their own error bars (1.08x / 0.90x); they resolve here rather than reversing. → [Results](benchmarks/results/TXT-08-ContainsAny.md)
 
 ---
 
