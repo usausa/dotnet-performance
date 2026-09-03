@@ -64,17 +64,17 @@
 
 上記は `for` / `while` / `do-while` / 反復方向の比較で `foreach` を含んでいなかったため、別途 3 形状を測った。ベンチマークは `Lab/LoopFormBenchmark.cs`。→ [測定結果](../benchmarks/results/R-04-LoopForm.md)
 
-**結論: `foreach` と `for` は基本的に同一命令列。あえて `for` を選ぶ理由は index が必要な場合だけで、逆に「配列をフィールド経由で回す `for`」は避けるべき形になる。**
+**結論: `foreach` と `for` は基本的に同一命令列。あえて `for` を選ぶ理由は index が必要な場合だけで、逆に「配列をフィールド経由で回す `for`」と「`List<T>` を添字 `for` で回す形」は避けるべき形になる。**
 
 **① 配列 / Span / ReadOnlySpan**
 
 | 形 | 時間 | コードサイズ | 生成コード |
 |---|---:|---:|---|
-| `ArrayForeach`(基準) | 268.5 ns | 32 B | ポインタ歩進、境界チェックなし |
-| `ArrayLocalFor` | 317.7 ns | 32 B | **`ArrayForeach` と命令列が完全一致** |
-| **`ArrayFieldFor`** | **590.5 ns(2.20 倍)** | **67 B** | **別物**(下記) |
-| `SpanForeach` / `SpanFor` | 335.6 / 282.3 ns | 54 B | **4 形式すべて命令列が完全一致** |
-| `ReadOnlySpanForeach` / `ReadOnlySpanFor` | 261.4 / 263.1 ns | 54 B | 同上 |
+| `ArrayForeach`(基準) | 212.4 ns | 32 B | ポインタ歩進、境界チェックなし |
+| `ArrayLocalFor` | 212.6 ns | 32 B | **`ArrayForeach` と命令列が完全一致** |
+| **`ArrayFieldFor`** | **239.1 ns(1.13 倍)** | **67 B** | **別物**(下記) |
+| `SpanForeach` / `SpanFor` | 219.6 / 219.4 ns | 54 B | **4 形式すべて命令列が完全一致** |
+| `ReadOnlySpanForeach` / `ReadOnlySpanFor` | 219.8 / 219.9 ns | 54 B | 同上 |
 
 `ArrayFieldFor`(ループ条件が `this.values.Length`)だけが失うもの — JitDisasm:
 
@@ -90,21 +90,21 @@
 
 | 形 | 時間 | 比率 | コードサイズ |
 |---|---:|---:|---:|
-| `ListForeach`(基準) | 615.7 ns | 1.00 | 71 B |
-| `ListFor` | 646.6 ns | 1.06(誤差内) | 72 B |
-| `ListAsSpanForeach` | 279.0 ns | **0.46** | 72 B |
-| `ListAsSpanFor` | 301.8 ns | **0.50** | 72 B |
+| `ListForeach`(基準) | 254.8 ns | 1.00 | 71 B |
+| `ListFor` | 328.8 ns | **1.29** | 72 B |
+| `ListAsSpanForeach` | 216.3 ns | **0.85** | 72 B |
+| `ListAsSpanFor` | 216.2 ns | **0.85** | 72 B |
 
-`List<T>.Enumerator` の `_version` 比較を気にする必要はない。**どちらの形も `_items` を反復ごとに再ロードし境界チェックが残る**(`ListFor` は Count と配列で**チェックが 2 本**)ため、差は誤差に収まる。COL-01 の「素の foreach / for は同速」を生成コードで裏付けた形で、効くのは構文ではなく `CollectionsMarshal.AsSpan`(0.46〜0.50 倍)。
+`List<T>.Enumerator` の `_version` 比較を気にする必要はない。列挙子の方が**速い**側になる。**どちらの形も `_items` を反復ごとに再ロードし境界チェックが残る**が、**`ListFor` は Count と配列でチェックが 2 本**あり、この 2 本目が 1.29 倍の正体。同じ形を `int` 累算で測った COL-01 の 1.07 倍とも向きは一致し、どちらにせよ `List<T>` の添字 `for` が 4 形式で最も遅い。効くのは構文ではなく `CollectionsMarshal.AsSpan`(0.85 倍、foreach / for は同一命令列)。
 
 **③ 大きい struct 要素(64 バイト)**
 
 | 形 | 時間 | コードサイズ |
 |---|---:|---:|
-| `ForeachCopy`(基準) | 475.5 ns | 51 B |
-| `ForeachRef` | 474.5 ns | 51 B |
-| `ForIndexer` | 481.6 ns | 51 B |
-| `ForRef` | 474.3 ns | 51 B |
+| `ForeachCopy`(基準) | 295.7 ns | 51 B |
+| `ForeachRef` | 296.3 ns | 51 B |
+| `ForIndexer` | 296.7 ns | 51 B |
+| `ForRef` | 294.5 ns | 51 B |
 
 **4 形式すべて命令列が完全一致。** `foreach (var x in span)` は 64 バイトのコピーを生成しない — 本体が `entry.Id` しか読まないため JIT はフィールドを直接読む(`add rax,[rdx+r8]`、`add r8,40` で要素サイズ分進む)。**「大きい struct を foreach で受けるとコピーが起きる」は、本体がフィールドを読むだけなら成り立たない。** ただし要素を**インライン化されないメソッドへ渡す**場合はコピーが実体化するので、その形は MEM-02 / MEM-04 の領域。
 
@@ -113,12 +113,14 @@
 | 状況 | 選ぶもの |
 |---|---|
 | 配列 / Span / ReadOnlySpan | **どちらでもよい**(命令列が同一)。可読性で選ぶ |
-| 配列を `for` で回す | ループ条件が**フィールドを再読みしない**ようにローカルへ退避する。しないと 2.20 倍 |
-| `List<T>` | どちらでも同じ。`CollectionsMarshal.AsSpan` にする(COL-01) |
+| 配列を `for` で回す | ループ条件が**フィールドを再読みしない**ようにローカルへ退避する。しないと 1.13 倍 |
+| `List<T>` | `foreach`(添字 `for` は 1.29 倍)。さらに `CollectionsMarshal.AsSpan` にする(COL-01) |
 | 大きい struct 要素 | 読むだけなら**どちらでもよい**。メソッドへ渡すなら `ref` |
 | **index が必要** | **`for`**([R-21](#r-21-unsafebyteoffset-による-ref-からの-index-復元): 逆算は 1.52 倍遅い) |
 
-**判定の根拠について:** 時間はこの環境ではノイズが大きい(±10% 程度)ため、「差なし」の判定は時間ではなく**命令列の一致**に基づく。時間で判定したのは 2.20 倍の `ArrayFieldFor` のみ(信頼区間非重複)。
+**判定の根拠について:** 「差なし」の判定は時間ではなく**命令列の一致**に基づく。実際、配列 2 形式は 212.4 / 212.6 ns、struct 4 形式は 2 ns 以内に収まっており、命令列が同一ならこうなるという形。時間で判定したのは `ArrayFieldFor`(1.13 倍)と `ListFor`(1.29 倍)の 2 つだけで、いずれも信頼区間非重複。
+
+**この 2 つのペナルティは「大きさ」がコア依存で、「存在」はコア依存ではない。** 本ベンチの前回測定は Ryzen 9 5900X(x86-64-v3)で、`ArrayFieldFor` は 2.20 倍、`ListFor` は誤差内だった。今回の値は Ryzen AI 9 HX 370(x86-64-v4)で、参照の再ロードはよく吸収する一方、境界チェック 2 本目は吸収しない。**コードサイズと上記で引用した命令列は両環境で同一**(32 / 67 / 54 B と 71 / 72 B)— 拠り所にすべきはこちら。
 
 **多次元配列(`int[,]`)は対象外とした。** 出荷ライブラリに `[,]` の使用が 1 件も無く(検出されたのは Work 系のコンソールのみ)、測るには CA1814 の抑制が必要になるため、費用対効果が見合わない。
 

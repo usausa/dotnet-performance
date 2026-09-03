@@ -64,17 +64,17 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 The comparison above covers `for` / `while` / `do-while` / iteration direction and did not include `foreach`, so three more shapes were measured separately. The benchmark is `Lab/LoopFormBenchmark.cs`. → [Results](../benchmarks/results/R-04-LoopForm.md)
 
-**Conclusion: `foreach` and `for` normally compile to the same instruction sequence. The only reason to deliberately reach for `for` is needing the index — and conversely, "a `for` that walks an array through a field" is the shape to avoid.**
+**Conclusion: `foreach` and `for` normally compile to the same instruction sequence. The only reason to deliberately reach for `for` is needing the index — and conversely, "a `for` that walks an array through a field" and "an indexed `for` over `List<T>`" are the shapes to avoid.**
 
 **1. Array / Span / ReadOnlySpan**
 
 | Form | Time | Code size | Generated code |
 |---|---:|---:|---|
-| `ArrayForeach` (baseline) | 268.5 ns | 32 B | Pointer walk, no bounds check |
-| `ArrayLocalFor` | 317.7 ns | 32 B | **Instruction sequence identical to `ArrayForeach`** |
-| **`ArrayFieldFor`** | **590.5 ns (2.20x)** | **67 B** | **Different code** (see below) |
-| `SpanForeach` / `SpanFor` | 335.6 / 282.3 ns | 54 B | **All four forms share one instruction sequence** |
-| `ReadOnlySpanForeach` / `ReadOnlySpanFor` | 261.4 / 263.1 ns | 54 B | Same as above |
+| `ArrayForeach` (baseline) | 212.4 ns | 32 B | Pointer walk, no bounds check |
+| `ArrayLocalFor` | 212.6 ns | 32 B | **Instruction sequence identical to `ArrayForeach`** |
+| **`ArrayFieldFor`** | **239.1 ns (1.13x)** | **67 B** | **Different code** (see below) |
+| `SpanForeach` / `SpanFor` | 219.6 / 219.4 ns | 54 B | **All four forms share one instruction sequence** |
+| `ReadOnlySpanForeach` / `ReadOnlySpanFor` | 219.8 / 219.9 ns | 54 B | Same as above |
 
 What only `ArrayFieldFor` (loop condition reading `this.values.Length`) gives up — JitDisasm:
 
@@ -90,21 +90,21 @@ The cause is that **the JIT cannot prove the loop body never writes to the field
 
 | Form | Time | Ratio | Code size |
 |---|---:|---:|---:|
-| `ListForeach` (baseline) | 615.7 ns | 1.00 | 71 B |
-| `ListFor` | 646.6 ns | 1.06 (within noise) | 72 B |
-| `ListAsSpanForeach` | 279.0 ns | **0.46** | 72 B |
-| `ListAsSpanFor` | 301.8 ns | **0.50** | 72 B |
+| `ListForeach` (baseline) | 254.8 ns | 1.00 | 71 B |
+| `ListFor` | 328.8 ns | **1.29** | 72 B |
+| `ListAsSpanForeach` | 216.3 ns | **0.85** | 72 B |
+| `ListAsSpanFor` | 216.2 ns | **0.85** | 72 B |
 
-The `_version` comparison in `List<T>.Enumerator` is not worth worrying about. **Both forms reload `_items` every iteration and keep a bounds check** (`ListFor` carries **two** checks, one for Count and one for the array), so the difference stays within noise. This confirms COL-01's "the plain foreach and for are the same speed" at the generated-code level: what matters is not the syntax but `CollectionsMarshal.AsSpan` (0.46-0.50x).
+The `_version` comparison in `List<T>.Enumerator` is not the thing to worry about — the enumerator is the **faster** of the two. **Both forms reload `_items` every iteration and keep a bounds check, but `ListFor` carries two** (one for Count, one for the array), and that second check is where the 1.29x comes from. This matches COL-01, which measures the same shape at 1.07x with an `int` accumulator: the indexed `for` over `List<T>` is the slowest of the four either way, and what actually matters is `CollectionsMarshal.AsSpan` (0.85x, foreach and for identical there).
 
 **3. Large struct elements (64 bytes)**
 
 | Form | Time | Code size |
 |---|---:|---:|
-| `ForeachCopy` (baseline) | 475.5 ns | 51 B |
-| `ForeachRef` | 474.5 ns | 51 B |
-| `ForIndexer` | 481.6 ns | 51 B |
-| `ForRef` | 474.3 ns | 51 B |
+| `ForeachCopy` (baseline) | 295.7 ns | 51 B |
+| `ForeachRef` | 296.3 ns | 51 B |
+| `ForIndexer` | 296.7 ns | 51 B |
+| `ForRef` | 294.5 ns | 51 B |
 
 **All four share one instruction sequence.** `foreach (var x in span)` emits no 64-byte copy — the body only reads `entry.Id`, so the JIT reads that field directly (`add rax,[rdx+r8]`, advancing by the element size with `add r8,40`). **"Receiving a large struct by foreach copies it" does not hold when the body only reads fields.** It does materialize if the element is **passed to a method that is not inlined**, and that shape belongs to MEM-02 / MEM-04.
 
@@ -113,12 +113,14 @@ The `_version` comparison in `List<T>.Enumerator` is not worth worrying about. *
 | Situation | Choice |
 |---|---|
 | Array / Span / ReadOnlySpan | **Either** (same instruction sequence). Pick for readability |
-| Walking an array with `for` | Hoist the reference so the loop condition **does not re-read a field**; otherwise 2.20x |
-| `List<T>` | Either is the same. Move to `CollectionsMarshal.AsSpan` (COL-01) |
+| Walking an array with `for` | Hoist the reference so the loop condition **does not re-read a field**; otherwise 1.13x |
+| `List<T>` | `foreach` (the indexed `for` is 1.29x). Better still, move to `CollectionsMarshal.AsSpan` (COL-01) |
 | Large struct elements | **Either** if you only read. Use `ref` when passing to a method |
 | **The index is needed** | **`for`** (R-21: recovering it afterwards is 1.52x slower) |
 
-**About how these verdicts were reached:** timing on this machine is noisy (about ±10%), so every "no difference" verdict rests on **instruction-sequence identity**, not on the times. The only verdict decided by timing is the 2.20x `ArrayFieldFor` (non-overlapping confidence intervals).
+**About how these verdicts were reached:** every "no difference" verdict rests on **instruction-sequence identity**, not on the times — the two array forms land at 212.4 / 212.6 ns and the four struct forms within 2 ns of each other, which is what identical code should look like. Only `ArrayFieldFor` (1.13x) and `ListFor` (1.29x) are decided by timing, both on non-overlapping confidence intervals.
+
+**These two penalties are core-dependent in size, not in existence.** The previous run of this benchmark, on a Ryzen 9 5900X (x86-64-v3), put `ArrayFieldFor` at 2.20x and `ListFor` within noise; the current numbers come from a Ryzen AI 9 HX 370 (x86-64-v4), which absorbs the extra reload far better and the second bounds check far worse. **The code sizes and the instruction sequences quoted above are identical on both machines** (32 / 67 / 54 B and 71 / 72 B) — that is the part to rely on.
 
 **Multi-dimensional arrays (`int[,]`) are out of scope.** No shipping library uses `[,]` at all (the only hit is a console program in the Work repositories), and measuring it would require suppressing CA1814, which is not worth it.
 

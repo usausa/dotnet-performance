@@ -3959,7 +3959,7 @@ Techniques measured and judged to have no effect or to be counterproductive. **D
 | R-01 | static readonly caching of `typeof(X)` | The JIT constant-folds typeof, so it is exactly the same speed |
 | R-02 | Manual ref walking (GetReference / GetArrayDataReference) | Not faster in any shape (1.46x for multi-Span, 1.30x for arrays) |
 | R-03 | Manual ref walking after `CollectionsMarshal.AsSpan` | No difference, only more code |
-| R-04 | Choice of loop construct (for / while / do-while / foreach / ascending or descending) | No difference (exception: a for that walks an array through a field is 2.20x) |
+| R-04 | Choice of loop construct (for / while / do-while / foreach / ascending or descending) | No difference (exceptions: a for that walks an array through a field is 1.13x, an indexed for over `List<T>` is 1.29x) |
 | R-05 | Applying ArrayPool to arrays of class elements | Per-element allocation remains, so it ranges from no effect to counterproductive |
 | R-06 | Hand-rolled sort implementations | The BCL's `Span.Sort` is about 9x faster |
 | R-07 | `SearchValues` for 2-3 candidate characters | The dedicated `IndexOfAny(char, char)` overload is faster |
