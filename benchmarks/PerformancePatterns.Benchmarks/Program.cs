@@ -146,6 +146,9 @@ public static class Program
                 typeof(StringBuildBenchmark),
                 typeof(SearchValuesBenchmark),
                 typeof(ContainsAnyBenchmark),
+                typeof(LoopFormSpanBenchmark),
+                typeof(LoopFormListBenchmark),
+                typeof(LoopFormStructBenchmark),
                 typeof(ImmutableBuildBenchmark),
                 typeof(ListReuseBenchmark),
                 typeof(StaticArtifactBenchmark),
@@ -587,6 +590,41 @@ public static class Program
             containsAny.ContainsAny_Absent())
         {
             throw new InvalidOperationException("Verify failed. ContainsAny");
+        }
+
+        // R-04 extension: every loop form must produce the same sum
+        var loopSpan = new LoopFormSpanBenchmark();
+        loopSpan.Setup();
+        const long expectedSpanTotal = 1024L * 1023L / 2L;
+        if ((loopSpan.ArrayForeach() != expectedSpanTotal) ||
+            (loopSpan.ArrayFieldFor() != expectedSpanTotal) ||
+            (loopSpan.ArrayLocalFor() != expectedSpanTotal) ||
+            (loopSpan.SpanForeach() != expectedSpanTotal) ||
+            (loopSpan.SpanFor() != expectedSpanTotal) ||
+            (loopSpan.ReadOnlySpanForeach() != expectedSpanTotal) ||
+            (loopSpan.ReadOnlySpanFor() != expectedSpanTotal))
+        {
+            throw new InvalidOperationException("Verify failed. LoopFormSpan");
+        }
+
+        var loopList = new LoopFormListBenchmark();
+        loopList.Setup();
+        if ((loopList.ListForeach() != expectedSpanTotal) ||
+            (loopList.ListFor() != expectedSpanTotal) ||
+            (loopList.ListAsSpanForeach() != expectedSpanTotal) ||
+            (loopList.ListAsSpanFor() != expectedSpanTotal))
+        {
+            throw new InvalidOperationException("Verify failed. LoopFormList");
+        }
+
+        var loopStruct = new LoopFormStructBenchmark();
+        loopStruct.Setup();
+        if ((loopStruct.ForeachCopy() != expectedSpanTotal) ||
+            (loopStruct.ForeachRef() != expectedSpanTotal) ||
+            (loopStruct.ForIndexer() != expectedSpanTotal) ||
+            (loopStruct.ForRef() != expectedSpanTotal))
+        {
+            throw new InvalidOperationException("Verify failed. LoopFormStruct");
         }
 
         // TYP-06: All three paths must return the same SQL

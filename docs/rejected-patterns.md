@@ -60,6 +60,45 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 ✅ **Do this instead:** Choose for readability (default to for / while). do-while and descending loops produce genuinely different code, so use an ascending for wherever you are relying on bounds-check elimination. What matters is not the syntax but the data access shape (MEM-01 / COL-01 / MEM-02).
 
+#### Choosing between `foreach` and `for` (⏳ measurement pending)
+
+The comparison above covers `for` / `while` / `do-while` / iteration direction and **does not include `foreach`**. To settle whether there is a case where code that could be written as `foreach` should deliberately use `for`, three shapes are measured. The benchmark is `Lab/LoopFormBenchmark.cs` (registered and verified in `Program.cs`).
+
+```bash
+dotnet run -c Release --framework net10.0 -- --filter "*LoopForm*"
+```
+
+**1. Array / Span / ReadOnlySpan** — expected to produce identical instruction streams. This also covers the **field-backed** case: whether a loop whose condition reads `this.values.Length` still gets bounds-check elimination, and whether hoisting the reference into a local changes anything.
+
+| Form | Time | Code size | Verdict |
+|---|---:|---:|---|
+| `ArrayForeach` (baseline) | pending | pending | — |
+| `ArrayFieldFor` | pending | pending | — |
+| `ArrayLocalFor` | pending | pending | — |
+| `SpanForeach` / `SpanFor` | pending | pending | — |
+| `ReadOnlySpanForeach` / `ReadOnlySpanFor` | pending | pending | — |
+
+**2. `List<T>`** — `foreach` goes through `List<T>.Enumerator`, which compares `_version` on every `MoveNext`; the indexed form does not. COL-01 records that "the plain foreach and for are the same speed" but never looked at the generated code.
+
+| Form | Time | Code size | Verdict |
+|---|---:|---:|---|
+| `ListForeach` (baseline) | pending | pending | — |
+| `ListFor` | pending | pending | — |
+| `ListAsSpanForeach` / `ListAsSpanFor` | pending | pending | — |
+
+**3. Large struct elements (64 bytes)** — `foreach (var x in span)` **copies each element into the loop variable**. MEM-02 already prescribes `ref` access, but what choosing the copying form actually costs has never been measured.
+
+| Form | Time | Code size | Verdict |
+|---|---:|---:|---|
+| `ForeachCopy` (baseline) | pending | pending | — |
+| `ForeachRef` | pending | pending | — |
+| `ForIndexer` | pending | pending | — |
+| `ForRef` | pending | pending | — |
+
+**The one established reason to reach for `for` today:** **when the index is needed**. Iterating with `foreach` and recovering the index via `Unsafe.ByteOffset` is 1.52x slower than an indexed `for` (R-21).
+
+**Multi-dimensional arrays (`int[,]`) are out of scope.** No shipping library uses `[,]` at all (the only hit is a console program in the Work repositories), and measuring it would require suppressing CA1814, which is not worth it.
+
 ---
 
 ### R-05: Applying ArrayPool to arrays of class elements

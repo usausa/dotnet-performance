@@ -60,6 +60,45 @@
 
 ✅ **代わりにやること:** 可読性で選ぶ(既定は for / while)。do-while・降順は生成コードが別物になるため、境界チェック除去を期待する場面では for の昇順を使う。効くのは構文でなくデータアクセス形(MEM-01 / COL-01 / MEM-02)。
 
+#### `foreach` と `for` の使い分け(⏳ 計測待ち)
+
+上記は `for` / `while` / `do-while` / 反復方向の比較で、**`foreach` を含んでいない**。「`foreach` で書けるが、あえて `for` を使うべきケースがあるか」を切り分けるため、以下 3 形状を測る。ベンチマークは `Lab/LoopFormBenchmark.cs`(`Program.cs` に登録・検証済み)。
+
+```bash
+dotnet run -c Release --framework net10.0 -- --filter "*LoopForm*"
+```
+
+**① 配列 / Span / ReadOnlySpan** — 同一命令列になるはず。あわせて**フィールド経由の配列**も見る(ループ条件が `this.values.Length` の形で境界チェック除去が効くか、ローカルへ退避した形と差が出るか)。
+
+| 形 | 時間 | コードサイズ | 判定 |
+|---|---:|---:|---|
+| `ArrayForeach`(基準) | 計測待ち | 計測待ち | — |
+| `ArrayFieldFor` | 計測待ち | 計測待ち | — |
+| `ArrayLocalFor` | 計測待ち | 計測待ち | — |
+| `SpanForeach` / `SpanFor` | 計測待ち | 計測待ち | — |
+| `ReadOnlySpanForeach` / `ReadOnlySpanFor` | 計測待ち | 計測待ち | — |
+
+**② `List<T>`** — `foreach` は `List<T>.Enumerator` を通り、`MoveNext` ごとに `_version` の比較が入る。添字形にはこれが無い。COL-01 は「素の foreach / for は同速」と記録しているが、生成コードの差までは見ていない。
+
+| 形 | 時間 | コードサイズ | 判定 |
+|---|---:|---:|---|
+| `ListForeach`(基準) | 計測待ち | 計測待ち | — |
+| `ListFor` | 計測待ち | 計測待ち | — |
+| `ListAsSpanForeach` / `ListAsSpanFor` | 計測待ち | 計測待ち | — |
+
+**③ 大きい struct 要素(64 バイト)** — `foreach (var x in span)` は**要素ごとにループ変数へコピーする**。MEM-02 は既に `ref` 受けを指示しているが、コピー形を選んだときの実コストは測っていない。
+
+| 形 | 時間 | コードサイズ | 判定 |
+|---|---:|---:|---|
+| `ForeachCopy`(基準) | 計測待ち | 計測待ち | — |
+| `ForeachRef` | 計測待ち | 計測待ち | — |
+| `ForIndexer` | 計測待ち | 計測待ち | — |
+| `ForRef` | 計測待ち | 計測待ち | — |
+
+**現時点で確定している唯一の「for を選ぶ理由」:** **index が必要な場合**。`foreach` で回して `Unsafe.ByteOffset` から index を逆算する形は索引 `for` に対して 1.52 倍遅い([R-21](#r-21-unsafebyteoffset-による-ref-からの-index-復元))。
+
+**多次元配列(`int[,]`)は対象外とした。** 出荷ライブラリに `[,]` の使用が 1 件も無く(検出されたのは Work 系のコンソールのみ)、測るには CA1814 の抑制が必要になるため、費用対効果が見合わない。
+
 ---
 
 ### R-05: class 要素配列への ArrayPool 適用
