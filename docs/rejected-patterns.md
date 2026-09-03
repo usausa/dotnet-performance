@@ -48,7 +48,7 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 ---
 
-### R-04: Choosing the loop construct (for / while / do-while / ascending vs descending)
+### R-04: Choosing the loop construct (for / while / do-while / foreach / ascending vs descending)
 
 🎯 **Intent:** Make code faster by picking a particular loop construct or iteration direction.
 
@@ -60,42 +60,65 @@ Manual walking also has a high defect rate (several real bugs were found during 
 
 ✅ **Do this instead:** Choose for readability (default to for / while). do-while and descending loops produce genuinely different code, so use an ascending for wherever you are relying on bounds-check elimination. What matters is not the syntax but the data access shape (MEM-01 / COL-01 / MEM-02).
 
-#### Choosing between `foreach` and `for` (⏳ measurement pending)
+#### Choosing between `foreach` and `for`
 
-The comparison above covers `for` / `while` / `do-while` / iteration direction and **does not include `foreach`**. To settle whether there is a case where code that could be written as `foreach` should deliberately use `for`, three shapes are measured. The benchmark is `Lab/LoopFormBenchmark.cs` (registered and verified in `Program.cs`).
+The comparison above covers `for` / `while` / `do-while` / iteration direction and did not include `foreach`, so three more shapes were measured separately. The benchmark is `Lab/LoopFormBenchmark.cs`. → [Results](../benchmarks/results/R-04-LoopForm.md)
 
-```bash
-dotnet run -c Release --framework net10.0 -- --filter "*LoopForm*"
-```
+**Conclusion: `foreach` and `for` normally compile to the same instruction sequence. The only reason to deliberately reach for `for` is needing the index — and conversely, "a `for` that walks an array through a field" is the shape to avoid.**
 
-**1. Array / Span / ReadOnlySpan** — expected to produce identical instruction streams. This also covers the **field-backed** case: whether a loop whose condition reads `this.values.Length` still gets bounds-check elimination, and whether hoisting the reference into a local changes anything.
+**1. Array / Span / ReadOnlySpan**
 
-| Form | Time | Code size | Verdict |
+| Form | Time | Code size | Generated code |
 |---|---:|---:|---|
-| `ArrayForeach` (baseline) | pending | pending | — |
-| `ArrayFieldFor` | pending | pending | — |
-| `ArrayLocalFor` | pending | pending | — |
-| `SpanForeach` / `SpanFor` | pending | pending | — |
-| `ReadOnlySpanForeach` / `ReadOnlySpanFor` | pending | pending | — |
+| `ArrayForeach` (baseline) | 268.5 ns | 32 B | Pointer walk, no bounds check |
+| `ArrayLocalFor` | 317.7 ns | 32 B | **Instruction sequence identical to `ArrayForeach`** |
+| **`ArrayFieldFor`** | **590.5 ns (2.20x)** | **67 B** | **Different code** (see below) |
+| `SpanForeach` / `SpanFor` | 335.6 / 282.3 ns | 54 B | **All four forms share one instruction sequence** |
+| `ReadOnlySpanForeach` / `ReadOnlySpanFor` | 261.4 / 263.1 ns | 54 B | Same as above |
 
-**2. `List<T>`** — `foreach` goes through `List<T>.Enumerator`, which compares `_version` on every `MoveNext`; the indexed form does not. COL-01 records that "the plain foreach and for are the same speed" but never looked at the generated code.
+What only `ArrayFieldFor` (loop condition reading `this.values.Length`) gives up — JitDisasm:
 
-| Form | Time | Code size | Verdict |
-|---|---:|---:|---|
-| `ListForeach` (baseline) | pending | pending | — |
-| `ListFor` | pending | pending | — |
-| `ListAsSpanForeach` / `ListAsSpanFor` | pending | pending | — |
+- Reloads the array reference every iteration (`mov r8,rcx`)
+- **A bounds check stays inside the loop** (`cmp edx,[r8+8]` / `jae`) plus a throw block
+- Re-reads `.Length` from memory for the loop condition (`cmp [rcx+8],edx`)
+- Needs a stack frame (`sub rsp,28`)
+- Indexed addressing `[r8+rdx*4+10]` (the foreach form uses a `add rcx,4` pointer walk)
 
-**3. Large struct elements (64 bytes)** — `foreach (var x in span)` **copies each element into the loop variable**. MEM-02 already prescribes `ref` access, but what choosing the copying form actually costs has never been measured.
+The cause is that **the JIT cannot prove the loop body never writes to the field**. `foreach` takes the array reference once at loop entry, so it never hits this. **A `for` that hoists the reference into a local produces exactly the same code as `foreach`.**
 
-| Form | Time | Code size | Verdict |
-|---|---:|---:|---|
-| `ForeachCopy` (baseline) | pending | pending | — |
-| `ForeachRef` | pending | pending | — |
-| `ForIndexer` | pending | pending | — |
-| `ForRef` | pending | pending | — |
+**2. `List<T>`**
 
-**The one established reason to reach for `for` today:** **when the index is needed**. Iterating with `foreach` and recovering the index via `Unsafe.ByteOffset` is 1.52x slower than an indexed `for` (R-21).
+| Form | Time | Ratio | Code size |
+|---|---:|---:|---:|
+| `ListForeach` (baseline) | 615.7 ns | 1.00 | 71 B |
+| `ListFor` | 646.6 ns | 1.06 (within noise) | 72 B |
+| `ListAsSpanForeach` | 279.0 ns | **0.46** | 72 B |
+| `ListAsSpanFor` | 301.8 ns | **0.50** | 72 B |
+
+The `_version` comparison in `List<T>.Enumerator` is not worth worrying about. **Both forms reload `_items` every iteration and keep a bounds check** (`ListFor` carries **two** checks, one for Count and one for the array), so the difference stays within noise. This confirms COL-01's "the plain foreach and for are the same speed" at the generated-code level: what matters is not the syntax but `CollectionsMarshal.AsSpan` (0.46-0.50x).
+
+**3. Large struct elements (64 bytes)**
+
+| Form | Time | Code size |
+|---|---:|---:|
+| `ForeachCopy` (baseline) | 475.5 ns | 51 B |
+| `ForeachRef` | 474.5 ns | 51 B |
+| `ForIndexer` | 481.6 ns | 51 B |
+| `ForRef` | 474.3 ns | 51 B |
+
+**All four share one instruction sequence.** `foreach (var x in span)` emits no 64-byte copy — the body only reads `entry.Id`, so the JIT reads that field directly (`add rax,[rdx+r8]`, advancing by the element size with `add r8,40`). **"Receiving a large struct by foreach copies it" does not hold when the body only reads fields.** It does materialize if the element is **passed to a method that is not inlined**, and that shape belongs to MEM-02 / MEM-04.
+
+✅ **Which to use:**
+
+| Situation | Choice |
+|---|---|
+| Array / Span / ReadOnlySpan | **Either** (same instruction sequence). Pick for readability |
+| Walking an array with `for` | Hoist the reference so the loop condition **does not re-read a field**; otherwise 2.20x |
+| `List<T>` | Either is the same. Move to `CollectionsMarshal.AsSpan` (COL-01) |
+| Large struct elements | **Either** if you only read. Use `ref` when passing to a method |
+| **The index is needed** | **`for`** (R-21: recovering it afterwards is 1.52x slower) |
+
+**About how these verdicts were reached:** timing on this machine is noisy (about ±10%), so every "no difference" verdict rests on **instruction-sequence identity**, not on the times. The only verdict decided by timing is the 2.20x `ArrayFieldFor` (non-overlapping confidence intervals).
 
 **Multi-dimensional arrays (`int[,]`) are out of scope.** No shipping library uses `[,]` at all (the only hit is a console program in the Work repositories), and measuring it would require suppressing CA1814, which is not worth it.
 

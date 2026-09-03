@@ -3959,7 +3959,7 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | R-01 | `typeof(X)` の static readonly キャッシュ | JIT が typeof を定数化するため完全に同速 |
 | R-02 | 手動 ref 走査(GetReference / GetArrayDataReference) | どの形状でも速くならない(複数 Span 1.46 倍・配列 1.30 倍遅い) |
 | R-03 | `CollectionsMarshal.AsSpan` 後の手動 ref ウォーク | 差なし、コードサイズ増のみ |
-| R-04 | ループ構文の選択(for / while / do-while / 昇降順) | 差なし |
+| R-04 | ループ構文の選択(for / while / do-while / foreach / 昇降順) | 差なし(例外: 配列をフィールド経由で回す for は 2.20 倍) |
 | R-05 | class 要素配列への ArrayPool 適用 | 要素個別の確保が残り効果なし〜逆効果 |
 | R-06 | 自前ソート実装 | BCL の `Span.Sort` が約 9 倍速い |
 | R-07 | 候補 2〜3 文字での `SearchValues` | `IndexOfAny(char, char)` 専用オーバーロードが速い |
