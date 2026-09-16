@@ -124,7 +124,7 @@ The `_version` comparison in `List<T>.Enumerator` is not the thing to worry abou
 
 **Multi-dimensional arrays (`int[,]`) are out of scope.** No shipping library uses `[,]` at all (the only hit is a console program in the Work repositories), and measuring it would require suppressing CA1814, which is not worth it.
 
-**Wrapper collections (`ReadOnlyCollection<T>`) stay on the indexer (⏳❗ unexpected, pending the final run: the official .NET 10 post says foreach now beats the indexer, which contradicts this environment. If HX 370 reproduces the reversal, rewrite this paragraph. Numbers are provisional B550H / x86-64-v3):** the .NET 10 performance post states that array interface implementations are now devirtualized, so that `foreach` over a `ReadOnlyCollection<int>` wrapping an `int[]` beats the indexer. **That did not reproduce in this environment**: foreach is 1.26x slower than the indexer, the 32 B enumerator allocation is still there, and the code is 684 B against 134 B. The devirtualization does not reach through the wrapper's `IList<T>` field. Keep iterating wrappers by index. → [LAB-ReadOnlyCollectionLoop.md](../benchmarks/results/LAB-ReadOnlyCollectionLoop.md)
+**Wrapper collections (`ReadOnlyCollection<T>`) stay on the indexer:** the .NET 10 performance post states that array interface implementations are now devirtualized, so that `foreach` over a `ReadOnlyCollection<int>` wrapping an `int[]` beats the indexer. **That did not reproduce on either x86-64-v4 or x86-64-v3**: foreach is 1.21x slower than the indexer (558.6 vs 460.0 ns; 1.26x on x86-64-v3), the 32 B enumerator allocation is still there, and the code is 664 B against 134 B. The generated code shows the devirtualization itself does reach through the wrapper's `IList<T>` field (both forms get a guarded devirtualization on `int[]`, and foreach inlines `SZGenericArrayEnumerator<int>`'s MoveNext/Current), but **the enumerator object is never stack-allocated** — `CORINFO_HELP_NEWSFAST` remains — so every element pays a reload of `_index` from the heap plus three checks. The indexer form is two guards plus one bounds check with no allocation. Keep iterating wrappers by index. → [LAB-ReadOnlyCollectionLoop.md](../benchmarks/results/LAB-ReadOnlyCollectionLoop.md)
 
 ---
 
@@ -187,16 +187,16 @@ There are two ways to remove it, and the **element width decides which**.
 
 A u8 literal does have the advantage that the table address becomes a link-time constant hoisted out of the loop, but **one `ushort` read turns into two `byte` reads plus an index doubling**, and for inputs with many digits the inner loop cost outweighs it. → see "do not change the access width" under TXT-01
 
-📌 **Checking an outside report that "pointers are faster" (⏳❗ unexpected, pending the final run: against the source's pointer 0.19x, this environment gave 0.52x — half the speed of Cast. Cast winning agrees with this entry, but the pointer ratio is to be confirmed on HX 370. Numbers are provisional B550H / x86-64-v3):** an NDepend article (2026) reports "Span 0.26x / pointer 0.19x" for bulk little-endian Int32 decoding and concludes in favor of pointers. The four shapes were measured side by side over the same 1024 values.
+📌 **Checking an outside report that "pointers are faster":** an NDepend article (2026) reports "Span 0.26x / pointer 0.19x" for bulk little-endian Int32 decoding and concludes in favor of pointers. The four shapes were measured side by side over the same 1024 values.
 
 | Form | Time | Ratio | Code size |
 |---|---:|---:|---:|
-| Shift/or of four bytes per element (baseline) | 928.1 ns | 1.00 | 200 B |
-| `BinaryPrimitives.ReadInt32LittleEndian` per element | 482.7 ns | 0.52 | 85 B |
-| **`MemoryMarshal.Cast<byte, int>` + indexed loop** | **240.9 ns** | **0.26** | **54 B** |
-| `fixed` + `int*` | 483.6 ns | 0.52 | 97 B |
+| Shift/or of four bytes per element (baseline) | 718.2 ns | 1.00 | 200 B |
+| `BinaryPrimitives.ReadInt32LittleEndian` per element | 364.0 ns | 0.51 | 85 B |
+| **`MemoryMarshal.Cast<byte, int>` + indexed loop** | **215.2 ns** | **0.30** | **54 B** |
+| `fixed` + `int*` | 249.0 ns | 0.35 | 97 B |
 
-**`Cast` is twice as fast as the pointer.** The article's "Span 0.26x" matches the `Cast` form exactly, and its "pointer 0.19x" did not reproduce (0.52x). The article's Span variant was evidently the per-element `BinaryPrimitives` call (also 0.52x here); **reinterpret once with `Cast` and index, and you beat the pointer** — which is this entry's conclusion. → [LAB-Int32Parse.md](../benchmarks/results/LAB-Int32Parse.md)
+**`Cast` beats the pointer (the pointer is 1.16x slower, non-overlapping CIs; 2.0x on x86-64-v3).** The article's "Span 0.26x" corresponds to the `Cast` form (0.26-0.30x), and its "pointer 0.19x" did not reproduce on either machine (0.35x / 0.52x). In the generated code the `Cast` inner loop is 5 instructions (a byte offset stepped forward, remaining count `dec`), while the pointer loop is 6 — the `int` index needs a `movsxd` on the dependent chain every element — plus the stack frame for `fixed`. **Reinterpret once with `Cast` and index, and you beat the pointer** — which is this entry's conclusion. → [LAB-Int32Parse.md](../benchmarks/results/LAB-Int32Parse.md)
 
 📌 **On the C# 16 unsafe redesign:** per the same article, C# 16 moves `unsafe` to individual members, makes pointer **types** themselves safe with only dereferences requiring an unsafe context, documents safety contracts in `/// <safety>`, and turns calls from a safe context into errors. That weakens this entry's "cost of introducing an unsafe context (auditing, safety)" rationale, but **the rejection rests on measurement (same speed or slower), which a language change does not overturn**. Revisit the wording once C# 16 is final.
 
@@ -270,13 +270,13 @@ A u8 literal does have the advantage that the table address becomes a link-time 
 
 🔗 **Measurement record:** [LAB-BoundsCheckHint.md](../benchmarks/results/LAB-BoundsCheckHint.md)
 
-📌 **Where bounds checks do and do not disappear on .NET 10 (confirmed in generated code, ⏳ provisional: B550H / x86-64-v3, to be replaced on HX 370):** of the shapes collected by an outside "patterns where the check disappears" article (Zenn, 2026-04) and the .NET 10 JIT changes, the two that affect implementation decisions were checked.
+📌 **Where bounds checks do and do not disappear on .NET 10 (confirmed in generated code):** of the shapes collected by an outside "patterns where the check disappears" article (Zenn, 2026-04) and the .NET 10 JIT changes, the two that affect implementation decisions were checked.
 
 | Shape | string / array | `ReadOnlySpan<char>` |
 |---|---|---|
 | `prefix.Length < path.Length ? path[prefix.Length] : -1` (**index taken from another sequence's Length**) | **Eliminated** (22 B, no RNGCHKFAIL) | **Kept** (48 B, `cmp/jae` + `CORINFO_HELP_RNGCHKFAIL` + a stack frame) |
 
-**With the very same guard, only the Span keeps its bounds check.** The guard and the check are the same two-register compare, yet the JIT does not merge them for Span. On a hot path that indexes by another sequence's length, take a string / array instead of a Span, or derive the index from the sequence's own `Length`.
+**With the very same guard, only the Span keeps its bounds check.** The guard and the check are the same two-register compare, yet the JIT does not merge them for Span. The time cost is core-dependent — 1.09x on x86-64-v4 (2.05x on x86-64-v3) — but **the instruction sequences are identical on both machines**. On a hot path that indexes by another sequence's length, take a string / array instead of a Span, or derive the index from the sequence's own `Length`.
 
 `switch (span.Length) { 4 => span[0] + span[1] + span[2] + span[3], _ => -1 }` is **check-free** from .NET 10 on, the same as the `if (span.Length == 4)` guard (32 B vs 31 B, equivalent instruction sequences). Formatting and parsing code that branches on length may use switch.
 
@@ -356,21 +356,40 @@ The same article's "`(uint)` cast" and "touch the last element first" shapes wer
 
 🎯 **Intent:** Replace `Dictionary<TKey, TValue>` with a hand-written table using the ankerl::unordered_dense layout — Robin Hood probing over a compact metadata array whose entries carry probe distance plus an 8-bit fingerprint, with keys and values packed densely in separate arrays — to speed up lookups. An outside article (2024) reports 4.88 us for 1024 lookups against 18.61 us for `Dictionary` (about 3.8x).
 
-📉 **Measured — why it is rejected (⏳❗ unexpected, pending the final run — this entry is a provisional verdict. The result is the opposite of the source's "3.8x faster", so the rejection is finalized only after re-measuring on HX 370; if it flips, withdraw this entry and move it to the COL adoption candidates. Numbers are provisional B550H / x86-64-v3):** with the same 1024 string keys and the same hash function side by side, it is **slower**.
+📉 **Measured — why it is rejected:** with the same 1024 string keys and the same hash function side by side, it is **slower**. Because this is the opposite of the source's "3.8x faster", it was measured on both x86-64-v4 and x86-64-v3: the sign agrees on both machines, and the gap widens on the newer core.
 
 | Operation | `Dictionary<string, int>` | Ankerl layout | Ratio |
 |---|---:|---:|---:|
-| Lookup (all hits) | 5.69-7.82 us | 9.44-9.78 us | **1.26-1.66x slower** |
-| Lookup (all misses) | 6.80-7.13 us | 8.84-9.22 us | 1.14-1.30x slower |
-| Build | 12.3-14.8 us | 12.9-14.7 us | Equal |
+| Lookup (all hits) | 3.92-3.93 us | 5.82 us | **1.48x slower** (x86-64-v3: 1.26-1.66x) |
+| Lookup (all misses) | 3.38 us | 5.33 us | 1.58x slower (x86-64-v3: 1.14-1.30x) |
+| Build | 6.59 us | 7.98 us | 1.21x slower (x86-64-v3: equal) |
 
-The gap is not the hash function. `Dictionary` uses a non-randomized string hash while the Ankerl table can only call `string.GetHashCode` (randomized), so a row was added giving `Dictionary` the same randomized hash via `StringComparer.Ordinal` — Ankerl is still **1.40x slower** (9.78 vs 6.97 us). **The table layout by itself does not beat .NET 10's `Dictionary`.**
+The gap is not the hash function. `Dictionary` uses a non-randomized string hash while the Ankerl table can only call `string.GetHashCode` (randomized), so a row was added giving `Dictionary` the same randomized hash via `StringComparer.Ordinal` — Ankerl is still **1.48x slower** (5.82 vs 3.92 us, non-overlapping CIs; 1.40x on x86-64-v3 as well). **The table layout by itself does not beat .NET 10's `Dictionary`.**
 
-The article's 3.8x comes from its `Dictionary` baseline (18.6 us per 1024 lookups); `Dictionary` does the same work in 5.7-7.8 us here. **The baseline being compared against was the outlier.**
+The article's 3.8x comes from its `Dictionary` baseline (18.6 us per 1024 lookups); `Dictionary` does the same work in 3.9 us here (5.7-7.8 us even on x86-64-v3). **The baseline being compared against was the outlier.**
 
 ✅ **Do this instead:** Keep `Dictionary<TKey, TValue>` for general keys. For name resolution over a known key set use COL-04 (sampling hash, 0.60-0.62x of `Dictionary`); for `Type` keys use TYP-01. Hand-roll a table only when it has been measured to beat `Dictionary` on a specific key distribution; a generic layout difference will not do it.
 
 🔗 **Measurement:** [LAB-HashTableDesign.md](../benchmarks/results/LAB-HashTableDesign.md)
+
+---
+
+### R-23: A small list backed by InlineArray with heap spill (SmallVec)
+
+🎯 **Intent:** The small-vector shape — the first N elements live in an `[InlineArray]` inside the struct and move to a heap array once exceeded — to skip `List<T>`'s heap allocation while the count is small and keep working when it is not. An outside article (Qiita) reports 166% of `List<T>`'s speed while the elements fit.
+
+📉 **Measured — why it is rejected:** It wins while it fits, as the source says, and **loses to a capacity-sized `List<T>` the moment it spills**. The asymmetry has the same sign on x86-64-v4 and x86-64-v3, with identical allocation counts.
+
+| Elements | `List<int>` | `List<int>(capacity)` | InlineList (8 inline) |
+|---:|---:|---:|---:|
+| 4 (fits) | 8.8 ns / 72 B | 8.1 ns / 72 B | **4.3 ns / 0 B (0.49x)** |
+| 32 (spills) | 58.5 ns / 368 B | **25.0 ns / 184 B (0.43x)** | 44.1 ns / 240 B (**1.76x behind the sized List**; x86-64-v3: 1.62x) |
+
+Once it spills, copying the inline elements out plus two resizes costs more than one correctly sized allocation, and it allocates more (240 vs 184 B). It only wins when the upper bound is known and the inline capacity can be set to cover it — but **with a known bound the spill path is never needed, and STK-08's fixed-length InlineArray already covers that case**. With an unknown bound it loses to `List<T>(capacity)` / BUF-05. Nothing is left for it between STK-08 and BUF-05. On top of that, a by-value copy makes the inline and array forms disagree on writes, so it has to be a `ref struct` that forbids copies (the source's own caveat).
+
+✅ **Do this instead:** STK-08 (a fixed-length `[InlineArray]` buffer) when the bound is known; `List<T>(capacity)` or the BUF-05 tiered strategy (stackalloc / ArrayPool) when it is not.
+
+🔗 **Measurement:** [LAB-InlineList.md](../benchmarks/results/LAB-InlineList.md)
 
 ---
 

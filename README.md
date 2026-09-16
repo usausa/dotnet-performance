@@ -467,16 +467,16 @@ foreach (var line in text.SplitLines())
 
 **Caveats:** Exposing a struct enumerator as `IEnumerable<T>` boxes it and erases the benefit. Expose a `GetEnumerator()` that returns the struct directly, and if `IEnumerable<T>` support is required, separate it out with an explicit implementation.
 
-**How .NET 10 changes the premise (⏳ provisional: B550H / x86-64-v3, to be replaced on HX 370):** with dynamic PGO's conditional escape analysis, **when an `IEnumerable<int>` field always holds an `int[]` (monomorphic), the `foreach` enumerator is stack-allocated and the allocation disappears** — 324 ns / **0 B**, on par with iterating the array directly (311 ns). The assumption "foreach over `IEnumerable<T>` allocates" no longer holds at a monomorphic call site.
+**How .NET 10 changes the premise:** with dynamic PGO's conditional escape analysis, **when an `IEnumerable<int>` field always holds an `int[]` (monomorphic), the `foreach` enumerator is stack-allocated and the allocation disappears** — 234 ns / **0 B**, 1.09x of iterating the array directly (214 ns). The assumption "foreach over `IEnumerable<T>` allocates" no longer holds at a monomorphic call site.
 
 | Shape | Time | Allocated | Code size |
 |---|---:|---:|---:|
-| foreach directly over `int[]` | 311 ns | 0 B | 32 B |
-| `IEnumerable<int>` field (always `int[]`) | 324 ns | **0 B** | 206 B |
-| `IEnumerable<int>` field (alternating `int[]` / `List<int>`) | **3,282 ns** | **36 B** | 660 B |
-| struct enumerator (this pattern) | 417 ns | 0 B | 55 B |
+| foreach directly over `int[]` | 214 ns | 0 B | 32 B |
+| `IEnumerable<int>` field (always `int[]`) | 234 ns | **0 B** | 206 B |
+| `IEnumerable<int>` field (alternating `int[]` / `List<int>`) | **1,904 ns** | **36 B** | 657 B |
+| struct enumerator (this pattern) | 218 ns | 0 B | 55 B |
 
-But **the moment it becomes polymorphic it is back to 10x and allocating**. STK-03's value has shifted to "zero allocation and direct calls guaranteed regardless of what PGO observes, polymorphic or not". Keep the struct enumerator as the default when designing your own types' APIs; on the consuming side, **enumerator allocation over someone else's `IEnumerable<T>` is no longer a concern at a monomorphic site**. → [Results](benchmarks/results/LAB-EnumerableEscape.md)
+But **the moment it becomes polymorphic it is back to about 9x and allocating**. STK-03's value has shifted to "zero allocation and direct calls guaranteed regardless of what PGO observes, polymorphic or not". Keep the struct enumerator as the default when designing your own types' APIs; on the consuming side, **enumerator allocation over someone else's `IEnumerable<T>` is no longer a concern at a monomorphic site**. → [Results](benchmarks/results/LAB-EnumerableEscape.md)
 
 ---
 
@@ -713,16 +713,7 @@ Span<int> span = slots;
 
 **Measured (net10 / x86-64-v4, writing and summing int×8):** against `new int[8]` at 4.81 ns / 56 B, stackalloc is 2.87 ns (0.60) and InlineArray 2.92 ns (0.61) — both with zero allocation and equal in time (CIs overlap); InlineArray's code is slightly smaller (112 vs 134 B). The value of InlineArray is that it can be held as a struct field. → [Results](benchmarks/results/STK-08-InlineArray.md)
 
-**Caveats:** The element count is a compile-time constant. It cannot be used for variable lengths, so design the overflow path to switch to the BUF-05 tiered strategy.
-
-**Derived form: a small list backed by InlineArray with heap spill (⏳❗ unexpected, pending the final run: "wins while it fits" matches the source, but "loses to a sized List once it spills" is not in the source and decides the adoption condition. Confirm on HX 370 before finalizing "conditional". Numbers are provisional B550H / x86-64-v3):** the small-vector shape — the first N elements live in an `[InlineArray]` inside the struct and move to an array once exceeded — compared against `List<T>`.
-
-| Elements | `List<int>` | `List<int>(capacity)` | InlineList (8 inline) |
-|---:|---:|---:|---:|
-| 4 (fits) | 21.6 ns / 72 B | 16.5 ns / 72 B | **7.6 ns / 0 B (0.35x)** |
-| 32 (spills) | 133.5 ns / 368 B | **55.6 ns / 184 B (0.42x)** | 90.2 ns / 240 B (0.68x) |
-
-**It wins decisively while it fits and loses to a capacity-sized `List<T>` the moment it spills** (copying the inline elements out plus two resizes costs more than one correctly sized allocation). Adopt only where the upper bound is known and the inline capacity can be set to cover it; if the bound is unknown, use `List<T>(capacity)` or BUF-05. Since a by-value copy would make the inline and array forms disagree on writes, **make it a `ref struct` so the type forbids copies**. → [Results](benchmarks/results/LAB-InlineList.md)
+**Caveats:** The element count is a compile-time constant. It cannot be used for variable lengths, so design the overflow path to switch to the BUF-05 tiered strategy. The "spill to the heap when full" small-vector shape (SmallVec) is rejected because it loses to a capacity-sized `List<T>` (→ R-23).
 
 ---
 
@@ -1586,11 +1577,11 @@ public T? Find<TState>(TState state, Func<T, TState, bool> predicate) { ... }
 
 **Design guidance:** Codify the sequence "① put `static` on the lambda first → ② if it fails to compile, reconsider whether that state is really needed → ③ if it is, pass it as `TState`". This is the same principle as STK-04 (static local method iterators) applied more broadly; public APIs that take callbacks should always offer a TState overload so callers can follow the rule.
 
-**.NET 10 escape analysis does not change the guidance (⏳❗ unexpected, pending the final run: the official .NET 10 post says the delegate is elided, which contradicts this environment. If HX 370 does not reproduce the elision either, the text is finalized as "no elision on .NET 10"; if it does, rewrite it. Numbers are provisional B550H / x86-64-v3):** .NET 10 announced stack allocation of delegates that do not escape, but measured in the shape where the delegate is created and invoked inside one method, **no elision happened in this environment**. A lambda capturing a loop-scoped variable still allocates **88 B per iteration (24 B display class + 64 B delegate)** — 5,632 B over 64 iterations. Capturing a method-scoped variable is capped at 96 B per call because Roslyn caches the delegate inside the display class. **Only static + TState reaches 0 B.**
+**.NET 10 escape analysis does not change the guidance:** .NET 10 announced stack allocation of delegates that do not escape, but measured in the shape where the delegate is created and invoked inside one method, **no elision happened** (identical allocation counts on x86-64-v4 and x86-64-v3). A lambda capturing a loop-scoped variable still allocates **88 B per iteration (24 B display class + 64 B delegate)** — 5,632 B over 64 iterations, and the generated code keeps two `CORINFO_HELP_NEWSFAST` calls per iteration. Capturing a method-scoped variable is capped at 96 B per call because Roslyn caches the delegate inside the display class. **Only static + TState reaches 0 B.**
 
 | Shape | Allocated / call | Note |
 |---|---:|---|
-| Capturing a loop-scoped variable | **5,632 B** (64 iterations × 88 B) | .NET 10 elision did not reproduce |
+| Capturing a loop-scoped variable | **5,632 B** (64 iterations × 88 B) | .NET 10 elision did not reproduce (both machines) |
 | Capturing a method-scoped variable | 96 B | Roslyn caches the delegate in the display class |
 | **static lambda + TState** | **0 B** | The compiler caches the delegate statically |
 
@@ -3910,7 +3901,7 @@ The `Call` vs `Callvirt` substitution, on the other hand, measured 6.36 vs 6.46 
 
 1. **Move runtime resolution to build time** — bake dictionary lookups, reflection, hash computation, and string building into constants, switches, and literal `new` expressions
 2. **Branch on count and shape** — the generator knows how many items and which types are involved. Do the N-dependent implementation switching that a runtime library cannot
-3. **Compose only measured patterns** — the body of the generated code uses only the adopted patterns in this catalog. Never include a rejected one (R-01 through R-17)
+3. **Compose only measured patterns** — the body of the generated code uses only the adopted patterns in this catalog. Never include a rejected one (R-01 through R-23)
 
 **AOT:** ✅ No issues (this is the fundamental means of AOT support)
 
@@ -4007,7 +3998,8 @@ Techniques measured and judged to have no effect or to be counterproductive. **D
 | R-19 | "P/Invoke speed-up" as a pattern (LibraryImport / SuppressGCTransition) | LibraryImport is the standard declaration form; SuppressGCTransition shows no gain |
 | R-20 | Ref-returning accessor via `[UnscopedRef]` (for performance) | 1.02-1.07x against a get/set pair, CIs overlapping on both machines; no axis improves (the code-size delta is alignment padding) |
 | R-21 | Recovering an index from a ref with `Unsafe.ByteOffset` | 1.45-1.52x against carrying the index, and larger code (same conclusion as R-02) |
-| R-22 | Hand-written general-purpose hash table (ankerl::unordered_dense layout) | ⏳❗ Provisional verdict (expected: rejected). Contrary to the source's 3.8x, 1.40x slower than `Dictionary` even with the same hash. Finalized after the HX 370 run |
+| R-22 | Hand-written general-purpose hash table (ankerl::unordered_dense layout) | Contrary to the source's 3.8x, 1.48x slower than `Dictionary` even with the same hash (1.40x on x86-64-v3 as well) |
+| R-23 | Small list backed by InlineArray with heap spill (SmallVec) | Loses 1.76x to a capacity-sized `List<T>` once it spills and allocates more; with a known bound STK-08 already covers it |
 
 ---
 
