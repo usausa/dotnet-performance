@@ -149,6 +149,13 @@ public static class Program
                 typeof(LoopFormSpanBenchmark),
                 typeof(LoopFormListBenchmark),
                 typeof(LoopFormStructBenchmark),
+                typeof(EnumerableEscapeBenchmark),
+                typeof(DelegateEscapeBenchmark),
+                typeof(BoundsCheckPatternBenchmark),
+                typeof(Int32ParseBenchmark),
+                typeof(HashTableDesignBenchmark),
+                typeof(InlineListBenchmark),
+                typeof(ReadOnlyCollectionLoopBenchmark),
                 typeof(ImmutableBuildBenchmark),
                 typeof(ListReuseBenchmark),
                 typeof(StaticArtifactBenchmark),
@@ -625,6 +632,84 @@ public static class Program
             (loopStruct.ForRef() != expectedSpanTotal))
         {
             throw new InvalidOperationException("Verify failed. LoopFormStruct");
+        }
+
+        // Links batch (2026-09): every variant of each new study must agree
+        const long sum1024 = 1024L * 1023L / 2L;
+
+        var enumerableEscape = new EnumerableEscapeBenchmark();
+        enumerableEscape.Setup();
+        if ((enumerableEscape.ArrayDirect() != sum1024) ||
+            (enumerableEscape.InterfaceStatic() != sum1024) ||
+            (enumerableEscape.InterfaceMixed() != sum1024) ||
+            (enumerableEscape.InterfaceMixed() != sum1024) ||
+            (enumerableEscape.StructEnumerator() != sum1024))
+        {
+            throw new InvalidOperationException("Verify failed. EnumerableEscape");
+        }
+
+        var delegateEscape = new DelegateEscapeBenchmark();
+        var expectedDelegate = delegateEscape.CapturingLocal();
+        if ((delegateEscape.StaticWithState() != expectedDelegate) ||
+            (delegateEscape.CapturingLoopLocal() != expectedDelegate) ||
+            (delegateEscape.CapturingEscaped() != expectedDelegate))
+        {
+            throw new InvalidOperationException("Verify failed. DelegateEscape");
+        }
+
+        var boundsPattern = new BoundsCheckPatternBenchmark();
+        boundsPattern.Setup();
+        var expectedChar = boundsPattern.OtherLength_String();
+        if ((expectedChar != 'i' * 256) ||
+            (boundsPattern.OtherLength_Array() != expectedChar) ||
+            (boundsPattern.OtherLength_Span() != expectedChar) ||
+            (boundsPattern.LengthGuard_If() != 10 * 256) ||
+            (boundsPattern.LengthGuard_Switch() != 10 * 256))
+        {
+            throw new InvalidOperationException("Verify failed. BoundsCheckPattern");
+        }
+
+        var int32Parse = new Int32ParseBenchmark();
+        int32Parse.Setup();
+        var expectedInt32 = int32Parse.ByteByByte();
+        if ((int32Parse.SpanPerElement() != expectedInt32) ||
+            (int32Parse.SpanCast() != expectedInt32) ||
+            (int32Parse.Pointer() != expectedInt32))
+        {
+            throw new InvalidOperationException("Verify failed. Int32Parse");
+        }
+
+        var hashTable = new HashTableDesignBenchmark();
+        hashTable.Setup();
+        if ((hashTable.DictionaryHit() != sum1024) ||
+            (hashTable.DictionaryOrdinalHit() != sum1024) ||
+            (hashTable.AnkerlHit() != sum1024) ||
+            (hashTable.DictionaryMiss() != 0) ||
+            (hashTable.AnkerlMiss() != 0) ||
+            (hashTable.DictionaryBuild() != 1024) ||
+            (hashTable.AnkerlBuild() != 1024))
+        {
+            throw new InvalidOperationException("Verify failed. HashTableDesign");
+        }
+
+        foreach (var items in new[] { 4, 32 })
+        {
+            var inlineList = new InlineListBenchmark { Items = items };
+            var expectedInline = (long)items * (items - 1) / 2L;
+            if ((inlineList.ListDefault() != expectedInline) ||
+                (inlineList.ListWithCapacity() != expectedInline) ||
+                (inlineList.InlineListStruct() != expectedInline))
+            {
+                throw new InvalidOperationException("Verify failed. InlineList");
+            }
+        }
+
+        var readOnlyCollection = new ReadOnlyCollectionLoopBenchmark();
+        readOnlyCollection.Setup();
+        if ((readOnlyCollection.Indexer() != sum1024) ||
+            (readOnlyCollection.Foreach() != sum1024))
+        {
+            throw new InvalidOperationException("Verify failed. ReadOnlyCollectionLoop");
         }
 
         // TYP-06: All three paths must return the same SQL

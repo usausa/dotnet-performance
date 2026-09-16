@@ -124,6 +124,8 @@ The `_version` comparison in `List<T>.Enumerator` is not the thing to worry abou
 
 **Multi-dimensional arrays (`int[,]`) are out of scope.** No shipping library uses `[,]` at all (the only hit is a console program in the Work repositories), and measuring it would require suppressing CA1814, which is not worth it.
 
+**Wrapper collections (`ReadOnlyCollection<T>`) stay on the indexer (⏳❗ unexpected, pending the final run: the official .NET 10 post says foreach now beats the indexer, which contradicts this environment. If HX 370 reproduces the reversal, rewrite this paragraph. Numbers are provisional B550H / x86-64-v3):** the .NET 10 performance post states that array interface implementations are now devirtualized, so that `foreach` over a `ReadOnlyCollection<int>` wrapping an `int[]` beats the indexer. **That did not reproduce in this environment**: foreach is 1.26x slower than the indexer, the 32 B enumerator allocation is still there, and the code is 684 B against 134 B. The devirtualization does not reach through the wrapper's `IList<T>` field. Keep iterating wrappers by index. → [LAB-ReadOnlyCollectionLoop.md](../benchmarks/results/LAB-ReadOnlyCollectionLoop.md)
+
 ---
 
 ### R-05: Applying ArrayPool to arrays of class elements
@@ -184,6 +186,19 @@ There are two ways to remove it, and the **element width decides which**.
 | A u8 literal byte table | Only when the table was **already read byte by byte** | Replacing a `ushort` read gives 7.751 → 8.636 ns at `Int32.MaxValue` (**1.11x regression**) |
 
 A u8 literal does have the advantage that the table address becomes a link-time constant hoisted out of the loop, but **one `ushort` read turns into two `byte` reads plus an index doubling**, and for inputs with many digits the inner loop cost outweighs it. → see "do not change the access width" under TXT-01
+
+📌 **Checking an outside report that "pointers are faster" (⏳❗ unexpected, pending the final run: against the source's pointer 0.19x, this environment gave 0.52x — half the speed of Cast. Cast winning agrees with this entry, but the pointer ratio is to be confirmed on HX 370. Numbers are provisional B550H / x86-64-v3):** an NDepend article (2026) reports "Span 0.26x / pointer 0.19x" for bulk little-endian Int32 decoding and concludes in favor of pointers. The four shapes were measured side by side over the same 1024 values.
+
+| Form | Time | Ratio | Code size |
+|---|---:|---:|---:|
+| Shift/or of four bytes per element (baseline) | 928.1 ns | 1.00 | 200 B |
+| `BinaryPrimitives.ReadInt32LittleEndian` per element | 482.7 ns | 0.52 | 85 B |
+| **`MemoryMarshal.Cast<byte, int>` + indexed loop** | **240.9 ns** | **0.26** | **54 B** |
+| `fixed` + `int*` | 483.6 ns | 0.52 | 97 B |
+
+**`Cast` is twice as fast as the pointer.** The article's "Span 0.26x" matches the `Cast` form exactly, and its "pointer 0.19x" did not reproduce (0.52x). The article's Span variant was evidently the per-element `BinaryPrimitives` call (also 0.52x here); **reinterpret once with `Cast` and index, and you beat the pointer** — which is this entry's conclusion. → [LAB-Int32Parse.md](../benchmarks/results/LAB-Int32Parse.md)
+
+📌 **On the C# 16 unsafe redesign:** per the same article, C# 16 moves `unsafe` to individual members, makes pointer **types** themselves safe with only dereferences requiring an unsafe context, documents safety contracts in `/// <safety>`, and turns calls from a safe context into errors. That weakens this entry's "cost of introducing an unsafe context (auditing, safety)" rationale, but **the rejection rests on measurement (same speed or slower), which a language change does not overturn**. Revisit the wording once C# 16 is final.
 
 🔗 **Measurement record:** [BIT-04-XxHash3.md](../benchmarks/results/BIT-04-XxHash3.md) (includes the Cast vs fixed comparison)
 
@@ -255,6 +270,18 @@ A u8 literal does have the advantage that the table address becomes a link-time 
 
 🔗 **Measurement record:** [LAB-BoundsCheckHint.md](../benchmarks/results/LAB-BoundsCheckHint.md)
 
+📌 **Where bounds checks do and do not disappear on .NET 10 (confirmed in generated code, ⏳ provisional: B550H / x86-64-v3, to be replaced on HX 370):** of the shapes collected by an outside "patterns where the check disappears" article (Zenn, 2026-04) and the .NET 10 JIT changes, the two that affect implementation decisions were checked.
+
+| Shape | string / array | `ReadOnlySpan<char>` |
+|---|---|---|
+| `prefix.Length < path.Length ? path[prefix.Length] : -1` (**index taken from another sequence's Length**) | **Eliminated** (22 B, no RNGCHKFAIL) | **Kept** (48 B, `cmp/jae` + `CORINFO_HELP_RNGCHKFAIL` + a stack frame) |
+
+**With the very same guard, only the Span keeps its bounds check.** The guard and the check are the same two-register compare, yet the JIT does not merge them for Span. On a hot path that indexes by another sequence's length, take a string / array instead of a Span, or derive the index from the sequence's own `Length`.
+
+`switch (span.Length) { 4 => span[0] + span[1] + span[2] + span[3], _ => -1 }` is **check-free** from .NET 10 on, the same as the `if (span.Length == 4)` guard (32 B vs 31 B, equivalent instruction sequences). Formatting and parsing code that branches on length may use switch.
+
+The same article's "`(uint)` cast" and "touch the last element first" shapes were measured in this entry and R-18: the check disappears in the assembly but **the time does not move**. Treat "gone from the asm" and "faster" as separate claims. → [LAB-BoundsCheckPattern.md](../benchmarks/results/LAB-BoundsCheckPattern.md)
+
 ---
 
 ### R-16: Hand-rolled digit-ordering formatting tricks (right-aligned generation → forward shift, reverse-order writing)
@@ -322,6 +349,28 @@ A u8 literal does have the advantage that the table address becomes a link-time 
 ✅ **Do this instead:** if you need an index, use an indexed `for` and carry it. Reserve `Unsafe.ByteOffset` for cases where the distance itself is the answer (computing an offset inside a buffer, for example).
 
 🔗 **Measurement:** [LAB-RefIdentity.md](../benchmarks/results/LAB-RefIdentity.md)
+
+---
+
+### R-22: A hand-written general-purpose hash table (ankerl::unordered_dense layout)
+
+🎯 **Intent:** Replace `Dictionary<TKey, TValue>` with a hand-written table using the ankerl::unordered_dense layout — Robin Hood probing over a compact metadata array whose entries carry probe distance plus an 8-bit fingerprint, with keys and values packed densely in separate arrays — to speed up lookups. An outside article (2024) reports 4.88 us for 1024 lookups against 18.61 us for `Dictionary` (about 3.8x).
+
+📉 **Measured — why it is rejected (⏳❗ unexpected, pending the final run — this entry is a provisional verdict. The result is the opposite of the source's "3.8x faster", so the rejection is finalized only after re-measuring on HX 370; if it flips, withdraw this entry and move it to the COL adoption candidates. Numbers are provisional B550H / x86-64-v3):** with the same 1024 string keys and the same hash function side by side, it is **slower**.
+
+| Operation | `Dictionary<string, int>` | Ankerl layout | Ratio |
+|---|---:|---:|---:|
+| Lookup (all hits) | 5.69-7.82 us | 9.44-9.78 us | **1.26-1.66x slower** |
+| Lookup (all misses) | 6.80-7.13 us | 8.84-9.22 us | 1.14-1.30x slower |
+| Build | 12.3-14.8 us | 12.9-14.7 us | Equal |
+
+The gap is not the hash function. `Dictionary` uses a non-randomized string hash while the Ankerl table can only call `string.GetHashCode` (randomized), so a row was added giving `Dictionary` the same randomized hash via `StringComparer.Ordinal` — Ankerl is still **1.40x slower** (9.78 vs 6.97 us). **The table layout by itself does not beat .NET 10's `Dictionary`.**
+
+The article's 3.8x comes from its `Dictionary` baseline (18.6 us per 1024 lookups); `Dictionary` does the same work in 5.7-7.8 us here. **The baseline being compared against was the outlier.**
+
+✅ **Do this instead:** Keep `Dictionary<TKey, TValue>` for general keys. For name resolution over a known key set use COL-04 (sampling hash, 0.60-0.62x of `Dictionary`); for `Type` keys use TYP-01. Hand-roll a table only when it has been measured to beat `Dictionary` on a specific key distribution; a generic layout difference will not do it.
+
+🔗 **Measurement:** [LAB-HashTableDesign.md](../benchmarks/results/LAB-HashTableDesign.md)
 
 ---
 
