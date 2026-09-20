@@ -259,7 +259,7 @@ Differences that measurement could not resolve, listed together with the result 
 | ⑤ | System.Threading.Channels | Producer-consumer queues. Effect of the Bounded/Unbounded and SingleReader/SingleWriter options | DSP-03 | ✅ Documented ([ASY-02](../README.md#-asy-02-producerconsumer-with-systemthreadingchannels), ~45ns/element. Bounded is 2x) |
 | ⑤ | System.IO.Pipelines | I/O pipelines via PipeReader/PipeWriter. Compared against processing a Stream directly | BUF-02 | ✅ Documented conditionally ([ASY-03](../README.md#-asy-03-systemiopipelines), 1.63x on small data / 1/80 the allocation. Watch out for the 64KB deadlock) |
 | ⑤ | The cost of IAsyncEnumerable | Per-element overhead of await foreach (vs IEnumerable / Channel), and the conventions around \[EnumeratorCancellation\] | SEQ-03 | ✅ Documented ([ASY-04](../README.md#-asy-04-knowing-the-cost-of-iasyncenumerable-and-when-to-use-it), being aware of the 11.6x per-element cost) |
-| ⑥ | net11 generation watch | Re-measure after net11 GA: (1) enum boxing through Equals disappears via JIT specialization (add a generation note to STK-05's implicit-boxing list), (2) LINQ Min/Max vectorization (reinforces VEC-01's prefer-BCL-APIs guidance) | STK-05 / VEC-01 | ⏳ Waiting for net11 GA |
+| ⑥ | net11 generation watch | Re-measure after net11 GA: (1) enum boxing through Equals disappears via JIT specialization (add a generation note to STK-05's implicit-boxing list), (2) LINQ Min/Max vectorization (reinforces VEC-01's prefer-BCL-APIs guidance) → further items in "Items to re-verify at net11 GA" below (A1-G2) | STK-05 / VEC-01 and others | ⏳ Waiting for net11 GA |
 | ⑦ | `scoped` / `[UnscopedRef]` (C# 11) | Does it show in codegen? Does a ref-returning accessor beat a get/set pair? | STK-01 | ❌ No difference / rejected (R-20). `scoped` documented in STK-01 |
 | ⑦ | ref field cursor for structured reads | Does it beat the indexed form in the field-granular shape R-12 named? | STK-01 / R-12 | ✅ Adopted ([STK-10](../README.md), 0.81x on x86-64-v4 / 0.75x on v3, identical codegen) |
 | ⑦ | `GetValueRefOrNullRef` + `IsNullRef` | Can an existence-checked update collapse into one probe? | COL-01 | ✅ Adopted ([COL-07](../README.md), update 0.44-0.59x. Read path: no difference for a single-field read, 0.93x for a 32 B value read through two fields on x86-64-v4) |
@@ -274,5 +274,73 @@ Differences that measurement could not resolve, listed together with the result 
 | ⑦ | `Unsafe.Unbox<T>` | Can an existing box be updated without reallocating? | STK-05 | ✅ Adopted (STK-05 extension, 0.17-0.18x and zero allocation; the ratio is machine independent because what is removed is an allocation) |
 | ⑦ | `MemoryMarshal.TryGetArray` | Copy-free bridge to `byte[]`-based APIs | BUF-04 | ✅ Adopted (lives in BUF-08, 4,120 → 0 B allocated) |
 | ⑧ | Normalising the probe to enable an ordinal switch (column-name matching) | Does upper-casing the probe first beat `Equals(OrdinalIgnoreCase)` / the sampling-hash switch? | TXT-10 / GEN-02 | ⚠️ **Split verdict.** The conversion is **rejected** - it loses in 12 of 12 conditions (2.0-3.0x at 8 columns, 1.35-2.91x at 24) and costs 2.7-3.2 ns per column. For the match itself the crossover is the column count: the chain wins at 8 (the switch is 1.17-1.19x) and the **un-converted** ordinal switch wins at 24 (0.91x, code 2,212 vs 3,261 B). Measured like for like only after adding a harness-matched baseline - see pitfall 3 → [LAB-ColumnMatch](../benchmarks/results/LAB-ColumnMatch.md) |
+| ⑧ | Key type for a Type-keyed dictionary (`Type` vs `RuntimeTypeHandle`) | TYP-07 compared hash sources inside a hand-written table. For code that stays on the BCL `Dictionary`, does keying by `RuntimeTypeHandle` alone help, and does the gap to the hand-written table remain? | TYP-07 / TYP-01 / R-22 | ⏳ Provisional (B550H): the `RuntimeTypeHandle` key is 0.70x on hit / 0.77x on miss (CIs disjoint, code 1,037 → 797 B). The hand-written table over `TypeHandle.Value` sits 2.4x further ahead at 0.29x. **The two decisions are independent** — finalize on HX 370 and under NativeAOT |
 
 ---
+
+### 🔭 Items to re-verify at net11 GA (limited to those that change how library code is written)
+
+Source: [Performance Improvements in .NET 11](https://devblogs.microsoft.com/dotnet/performance-improvements-in-net-11/) (.NET Blog, 2026-09). **Items that merely make a feature faster are not listed.** Only changes that make a hand-written workaround unnecessary or that could change a catalog guideline qualify; LINQ improvements are out of scope. Each row reads "what changed in net11 → which catalog text it touches → what to measure → which result rewrites the catalog".
+
+**Common verdict policy:** decide on **generated code (presence of RNGCHKFAIL, code size) and allocated bytes**, not on time — the R-04 ratios turned out to be core-dependent. Existing benchmarks re-run by adding a `RuntimeMoniker.Net11_0` job.
+
+#### A. Wider bounds-check elimination — the "exceptions" for manual ref / unsafe shrink
+
+| # | net11 change (PR) | Catalog text affected | What to measure | Rewrite condition |
+|---|---|---|---|---|
+| A1 | Consecutive constant-index accesses collapse into one guard (#127439 / #124705): `values[0]..values[15]` becomes a single check at the highest index. Sum16 0.62x | R-15 (touching the last element first), outside article "patterns where the check disappears" #5 | Re-run `LAB-BoundsCheckHint` on net11 | If the hand-written pre-touch is **slower / larger**, upgrade R-15 from "unnecessary" to "harmful" |
+| A2 | A lookahead guard `(uint)(i + n) < (uint)span.Length` proves `span[i]..span[i+n]` (#124242 / #125235) | R-02 exception (2) "sampling access whose range is guaranteed by construction" = the manual ref in `SampledNameTable.CalculateHash` | Re-measure indexed vs manual ref in `SampledNameTable` on net11 | If RNGCHKFAIL disappears from the indexed form, **revert the manual ref to indexing and delete R-02 exception (2)** |
+| A3 | Fixed-width read after `Slice(Length - n)` (#127488, 73 → 28 B) and tracking of slice-advancing loops (#122040 / #127117) | SEQ-02 (tail reads via `BinaryPrimitives`), VEC-01 chunk loops (`data = data.Slice(16)`) | Code size and RNGCHKFAIL of both shapes | If the checks disappear, add "the Slice form is fine; no need to unroll into index arithmetic" to SEQ-02 / VEC-01 |
+| A4 | Result ranges of `BitOperations.LeadingZeroCount / TrailingZeroCount / PopCount` recognized (#128620, 0.85x); OR-operand bounds combined (#122263) | BIT-03, TXT-01 (table indexing), R-09 | Code size of `table[BitOperations.Log2(v)]` and Base64-style `(a << 4) \| (b >> 4)` indexing | If gone, add "indices derived from bit operations need no unsafe" to BIT-03 / TXT-01 |
+| A5 | The `(uint)i < (uint)span.Length` guard now also records `i >= 0` (#125056) | R-18 (hand-written uint cast) | Compare with and without the uint guard in a shape containing `span[i - 1]` | If a shape is found where the uint guard helps **in time**, qualify R-18's "pointless" |
+| A6 | Overflow branches of `checked(...)` removed after a guard (#124147 / #124184, 64 → 44 B, 52 → 24 B) | (not yet covered) the habit of avoiding `checked` on hot paths | Code size of guarded `checked(length * 10)` / `checked((byte)value)` | If gone, add a new note "after a range guard, `checked` is free" (a safety-side gain) |
+| A7 | Loop cloning for `!=` terminators (#129268 / #129303) | R-04 (recommends ascending `<`) | Add `for (i = 0; i != n; i++)` to `LoopFormBenchmark` | If identical to `<`, relax R-04's recommendation to "`<` or `!=`" |
+
+#### B. Wider escape analysis — hand-written allocation avoidance becomes unnecessary
+
+| # | net11 change (PR) | Catalog text affected | What to measure | Rewrite condition |
+|---|---|---|---|---|
+| B1 | Conditional escape analysis recognizes delegating `GetEnumerator()` chains (#122946). `ReadOnlyInstance` 13.874 → 2.674 ns, 32 → 0 B | **STK-03, and the wrapper paragraph in R-04 (⏳❗ pending the final run)** | Re-run `ReadOnlyCollectionLoopBenchmark` / `EnumerableEscapeBenchmark` on net11 | If foreach over the wrapper reaches 0 B, demote R-04's "wrappers stay on the indexer" to net10-only and narrow STK-03 further. It would also confirm that the net10 "did not reproduce" was a generation gap |
+| B2 | `Nullable<T>` boxing expanded by the JIT and exposed to escape analysis (#122167, 0.21x, 24 → 0 B) | STK-05 (implicit boxing list), item (1) of row ⑥ above | Add a `T?` path to STK-05's implicit boxing cases and re-measure | Drop the cases that disappear from the list with a "not needed from net11" generation note |
+| B3 | Receiver of `EqualityComparer<T>.Default.Equals` loaded directly instead of through an address (#121918, 0.46x, 24 → 0 B) | JIT-02 (`IEquatable<T>` constraint) | Re-measure JIT-02 as "with constraint" vs "`EqualityComparer<T>.Default` called directly" | If the gap closes, qualify JIT-02 as "the constraint is for AOT / older generations" |
+
+#### C. Wider devirtualization
+
+| # | net11 change (PR) | Catalog text affected | What to measure | Rewrite condition |
+|---|---|---|---|---|
+| C1 | Generic virtual methods (GVM) devirtualized and inlined (#122023 / #128702, 0.25x, 24 → 0 B) | (not yet covered) around DSP-01 / JIT-02 | New benchmark: `T Get<T>()` on an interface, called through a sealed implementation | If net11 turns it into a direct call, note in DSP-01 that "avoid GVMs on hot paths" is no longer needed |
+
+#### D. Runtime async (opt-in)
+
+| # | net11 change | Catalog text affected | What to measure | Rewrite condition |
+|---|---|---|---|---|
+| D1 | `<Features>runtime-async=on</Features>` moves async lowering from the C# compiler to the JIT. Two-layer chain 21.2 → 6.2 ns, 144 → 0 B; 10-layer exception propagation 0.30x; binary 0.52x | ASY-01 (async elision), ASY-05 (ValueTask), ASY-04 | Re-measure the existing ASY-01 / ASY-05 benchmarks with two jobs, flag on and off | If `return await` stops allocating with the flag on, qualify ASY-01 as "flag off or net10 and earlier". Re-judge the motive for `ValueTask` (avoiding allocation on synchronous completion) as well |
+
+#### E. New core-library APIs — replace hand-written code with the BCL
+
+| # | net11 change (PR) | Catalog text affected | What to measure | Rewrite condition |
+|---|---|---|---|---|
+| E1 | `MemoryExtensions` gains `ContainsAnyWhiteSpace` / `IndexOfAnyWhiteSpace` / `IndexOfAnyExceptWhiteSpace` / `LastIndexOfAny(Except)WhiteSpace` (#111439), backed by one shared `SearchValues<char>` | TXT-08 (hand-built whitespace `SearchValues`), trimming and parser code | Time and code size of a hand-built `SearchValues.Create(" \t\r\n…")` versus the new API. The article itself notes that **for inputs with almost nothing to trim a scalar loop can win**, so measure that shape too | If equal or better, add "do not keep your own whitespace SearchValues; use the BCL API" to TXT-08. Record the short-input condition where scalar wins, if one appears |
+| E2 | `Span<T>.Sort<T, TComparer>` specializes on a struct comparer **without boxing it** (#116109). 0.30x, 88 → 0 B | **R-06 / JIT-02** ("pass the comparer as a struct via a generic constraint"). **Up to net10 that guidance was not effective for `Span.Sort`** (boxed plus interface calls) | Allocated bytes of `Span.Sort` with a struct comparer on net10 and net11 | If net10 shows 88 B, add a generation note to R-06: "struct comparers on `Span.Sort` take effect from net11". Revisit JIT-02's stated scope as well |
+| E3 | `DeflateEncoder/Decoder`, `ZLibEncoder/Decoder`, `GZipEncoder/Decoder` made public (#123145), following `BrotliEncoder`; callers own or pool the input and output buffers | BUF-05 / ASY-07, Rester's `CompressedContent` (GZipStream / DeflateStream) | Allocation and time via `GZipStream` versus `GZipEncoder` over pooled buffers | If the allocation disappears, add "Span compression without a Stream wrapper" to the BUF family and mark Rester as a candidate |
+| E4 | Portable lane-manipulation APIs (#129627): sequence construction (`[1, 2, 4, 8]`), half-vector concatenation, interleave / de-interleave, reverse; the JIT picks the instruction | **VEC-02** (`Ssse3` vs `Vector128.Shuffle`), VEC-01 | Codegen and time of the VEC-02 shuffle rewritten with the new APIs | If the instruction sequences match, add "platform-specific APIs can be replaced by the portable ones" to VEC-02 |
+| E5 | User-defined structs that are `Unsafe.BitCast` to SIMD types are excluded from struct promotion so they keep their vector representation (#129563) | LAB-BitCast, VEC-01 (value types like `Vector2Double`) | Whether the spill disappears when round-tripping a two-`double` struct through `Vector128<double>` | If it does, add "domain types may be BitCast to SIMD for arithmetic" to VEC-01 |
+
+#### F. Changes that move an existing verdict's numbers
+
+| # | net11 change (PR) | Catalog text affected | What to measure | Rewrite condition |
+|---|---|---|---|---|
+| F1 | The temporary `Dictionary` built while constructing a `FrozenDictionary` is now pre-sized from the source count (#128300) | **COL-02 / R-08** (the main reason for rejection is "construction costs 5-20x a `Dictionary`") | Re-measure COL-02's build benchmark on net11 | If the build ratio shrinks, relax COL-02's adoption condition. The lookup side is unchanged, so "1.19x slower at 1024 entries" stays |
+| F2 | `Enum.Equals` in a generic `T : Enum` context folds to a direct comparison of the underlying integers (#122779); it used to box twice and make a virtual call | Item (1) of row ⑥ above, STK-05 (implicit boxing list) | Re-measure STK-05's enum comparison case on net11 | If it reaches 0 B, drop it from the STK-05 list with a "not needed from net11" note; the `EqualityComparer<T>.Default` and `Unsafe.As` workarounds become unnecessary too |
+| F3 | The covariance check on stores into reference-type arrays is removed when the JIT knows the exact array type (#126547) | MEM-02, DSP-01 (sealed) | Stores into `object[]` versus an array of a sealed element type versus a locally created array | If the condition under which the check disappears is confirmed, add "avoids the covariance check on array stores" to DSP-01's benefits |
+
+#### G. Notes only (not measurable in this environment, or applicable without waiting for net11)
+
+| # | Item | Handling |
+|---|---|---|
+| G1 | `volatile` on fields already protected by a lock, `Interlocked`, or one-time initialization is redundant (#125274 removed them across the BCL). No extra instructions on x64, but **fences on Arm** | Record as a CON-family guideline. State explicitly that it cannot be measured on x64 and the verdict rests on the article |
+| G2 | In fixed-format parsing and formatting, **slicing to the exact length up front** (`span = span[..N]`) lets the JIT drop every later constant-index bounds check (#119254 applied it to `Decimal` / `Guid` / `IPAddress`) | **Verifiable on net10 without waiting.** Measure first as a candidate for TXT-09 (fixed-width formatting idioms) |
+
+**Excluded (faster, but the way code is written does not change):** the 8 B delegate shrink (#99200 — DSP-04's table numbers move, the guidance does not), same-block assertion tracking (#121527), bounds checks in list patterns (#121273), relaxed inlining budget for intrinsic types (#127433), class-handle preservation across spills (#128485), better register passing of small structs (#112740 — MEM-04's numbers move), R2R / NativeAOT GVM devirtualization, Arm64 codegen in general (paired loads, shrn, ubfx, …), SVE (experimental), Tier0 Nullable boxing, the `string.Concat` / `string.Split` / `Ascii.Equals` speedups, the value-type-key optimization in `Dictionary.Remove` (#125884 — it only reinforces R-22's "Dictionary is already fast"), internal improvements to `HashSet.UnionWith` / `Array.FindAll` / `ImmutableArray`, the `[NoInlining]` on `Random` (#131714 — the article itself calls it a stopgap until the JIT if-converts inside loops), BigInteger / TensorPrimitives / TimeZoneInfo / Regex / Networking / Diagnostics, LINQ in general.
+
+**Coverage:** selected after reading the full article (Benchmarking Setup through What's Next, 379 KB). A-D come from the JIT section; E-G from the Vectorization / Threading / Numerics / Strings and Spans / Collections sections.

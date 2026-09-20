@@ -259,7 +259,7 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | ✅ 収録([ASY-02](../README.ja.md#-asy-02-systemthreadingchannels-による生産者消費者)、~45ns/要素・Bounded は 2 倍) |
 | ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 | ✅ 条件付き収録([ASY-03](../README.ja.md#-asy-03-systemiopipelines)、小データは 1.63 倍・アロケーション 1/80。64KB デッドロック注意) |
 | ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-03 | ✅ 収録([ASY-04](../README.ja.md#-asy-04-iasyncenumerable-のコスト認知と使い分け)、要素あたり 11.6 倍のコスト認知) |
-| ⑥ | net11 世代ウォッチ | net11 GA 後に再測定: ① enum の Equals 経由ボックス化が JIT 特殊化で消える(STK-05 の暗黙ボックス化リストへ世代注記)② LINQ Min/Max のベクトル化(VEC-01 の「BCL 済み API 優先」指針の裏付け強化) | STK-05 / VEC-01 | ⏳ net11 GA 待ち |
+| ⑥ | net11 世代ウォッチ | net11 GA 後に再測定: ① enum の Equals 経由ボックス化が JIT 特殊化で消える(STK-05 の暗黙ボックス化リストへ世代注記)② LINQ Min/Max のベクトル化(VEC-01 の「BCL 済み API 優先」指針の裏付け強化) → 追加分は下記「net11 GA 時の再検証項目」(A1〜G2) | STK-05 / VEC-01 ほか | ⏳ net11 GA 待ち |
 | ⑦ | `scoped` / `[UnscopedRef]`(C# 11) | codegen に出るか。ref 返しアクセサは get/set ペアに勝つか | STK-01 | ❌ 差なし / 不採用(R-20)。`scoped` は STK-01 の注記へ |
 | ⑦ | ref フィールドの構造読み | R-12 が名指しした「フィールド粒度の読み」で索引形に勝つか | STK-01 / R-12 | ✅ 収録([STK-10](../README.ja.md)、x86-64-v4 で 0.81 倍 / v3 で 0.75 倍、生成コードは同一) |
 | ⑦ | `GetValueRefOrNullRef` + `IsNullRef` | 存在確認つき更新を探索 1 回に畳めるか | COL-01 | ✅ 収録([COL-07](../README.ja.md)、更新 0.44〜0.59 倍。読み取りは 1 フィールドなら差なし、32 バイト値を 2 フィールド読む形は x86-64-v4 で 0.93 倍) |
@@ -274,5 +274,73 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ⑦ | `Unsafe.Unbox<T>` | 既存ボックスを再確保せず更新できるか | STK-05 | ✅ 収録(STK-05 拡張、0.17〜0.18 倍・割り当てゼロ。消えるのが割り当てなので比率は機械非依存) |
 | ⑦ | `MemoryMarshal.TryGetArray` | `byte[]` 前提 API への無コピー橋渡し | BUF-04 | ✅ 収録(BUF-08 に同居、割り当て 4,120 → 0 B) |
 | ⑧ | 序数 switch を使うためのプローブ正規化(列名照合) | 先に大文字化する形は `Equals(OrdinalIgnoreCase)` / サンプリングハッシュ switch に勝てるか | TXT-10 / GEN-02 | ⚠️ **判定は二分。** 変換は**不採用** — 測定 12 条件すべてで負け(8 列 2.0〜3.0 倍、24 列 1.35〜2.91 倍)、列あたり 2.7〜3.2 ns を足す。照合そのものの境界は列数で、8 列は連鎖の勝ち(switch が 1.17〜1.19 倍)、24 列は**変換なし**の序数 switch の勝ち(0.91 倍、コード 2,212 対 3,261 B)。等価比較はハーネスを揃えた基準を追加して初めて成立した — 落とし穴 3 を参照 → [LAB-ColumnMatch](../benchmarks/results/LAB-ColumnMatch.md) |
+| ⑧ | Type キー辞書のキー型(`Type` vs `RuntimeTypeHandle`) | TYP-07 は自作表内のハッシュ取得元を比較した。BCL `Dictionary` に留まる場合、キーの型を `RuntimeTypeHandle` にするだけで速くなるか。自作表との差は残るか | TYP-07 / TYP-01 / R-22 | ⏳ 仮測定(B550H)で `RuntimeTypeHandle` キーが hit 0.70 倍・miss 0.77 倍(信頼区間非重複、コード 1,037 → 797 B)。自作表 + `TypeHandle.Value` は 0.29 倍で 2.4 倍先。**2 つの判断は独立** — HX 370 と NativeAOT で確定 |
 
 ---
+
+### 🔭 net11 GA 時の再検証項目(ライブラリの書き方が変わるものに限定)
+
+出典: [Performance Improvements in .NET 11](https://devblogs.microsoft.com/dotnet/performance-improvements-in-net-11/)(.NET Blog、2026-09)。**「機能が速くなった」だけの項目は載せない。** 載せるのは「手書きの回避策が不要になる」「カタログの指針が変わりうる」ものだけで、LINQ の改善は対象外。各行は「net11 で何が変わったか → カタログのどこが影響を受けるか → 何で測るか → どの結果ならカタログを書き換えるか」。
+
+**共通の判定方針:** 時間ではなく**生成コード(RNGCHKFAIL の有無・コードサイズ)と確保バイト数**で判定する(R-04 で倍率がコア依存だった経緯のとおり)。既存ベンチマークは `RuntimeMoniker.Net11_0` の Job を足すだけで再実行できる。
+
+#### A. 境界チェック除去の拡張 — 手動 ref / unsafe の「例外」が縮む
+
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
+|---|---|---|---|---|
+| A1 | 定数添字の連続アクセスを 1 本のガードに畳む(#127439 / #124705)。`values[0]..values[15]` は最大添字の 1 回チェックに。Sum16 0.62 倍 | R-15(末尾の事前タッチ)、外部記事「消えるパターン集」#5 | `LAB-BoundsCheckHint` を net11 で再実行 | 手書きの事前タッチが**逆に遅い / コードが増える**なら R-15 を「不要」から「有害」へ格上げ |
+| A2 | 先読みガード `(uint)(i + n) < (uint)span.Length` が `span[i]..span[i+n]` を証明(#124242 / #125235) | R-02 の例外(2)「構成的に範囲保証されたサンプリングアクセス」= `SampledNameTable.CalculateHash` の手動 ref | `SampledNameTable` の索引形 vs 手動 ref を net11 で再測 | 索引形で RNGCHKFAIL が消えるなら**手動 ref を索引形へ戻し、R-02 の例外(2)を削除** |
+| A3 | `Slice(Length - n)` 後の固定幅読み(#127488、73 → 28 B)と、Slice 前進ループの追跡(#122040 / #127117) | SEQ-02(`BinaryPrimitives` の末尾読み)、VEC-01 のチャンクループ(`data = data.Slice(16)`) | 両形のコードサイズと RNGCHKFAIL | チェックが消えるなら「Slice 形でよい、index 算術に開く必要なし」を SEQ-02 / VEC-01 に追記 |
+| A4 | `BitOperations.LeadingZeroCount / TrailingZeroCount / PopCount` の結果範囲を認識(#128620、0.85 倍)、ビット OR の範囲合成(#122263) | BIT-03、TXT-01(テーブル索引)、R-09 | `table[BitOperations.Log2(v)]` と Base64 型 `(a << 4) \| (b >> 4)` 索引のコードサイズ | 消えるなら「ビット演算由来の添字は unsafe 不要」を BIT-03 / TXT-01 に追記 |
+| A5 | `(uint)i < (uint)span.Length` ガードが `i >= 0` も記録(#125056) | R-18(uint キャストの手書き) | `span[i - 1]` を含む形で uint ガードの有無を比較 | uint ガードが**時間で**効く形が見つかれば、R-18 の「意味がない」に条件を付ける |
+| A6 | ガード後の `checked(...)` のオーバーフロー分岐を除去(#124147 / #124184、64 → 44 B・52 → 24 B) | (未収載)ホットパスで `checked` を避ける慣習 | ガード付き `checked(length * 10)` / `checked((byte)value)` のコードサイズ | 消えるなら「範囲ガード後は `checked` を書いてよい」を新規注記(安全性側の改善) |
+| A7 | `!=` 終端ループのクローン(#129268 / #129303) | R-04(昇順 `<` を推奨) | `for (i = 0; i != n; i++)` を `LoopFormBenchmark` に追加 | `<` と同一命令列なら R-04 の推奨を「`<` または `!=`」へ緩和 |
+
+#### B. エスケープ解析の拡張 — 確保回避の手書きが不要になる
+
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
+|---|---|---|---|---|
+| B1 | 委譲する `GetEnumerator()` 連鎖を条件付きエスケープ解析が認識(#122946)。`ReadOnlyInstance` 13.874 → 2.674 ns、32 → 0 B | **STK-03、R-04 のラッパー節(⏳❗ 本検証待ち)** | `ReadOnlyCollectionLoopBenchmark` / `EnumerableEscapeBenchmark` を net11 で再実行 | ラッパーの foreach が 0 B になれば R-04 の「ラッパーは添字」を net10 限定に格下げし、STK-03 の適用範囲をさらに狭める。net10 で「再現せず」だった原因が世代差だったと確定する |
+| B2 | `Nullable<T>` のボックス化を JIT が展開しエスケープ解析の対象に(#122167、0.21 倍・24 → 0 B) | STK-05(暗黙ボックス化リスト)、上表 ⑥ の ① | STK-05 の暗黙ボックス化ケースに `T?` 経由を追加して再測 | 消えるケースをリストから外し「net11 以降は不要」と世代注記 |
+| B3 | `EqualityComparer<T>.Default.Equals` の受け手を間接参照でなく直接ロード(#121918、0.46 倍・24 → 0 B) | JIT-02(`IEquatable<T>` 制約) | JIT-02 の比較を「制約あり」vs「`EqualityComparer<T>.Default` 直呼び」で再測 | 差が消えれば JIT-02 を「制約は AOT / 旧世代向け」に条件付け |
+
+#### C. devirt の拡張
+
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
+|---|---|---|---|---|
+| C1 | ジェネリック仮想メソッド(GVM)の devirt + インライン化(#122023 / #128702、0.25 倍・24 → 0 B) | (未収載)DSP-01 / JIT-02 の周辺 | インターフェース上の `T Get<T>()` 形を sealed 実装で呼ぶベンチを新設 | net11 で直接呼び出しになるなら「GVM をホットパスで避ける」という慣習は不要、と DSP-01 に注記 |
+
+#### D. runtime-async(オプトイン)
+
+| # | .NET 11 の変更 | 影響する記述 | 測るもの | 書き換え条件 |
+|---|---|---|---|---|
+| D1 | `<Features>runtime-async=on</Features>` で async の下位変換を C# コンパイラでなく JIT が担当。2 層チェーン 21.2 → 6.2 ns・144 → 0 B、10 層の例外伝播 0.30 倍、バイナリ 0.52 倍 | ASY-01(async 消去)、ASY-05(ValueTask)、ASY-04 | 既存の ASY-01 / ASY-05 ベンチをフラグ on / off の 2 Job で再測 | on で `return await` の確保が消えるなら ASY-01 を「フラグ off または net10 以前向け」に条件付け。`ValueTask` を選ぶ動機(同期完了時の確保回避)も再判定 |
+
+#### E. コアライブラリ API の追加 — 自前実装を BCL へ置き換える
+
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
+|---|---|---|---|---|
+| E1 | `MemoryExtensions` に `ContainsAnyWhiteSpace` / `IndexOfAnyWhiteSpace` / `IndexOfAnyExceptWhiteSpace` / `LastIndexOfAny(Except)WhiteSpace` を追加(#111439)。内部は共有の `SearchValues<char>` | TXT-08(自前の空白 `SearchValues`)、トリム・パーサ実装 | 自前 `SearchValues.Create(" \t\r\n…")` と新 API の時間・コードサイズ。**トリムのように「ほぼ何も無い」入力**では記事自身が「スカラーの方が速い場合がある」と注記しているので、その形も測る | 同等以上なら「空白探索は自前 SearchValues を持たず BCL API」を TXT-08 に追記。短い入力でスカラーが勝つ条件が出れば併記 |
+| E2 | `Span<T>.Sort<T, TComparer>` が struct 比較子を**ボックス化せず**ジェネリック特殊化(#116109)。0.30 倍・88 → 0 B | **R-06 / JIT-02**(「比較子は struct + ジェネリック制約で渡す」)。**net10 まではこの指針が `Span.Sort` では効いていなかった**(ボックス化 + インターフェース呼び出し) | net10 と net11 で struct 比較子渡しの `Span.Sort` の確保バイト数 | net10 で 88 B が出れば R-06 に「`Span.Sort` での struct 比較子は net11 から有効」と世代注記。JIT-02 の適用範囲の記述も見直す |
+| E3 | `DeflateEncoder/Decoder`、`ZLibEncoder/Decoder`、`GZipEncoder/Decoder` を公開(#123145、既存の `BrotliEncoder` と同形)。呼び出し側が入出力バッファを所有・プールできる | BUF-05 / ASY-07、Rester の `CompressedContent`(GZipStream / DeflateStream) | `GZipStream` 経由と `GZipEncoder` + プール済みバッファでの確保・時間 | 確保が消えるなら「Stream ラッパーを介さない Span 圧縮」を BUF 系に新設し、Rester を適用候補に |
+| E4 | portable なレーン操作 API を追加(#129627): 系列生成(`[1, 2, 4, 8]`)、半分連結、interleave / de-interleave、reverse。JIT が命令選択 | **VEC-02**(`Ssse3` vs `Vector128.Shuffle`)、VEC-01 | VEC-02 のシャッフルを新 API で書いた版のコード生成と時間 | 同一命令列なら VEC-02 に「プラットフォーム固有 API を portable へ置換可」を追記 |
+| E5 | SIMD 型へ `Unsafe.BitCast` されるユーザ定義 struct を struct promotion の対象外にし、ベクタ表現を維持(#129563) | LAB-BitCast、VEC-01(`Vector2Double` 型の値型) | 2 つの `double` を持つ struct ↔ `Vector128<double>` の往復で spill が消えるか | 消えるなら「ドメイン型は BitCast で SIMD 演算してよい」を VEC-01 に追記 |
+
+#### F. 既存判定の数値が動くもの
+
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
+|---|---|---|---|---|
+| F1 | `FrozenDictionary` 構築時の一時 `Dictionary` を元の件数で事前サイズ確保(#128300) | **COL-02 / R-08**(不採用の主因は「構築が `Dictionary` の 5〜20 倍」) | COL-02 の構築ベンチを net11 で再測 | 構築比が縮めば COL-02 の採用条件を緩和。検索側は変わらないので「1024 件で検索 1.19 倍遅い」は残る |
+| F2 | ジェネリック `T : Enum` 文脈の `Enum.Equals` を基底整数の直接比較へ畳む(#122779)。従来はボックス 2 回 + 仮想呼び出し | 上表 ⑥ の ①、STK-05(暗黙ボックス化リスト) | STK-05 の enum 比較ケースを net11 で再測 | 0 B になれば STK-05 のリストから外し「net11 以降は不要」と世代注記。`EqualityComparer<T>.Default` や `Unsafe.As` による回避策も不要になる |
+| F3 | 参照型配列への格納で、JIT が配列の正確な型を知る場合は共変性チェックを除去(#126547) | MEM-02、DSP-01(sealed) | `object[]` への格納 vs sealed 要素型の配列への格納 vs ローカル生成配列への格納 | チェックが消える条件が確認できれば DSP-01 の効果に「配列格納の共変性チェック回避」を追加 |
+
+#### G. 注記のみ(この環境では計測不能、または net11 を待たず適用可)
+
+| # | 内容 | 扱い |
+|---|---|---|
+| G1 | ロック / `Interlocked` / 一度きり初期化で既に保護されているフィールドの `volatile` は冗長(#125274 で BCL 全体から除去)。x64 では命令に出ないが **Arm ではフェンスになる** | CON 系の指針として注記する。x64 環境では計測できないため、判定は記事の記述に依拠すると明記 |
+| G2 | 固定書式の解析・整形で**先頭に `span = span[..N]` を置いて厳密な長さを確定**させると、後続の定数添字の境界チェックが全て消える(#119254 が `Decimal` / `Guid` / `IPAddress` に適用) | **net11 を待たず net10 で検証可能。** TXT-09(固定長整形の応用イディオム)の候補として先に測る |
+
+**除外したもの(性能向上のみで書き方は変わらない):** デリゲートの 8 B 縮小(#99200。DSP-04 の表の数値は動くが指針は不変)、同一ブロック内アサーション追跡(#121527)、list pattern の境界チェック(#121273)、intrinsic 型のインライン予算緩和(#127433)、spill 越しの型情報保持(#128485)、小さな struct のレジスタ渡し改善(#112740。MEM-04 の数値は動く)、R2R / NativeAOT の GVM devirt、Arm64 のコード生成全般(ペアロード・shrn・ubfx 等)、SVE(実験的)、Tier0 の Nullable ボックス化、`string.Concat` / `string.Split` / `Ascii.Equals` の高速化、`Dictionary.Remove` の値型キー最適化(#125884。R-22 の「Dictionary は既に速い」を補強するのみ)、`HashSet.UnionWith` / `Array.FindAll` / `ImmutableArray` の内部改善、`Random` の `[NoInlining]`(#131714。JIT がループ内 if 変換に対応するまでの暫定策と記事自身が明記)、BigInteger / TensorPrimitives / TimeZoneInfo / Regex / Networking / Diagnostics、LINQ 全般。
+
+**確認範囲:** 記事全文(Benchmarking Setup 〜 What's Next、379 KB)を通読した上での選別。A〜D は JIT 節、E〜G は Vectorization / Threading / Numerics / Strings and Spans / Collections 節に基づく。

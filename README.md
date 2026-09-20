@@ -2004,6 +2004,19 @@ var index = (int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask;
 - The handle is stable for the process lifetime of a loaded type. Under a collectible `AssemblyLoadContext` an unloaded type's address can be reused, so this is only safe while the table holds a strong `Type` reference for every live entry
 - If the type *is* known statically, none of this applies - use [TYP-01](#️-typ-01-static-type-slots-typemap--typeslot)'s generic slot at 0.09x instead
 
+**If you stay on the BCL `Dictionary` — key it by `RuntimeTypeHandle` (⏳ provisional: B550H / x86-64-v3, to be replaced on HX 370 and under NativeAOT):** the table above is about a hand-written table; a library that stays on `Dictionary<,>` cannot choose the hash source (the only way is a class `IEqualityComparer<Type>`, which brings back one interface dispatch). Changing the **key type itself** from `Type` to `RuntimeTypeHandle` keeps the same identity hash while putting the lookup on `Dictionary`'s value-type-key fast path.
+
+| Path (32 hits / 8 misses, per lookup) | Hit | Miss | Code size |
+|---|---:|---:|---:|
+| `Dictionary<Type, T>` (baseline) | 4.576 ns | 3.567 ns | 1,037 B |
+| **`Dictionary<RuntimeTypeHandle, T>`** | **3.188 ns (0.70x)** | **2.749 ns (0.77x)** | 797 B |
+| `Dictionary<Type, T>` + class comparer over `TypeHandle.Value` | 3.349 ns (0.73x) | 2.342 ns (0.66x) | 593 B |
+| Hand-written table + `TypeHandle.Value` (same as above) | **1.307 ns (0.29x)** | **1.125 ns (0.32x)** | 195 B |
+
+**Why it works (disassembly):** `Type.GetHashCode()`, `RuntimeHelpers.GetHashCode(type)` and `RuntimeTypeHandle.GetHashCode()` all return **the same identity hash**, so the difference is the path, not hash quality. `Dictionary<Type, T>` carries **three guarded-devirtualization type checks per lookup** (is the comparer `ObjectEqualityComparer<Type>`, is the `GetHashCode` receiver a `RuntimeType`, is the `Equals` receiver a `RuntimeType`) and **spills the key to the stack** for the constrained `GetHashCode` call. With a `RuntimeTypeHandle` key the comparer check and the spills disappear and the entry comparison becomes a single `cmp`. The identity-hash acquisition (`TryGetHashCode` call + header read + assigned check) remains, which is why it does not reach the hand-written table that replaces it with **one field load** (`mov rax,[rcx+18]`), 2.4x further ahead.
+
+**Which to use:** to speed up a `Dictionary` without replacing it, key by `RuntimeTypeHandle` (callers pass `type.TypeHandle`). For more than that, the hand-written table. **The two decisions are independent.** Under NativeAOT the virtual-call gap vanishes as it did for TYP-07 itself, so the ranking may change — confirm in the final run. → [Results](benchmarks/results/TYP-07-TypeKey.md)
+
 ---
 
 ## 🔢 BIT: Bit manipulation and branchless optimization

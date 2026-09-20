@@ -49,6 +49,7 @@ public static class Program
         IndexForwardBenchmark.Verify();
         StreamSequenceBenchmark.Verify();
         TypeHashSourceBenchmark.Verify();
+        TypeKeyBenchmark.Verify();
         StringSwitchSmallBenchmark.Verify();
         StringSwitchBenchmark.Verify();
         StringSwitchLongKeyBenchmark.Verify();
@@ -176,6 +177,7 @@ public static class Program
                 typeof(IndexForwardBenchmark),
                 typeof(StreamSequenceBenchmark),
                 typeof(TypeHashSourceBenchmark),
+                typeof(TypeKeyBenchmark),
                 typeof(StringSwitchSmallBenchmark),
                 typeof(StringSwitchBenchmark),
                 typeof(StringSwitchLongKeyBenchmark),

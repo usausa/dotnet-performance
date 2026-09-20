@@ -2004,6 +2004,19 @@ var index = (int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask;
 - ハンドルが安定なのは「その型がロードされている間」。回収可能な `AssemblyLoadContext` ではアンロードされた型のアドレスが再利用されうるため、生きているエントリすべてについて表が `Type` の強参照を保持している場合にのみ安全
 - 型が**静的に分かる**なら、この話は一切不要 — [TYP-01](#️-typ-01-静的型スロットtypemap--typeslot) のジェネリックスロット(0.09 倍)を使う
 
+**BCL の `Dictionary` を使い続ける場合 — キーの型を `RuntimeTypeHandle` にする(⏳ 仮測定: B550H / x86-64-v3、HX 370 と NativeAOT で差し替え):** 上表は自作表の中の話で、`Dictionary<,>` に留まるライブラリはハッシュ取得元を選べない(選ぶには class の `IEqualityComparer<Type>` を渡すしかなく、インターフェース呼び出しが 1 回戻る)。代わりに**キーの型そのもの**を `Type` から `RuntimeTypeHandle` へ変えると、同じ identity ハッシュのまま `Dictionary` の値型キー高速経路に乗る。
+
+| 経路(32 件 hit / 8 件 miss、1 探索あたり) | hit | miss | コードサイズ |
+|---|---:|---:|---:|
+| `Dictionary<Type, T>`(基準) | 4.576 ns | 3.567 ns | 1,037 B |
+| **`Dictionary<RuntimeTypeHandle, T>`** | **3.188 ns(0.70 倍)** | **2.749 ns(0.77 倍)** | 797 B |
+| `Dictionary<Type, T>` + `TypeHandle.Value` の class comparer | 3.349 ns(0.73 倍) | 2.342 ns(0.66 倍) | 593 B |
+| 自作表 + `TypeHandle.Value`(上表と同じ) | **1.307 ns(0.29 倍)** | **1.125 ns(0.32 倍)** | 195 B |
+
+**なぜ効くか(逆アセンブル):** `Type.GetHashCode()` / `RuntimeHelpers.GetHashCode(type)` / `RuntimeTypeHandle.GetHashCode()` は 3 つとも**同じ identity ハッシュ**を返すので、差はハッシュの質ではなく経路にある。`Dictionary<Type, T>` は 1 探索に **GDV の型チェックを 3 本**(comparer が `ObjectEqualityComparer<Type>` か、`GetHashCode` の受け手が `RuntimeType` か、`Equals` の受け手が `RuntimeType` か)持ち、制約付き `GetHashCode` 呼び出しのために**キーをスタックへ退避**する。`RuntimeTypeHandle` キーは comparer のチェックと退避が消え、エントリ比較は `cmp` 1 命令になる。ただし identity ハッシュの取得(`TryGetHashCode` 呼び出し + ヘッダ読み + 割り当て済み判定)は残るため、それを**フィールド読み 1 回**(`mov rax,[rcx+18]`)で済ませる自作表には 2.4 倍届かない。
+
+**使い分け:** `Dictionary` のまま速くするなら `RuntimeTypeHandle` キー(呼び出し側は `type.TypeHandle` を渡す)。それ以上が要るなら自作表。**2 つの判断は独立している。** NativeAOT では TYP-07 本体と同じく仮想呼び出しの差が消えるため順位が変わりうる — 本検証で確認する。→ [測定結果](benchmarks/results/TYP-07-TypeKey.md)
+
 ---
 
 ## 🔢 BIT: ビット演算・ブランチレス最適化
