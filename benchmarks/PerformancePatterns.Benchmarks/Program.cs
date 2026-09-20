@@ -50,6 +50,7 @@ public static class Program
         StreamSequenceBenchmark.Verify();
         TypeHashSourceBenchmark.Verify();
         TypeKeyBenchmark.Verify();
+        TypeKeyDispatchBenchmark.Verify();
         StringSwitchSmallBenchmark.Verify();
         StringSwitchBenchmark.Verify();
         StringSwitchLongKeyBenchmark.Verify();
@@ -178,6 +179,7 @@ public static class Program
                 typeof(StreamSequenceBenchmark),
                 typeof(TypeHashSourceBenchmark),
                 typeof(TypeKeyBenchmark),
+                typeof(TypeKeyDispatchBenchmark),
                 typeof(StringSwitchSmallBenchmark),
                 typeof(StringSwitchBenchmark),
                 typeof(StringSwitchLongKeyBenchmark),

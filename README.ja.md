@@ -2011,11 +2011,17 @@ var index = (int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask;
 | `Dictionary<Type, T>`(基準) | 4.576 ns | 3.567 ns | 1,037 B |
 | **`Dictionary<RuntimeTypeHandle, T>`** | **3.188 ns(0.70 倍)** | **2.749 ns(0.77 倍)** | 797 B |
 | `Dictionary<Type, T>` + `TypeHandle.Value` の class comparer | 3.349 ns(0.73 倍) | 2.342 ns(0.66 倍) | 593 B |
+| `ConcurrentDictionary<Type, T>`(既定比較子、第 2 回実行) | 3.156 ns | 2.050 ns | 787 B |
+| **`ConcurrentDictionary<RuntimeTypeHandle, T>`** | **2.531 ns(上行比 0.80 倍)** | 2.565 ns ⏳❗(StdDev 0.67、Min 1.960 ≒ 同等) | 641 B |
 | 自作表 + `TypeHandle.Value`(上表と同じ) | **1.307 ns(0.29 倍)** | **1.125 ns(0.32 倍)** | 195 B |
 
 **なぜ効くか(逆アセンブル):** `Type.GetHashCode()` / `RuntimeHelpers.GetHashCode(type)` / `RuntimeTypeHandle.GetHashCode()` は 3 つとも**同じ identity ハッシュ**を返すので、差はハッシュの質ではなく経路にある。`Dictionary<Type, T>` は 1 探索に **GDV の型チェックを 3 本**(comparer が `ObjectEqualityComparer<Type>` か、`GetHashCode` の受け手が `RuntimeType` か、`Equals` の受け手が `RuntimeType` か)持ち、制約付き `GetHashCode` 呼び出しのために**キーをスタックへ退避**する。`RuntimeTypeHandle` キーは comparer のチェックと退避が消え、エントリ比較は `cmp` 1 命令になる。ただし identity ハッシュの取得(`TryGetHashCode` 呼び出し + ヘッダ読み + 割り当て済み判定)は残るため、それを**フィールド読み 1 回**(`mov rax,[rcx+18]`)で済ませる自作表には 2.4 倍届かない。
 
-**使い分け:** `Dictionary` のまま速くするなら `RuntimeTypeHandle` キー(呼び出し側は `type.TypeHandle` を渡す)。それ以上が要るなら自作表。**2 つの判断は独立している。** NativeAOT では TYP-07 本体と同じく仮想呼び出しの差が消えるため順位が変わりうる — 本検証で確認する。→ [測定結果](benchmarks/results/TYP-07-TypeKey.md)
+**`ConcurrentDictionary` の場合(⏳ 第 2 回実行):** 同じキー型変更で **hit 0.80 倍、miss は同等** — 利得はノードごとの `Equals` にあり、miss では走らない。`<Type, T>` は `_comparerIsDefaultForClasses` フラグによりハッシュだけは `key.GetHashCode()` を直接呼ぶ(GDV 1 本)が、`Equals` は comparer 経由で GDV 2 本(comparer 型・ノードキーの `RuntimeType`)が残る。`<RuntimeTypeHandle, T>` は値型キー経路に乗り、ノード比較が `cmp` 1 命令になる(580 B → 434 B)。**⏳❗ 想定外:** この機では `ConcurrentDictionary<Type, T>` の hit(3.16 ns)が `Dictionary<Type, T>`(4.6-5.5 ns)より速かった。ハッシュ側にインターフェース呼び出しが無いためと読めるが、`Dictionary` 系の hit 行は実行間で 30% 動いたので、HX 370 で確認してから引用する。
+
+**⏳❗ 探索の後に結果でディスパッチする形では逆転する(B550H / Zen 3、`TypeKeyDispatchBenchmark`):** 上の表は探索だけを測っている。実際のレジストリは引いた値(ファクトリのデリゲート)を**呼び出す**。`ConcurrentDictionary<K, Func<object>>` で 5 型を順に引いて呼ぶと、`RuntimeTypeHandle` キーは同一型の繰り返しでは 0.62 倍(4.33 vs 5.70 ns)なのに、**5 型ローテーションでは 2.24 倍(15.64 vs 6.98 ns)** に沈んだ。identity ハッシュを使わないキーにはこのペナルティがない — `IntPtr`(`TypeHandle.Value`)キーは 0.69 倍(4.78 ns、ただし表が `Type` を参照しなくなる)、`Type` キー + `TypeHandle.Value` 比較子は 1.00 倍。ハッシュ取得単体・探索単体はどの経路も速く、逆転は「値型キー + identity ハッシュ FCall」と「型ごとに変わる多態呼び出し」の組み合わせでのみ起きる(命令列は Handle 版が最短)。BunnyTail.DependencyInjection の `ServiceRegistry.Activate` 実コードでも同じ結果(現行 9.79 ns → Handle 18.39 ns、比較子 7.82 ns)。→ [Run 3](benchmarks/results/TYP-07-TypeKey.md)
+
+**使い分け:** `Dictionary` / `ConcurrentDictionary` のまま速くするなら、引いた値が**そのまま値として使われる**表では `RuntimeTypeHandle` キー(呼び出し側は `type.TypeHandle` を渡す)。引いた値で**多態呼び出しをする**レジストリでは上記の逆転があるので、`TypeHandle.Value` を使う比較子か `IntPtr` キー(ALC の回収がなければ)を選ぶ。それ以上が要るなら自作表。**2 つの判断は独立している。** NativeAOT では TYP-07 本体と同じく仮想呼び出しの差が消えるため順位が変わりうる — 本検証で確認する。→ [測定結果](benchmarks/results/TYP-07-TypeKey.md)
 
 ---
 
