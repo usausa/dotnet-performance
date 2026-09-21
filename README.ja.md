@@ -69,6 +69,7 @@
 | [JIT-03](#️-jit-03-typeoft-分岐によるジェネリック特殊化) | typeof(T) 分岐特殊化 | ジェネリック変換の分岐除去 | ✅ | [検証済](benchmarks/results/JIT-03-TypeofBranch.md) |
 | [JIT-04](#️-jit-04-コールドパス分離throw-ヘルパー--grow-の-noinlining) | コールドパス分離 | ホットパスのインライン化促進 | ✅ | [実装](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
 | [JIT-05](#️-jit-05-isreferenceorcontainsreferences-による処理スキップ) | IsReferenceOrContainsReferences 分岐 | 参照なし型の後始末スキップ | ✅ | [検証済](benchmarks/results/JIT-05-ReferenceContainsBranch.md) |
+| [JIT-06](#️-jit-06-static-abstract-メンバー呼び出しと型引数の実体) | static abstract メンバー呼び出し | 参照型 T の共有コード経路(辞書 + 間接呼び出し)を避ける | ⚠️ | [仮測定](benchmarks/results/JIT-06-StaticAbstractCall.md) |
 | [DSP-01](#-dsp-01-sealed-による-devirtualization) | sealed による devirtualization | 仮想呼び出しの直接化 | ✅ | [検証済](benchmarks/results/DSP-01-SealedDevirt.md) |
 | [DSP-02](#-dsp-02-呼び出し抽象化の選択指針) | 呼び出し抽象化の選択指針 | delegate/interface/関数ポインタの使い分け | ✅ | [検証済](benchmarks/results/DSP-02-CallAbstraction.md) |
 | [DSP-03](#-dsp-03-ハンドラ列の不変配列化マルチキャストデリゲート回避) | ハンドラ列の不変配列化 | マルチキャストデリゲートの劣化回避 | ✅ | [実装](src/PerformancePatterns/Dsp/HandlerList.cs) |
@@ -477,6 +478,8 @@ foreach (var line in text.SplitLines())
 | struct enumerator(本パターン) | 218 ns | 0 B | 55 B |
 
 ただし**多相になった瞬間に約 9 倍・確保ありへ戻る**。STK-03 の価値は「PGO の観測に依存せず、多相でも常に確保ゼロ・直接呼び出しを保証する」点へ移った。自分の型の API 設計としては引き続き struct enumerator を既定にし、**他所の `IEnumerable<T>` を消費する側で列挙子確保を気にする必要は単相なら無くなった**、と読む。→ [測定結果](benchmarks/results/LAB-EnumerableEscape.md)
+
+**要素が struct の列挙子は `Current` を `ref readonly` で返す(⏳ 仮測定、B550H):** ループ本体が要素をメソッドに渡す形(`Consume(in entry)`、64 バイト要素)では、`Entry Current` は反復ごとに 64 バイトをスタックへコピーしてから渡す(`vmovdqu` ×4、124 B)。`ref readonly Entry Current` にすると配列スロットのアドレスをそのまま渡し(`lea rcx,[rsi+rcx+10]`、81 B)、`foreach (ref readonly var e in span)` や `for` + `ref readonly` ローカルと同等の **0.80 倍**(1.27 vs 1.62 ns / 要素)。フィールドを 1 つ読むだけの本体では R-04 のとおりどちらもコピーしないので、効くのは「要素を参照で渡す・大きく多フィールド」の場合。呼び出し側は `foreach (ref readonly var x in ...)` と書け、従来の `foreach (var x in ...)` もそのままコンパイルできる(コピーは呼び出し側の選択になる)。→ [LAB-RefEnumerator](benchmarks/results/LAB-RefEnumerator.md)
 
 ---
 
@@ -1419,6 +1422,55 @@ public void Return(T[] array)
 **ユースケース:** プール返却時のクリア、コレクションの Clear/Remove、シリアライザのバッファ後始末、コピー/比較方式の型別切替。
 
 **注意:** スキップしてよいのは「GC に参照を解放させる」目的のクリアだけ。機密データ消去などセキュリティ目的のクリアは型にかかわらず必ず実行する。
+
+---
+
+### ⚙️ JIT-06: static abstract メンバー呼び出しと型引数の実体
+
+**目的:** `static abstract` インターフェースメンバーを `T.Method()` で呼ぶとき、コストは「メンバーが static であること」ではなく**型引数 `T` の実体**(値型か参照型か、呼び出し元で型が確定しているか)で決まる。参照型 `T` の呼び出しを共有ジェネリックコードに残さない。
+
+**効果(⏳ 仮測定、net10 / B550H x86-64-v3、1 呼び出しあたり。HX 370 と NativeAOT で差し替え):**
+
+| 形 | 時間 | コードサイズ | 中身 |
+|---|---:|---:|---|
+| 直接呼び出し `OpA.Compute(i)`(基準) | 0.450 ns | 19 B | インライン化 |
+| 値型 T(`Saim<AddOp>`、NoInlining 経由) | 1.200 ns(2.67 倍) | 43 B | 専用コード。差は NoInlining の呼び出し分だけ |
+| **参照型 T、呼び出し元に展開**(`AggressiveInlining` + 正確な型引数) | **0.465 ns(1.03 倍)** | **19 B** | 基準と同一コード |
+| **参照型 T、共有コード(`__Canon`)が実行** | **3.799 ns(8.44 倍)** | 354 B | 辞書スロット読み + `call rax`(間接)。初回のみ `GenericsHelpers.Method` |
+| 同上、2 つのインスタンス化を交互 | 3.789 ns | 382 B | 追加コストなし |
+| インスタンス interface 呼び出し(単相) | 1.158 ns(2.57 倍) | 90 B | PGO の GDV で devirt + インライン(`cmp [rcx],MT_OpA`) |
+| 同(多相 2 種) | 2.436 ns(5.41 倍) | 109 B | ガード 2 本 |
+
+- 値型 `T` と、呼び出し元にインライン展開されて型が確定する参照型 `T` は、直接呼び出しと**同一のコード**になる
+- 共有コードに残った参照型 `T` の呼び出しは**辞書経由の間接呼び出し**になり、受け手オブジェクトが存在しないため PGO の GDV でも救えない。.NET 10 では単相の interface 呼び出し(GDV でインライン化される)の 3.3 倍、多相の interface 呼び出しよりも遅い。Coanet が .NET 7 で報告した「単相 VSD よりわずかに遅く、多相 VSD より速い」とは順位が入れ替わっている — 動的 PGO の有無による
+
+**AOT:** ⚠️ 未測定。NativeAOT には動的 PGO がないため interface 呼び出し側の GDV が消え、順位が .NET 7 時代の形(共有 SAIM ≒ 単相 VSD)へ戻る可能性がある。本検証で確認する。
+
+**実装例:**
+
+```csharp
+public interface IValueConverter<TDb, TClr>
+{
+    static abstract TDb ToDb(TClr value);
+}
+
+// ✅ 呼び出し元に展開されれば TConverter は確定し、TConverter.ToDb は直接呼び出しになる(Smart.Data.Accessor の形)
+[MethodImpl(MethodImplOptions.AggressiveInlining)]
+public static object? Convert<TConverter, TDb, TClr>(TClr value)
+    where TConverter : IValueConverter<TDb, TClr>
+    => TConverter.ToDb(value);
+
+// ❌ 展開されない(本体が大きい / 呼び出し元も参照型 T のジェネリック)と、毎回 辞書スロット読み + 間接呼び出し
+```
+
+**ユースケース:** ジェネリック演算(`INumber<T>` 系)は値型 `T` が主で問題にならない。対象は **`T` が class になる SAIM** — プロバイダ型(`IAccessorProvider<T>` の `T.Accessor`)、コンバータ(`TConverter.ToDb`)、ファクトリ(`T.Create()`)。
+
+**注意:**
+
+- `AggressiveInlining` は「展開されれば」の話。ジェネリックメソッドが大きい、呼び出し元がさらにジェネリック(`__Canon` のまま)、Tier-0 で走っている期間、のいずれでも共有経路に落ちる。逆アセンブルに `GenericsHelpers.Method` / `call rax` が残っていないかを `DisassemblyDiagnoser` で確認する
+- 共有経路を避けられない設計なら、実装オブジェクトをキャッシュして**インスタンス interface 呼び出し**にする方が .NET 10 の JIT では速い(単相なら GDV が効く)。SAIM を選ぶ理由が「速いから」ではなく「API として自然だから」なら、この表を踏まえて選ぶ
+
+**実測結果(⏳ B550H):** 上表のとおり。→ [測定結果](benchmarks/results/JIT-06-StaticAbstractCall.md)
 
 ---
 
@@ -4073,6 +4125,7 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | ホットループ内のスライス | MEM-03 |
 | ジェネリック変換の型別特殊化 | JIT-03 / TYP-04 |
 | ホットパスのインライン化促進 | JIT-04 |
+| static abstract メンバー呼び出しのコスト(参照型 T) | JIT-06 |
 | ハッシュ表のインデックス計算 | BIT-02 |
 | コールバック・ファクトリの保持形態選択 | DSP-01 / DSP-02 |
 | 複数購読イベントの高速発火 | DSP-03 |

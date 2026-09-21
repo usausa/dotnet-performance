@@ -69,6 +69,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [JIT-03](#️-jit-03-generic-specialization-via-typeoft-branches) | typeof(T) branch specialization | Remove branches from generic conversion | ✅ | [Verified](benchmarks/results/JIT-03-TypeofBranch.md) |
 | [JIT-04](#️-jit-04-cold-path-separation-throw-helpers--noinlining-on-grow) | Cold-path separation | Promote inlining of the hot path | ✅ | [Implemented](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
 | [JIT-05](#️-jit-05-skipping-work-with-isreferenceorcontainsreferences) | IsReferenceOrContainsReferences branch | Skip cleanup for reference-free types | ✅ | [Verified](benchmarks/results/JIT-05-ReferenceContainsBranch.md) |
+| [JIT-06](#️-jit-06-static-abstract-member-calls-and-what-t-really-is) | static abstract member calls | Keep reference-type T off the shared path (dictionary + indirect call) | ⚠️ | [Provisional](benchmarks/results/JIT-06-StaticAbstractCall.md) |
 | [DSP-01](#-dsp-01-devirtualization-via-sealed) | Devirtualization via sealed | Turn virtual calls into direct calls | ✅ | [Verified](benchmarks/results/DSP-01-SealedDevirt.md) |
 | [DSP-02](#-dsp-02-choosing-a-call-abstraction) | Choosing a call abstraction | When to use delegate / interface / function pointer | ✅ | [Verified](benchmarks/results/DSP-02-CallAbstraction.md) |
 | [DSP-03](#-dsp-03-immutable-handler-arrays-avoiding-multicast-delegates) | Immutable array of handlers | Avoid multicast delegate degradation | ✅ | [Implemented](src/PerformancePatterns/Dsp/HandlerList.cs) |
@@ -477,6 +478,8 @@ foreach (var line in text.SplitLines())
 | struct enumerator (this pattern) | 218 ns | 0 B | 55 B |
 
 But **the moment it becomes polymorphic it is back to about 9x and allocating**. STK-03's value has shifted to "zero allocation and direct calls guaranteed regardless of what PGO observes, polymorphic or not". Keep the struct enumerator as the default when designing your own types' APIs; on the consuming side, **enumerator allocation over someone else's `IEnumerable<T>` is no longer a concern at a monomorphic site**. → [Results](benchmarks/results/LAB-EnumerableEscape.md)
+
+**Return `Current` as `ref readonly` when the elements are structs (⏳ provisional, B550H):** when the loop body hands the element to a method (`Consume(in entry)`, 64-byte elements), an `Entry Current` copies 64 bytes to the stack on every iteration before passing them on (`vmovdqu` ×4, 124 B). A `ref readonly Entry Current` passes the array slot address as is (`lea rcx,[rsi+rcx+10]`, 81 B) and matches `foreach (ref readonly var e in span)` and `for` + `ref readonly` local: **0.80x** (1.27 vs 1.62 ns per element). A body that only reads one field copies nothing either way (R-04), so this pays off when elements are passed by reference or are large and multi-field. Callers write `foreach (ref readonly var x in ...)`, and a plain `foreach (var x in ...)` still compiles (the copy becomes the caller's choice). → [LAB-RefEnumerator](benchmarks/results/LAB-RefEnumerator.md)
 
 ---
 
@@ -1419,6 +1422,55 @@ public void Return(T[] array)
 **Use cases:** Clearing on pool return, collection Clear/Remove, serializer buffer cleanup, and switching copy/compare strategies by type.
 
 **Caveats:** Only clearing whose purpose is "let the GC release references" may be skipped. Clearing for security reasons, such as wiping sensitive data, must always run regardless of the type.
+
+---
+
+### ⚙️ JIT-06: static abstract member calls and what T really is
+
+**Purpose:** when a `static abstract` interface member is called as `T.Method()`, the cost is decided not by the member being static but by **what the type argument `T` really is** (value type or reference type, and whether the call site knows the exact type). Keep calls on a reference-type `T` out of shared generic code.
+
+**Effect (⏳ provisional, net10 / B550H x86-64-v3, per call; to be replaced on HX 370 and under NativeAOT):**
+
+| Shape | Time | Code size | What runs |
+|---|---:|---:|---|
+| Direct call `OpA.Compute(i)` (baseline) | 0.450 ns | 19 B | Inlined |
+| Value-type T (`Saim<AddOp>` through NoInlining) | 1.200 ns (2.67x) | 43 B | Exact code; the difference is only the NoInlining call |
+| **Reference-type T, inlined into the caller** (`AggressiveInlining` + exact type arguments) | **0.465 ns (1.03x)** | **19 B** | Identical to the baseline |
+| **Reference-type T, the shared (`__Canon`) body executes** | **3.799 ns (8.44x)** | 354 B | Dictionary slot load + indirect `call rax`; `GenericsHelpers.Method` on the first call only |
+| Same, two instantiations alternating | 3.789 ns | 382 B | No extra cost |
+| Instance interface call (monomorphic) | 1.158 ns (2.57x) | 90 B | Devirtualized + inlined by PGO's GDV (`cmp [rcx],MT_OpA`) |
+| Same (polymorphic, 2 types) | 2.436 ns (5.41x) | 109 B | Two guards |
+
+- A value-type `T`, and a reference-type `T` whose call is inlined into a caller that knows the exact type, compile to **the same code as a direct call**
+- A reference-type `T` call left in shared code becomes an **indirect call through the generic dictionary**, and PGO's GDV cannot rescue it because there is no receiver object to guard on. On .NET 10 it is 3.3x slower than a monomorphic interface call (which GDV inlines) and slower than a polymorphic one too. Coanet reported the opposite order on .NET 7 ("slightly slower than monomorphic VSD, faster than polymorphic VSD") — the difference is dynamic PGO
+
+**AOT:** ⚠️ Not measured. NativeAOT has no dynamic PGO, so the interface-call rows lose their GDV and the ranking may return to the .NET 7 shape (shared SAIM ≈ monomorphic VSD). Confirm in the final run.
+
+**Implementation example:**
+
+```csharp
+public interface IValueConverter<TDb, TClr>
+{
+    static abstract TDb ToDb(TClr value);
+}
+
+// ✅ Once inlined into the caller, TConverter is exact and TConverter.ToDb is a direct call (the Smart.Data.Accessor shape)
+[MethodImpl(MethodImplOptions.AggressiveInlining)]
+public static object? Convert<TConverter, TDb, TClr>(TClr value)
+    where TConverter : IValueConverter<TDb, TClr>
+    => TConverter.ToDb(value);
+
+// ❌ Not inlined (large body / the caller is itself generic over a reference-type T): dictionary slot load + indirect call on every call
+```
+
+**Use cases:** generic math (`INumber<T>` and friends) mostly has value-type `T` and is unaffected. The target is **SAIM with a class `T`** — provider types (`T.Accessor` on `IAccessorProvider<T>`), converters (`TConverter.ToDb`), factories (`T.Create()`).
+
+**Notes:**
+
+- `AggressiveInlining` only helps *if* the inline happens. A large generic method, a caller that is itself generic (still `__Canon`), or code still running at Tier-0 all fall back to the shared path. Check the disassembly (`DisassemblyDiagnoser`) for a remaining `GenericsHelpers.Method` / `call rax`
+- If the shared path cannot be avoided by design, caching an implementation object and making an **instance interface call** is faster on the .NET 10 JIT (GDV applies when monomorphic). Choose SAIM because the API reads better, not because it is assumed to be faster, and choose with this table in mind
+
+**Measured (⏳ B550H):** the table above. → [Results](benchmarks/results/JIT-06-StaticAbstractCall.md)
 
 ---
 
@@ -4073,6 +4125,7 @@ For the shape to emit per scenario and its evidence see the [generated code patt
 | Slicing inside a hot loop | MEM-03 |
 | Per-type specialization of generic conversion | JIT-03 / TYP-04 |
 | Encouraging inlining on hot paths | JIT-04 |
+| Cost of static abstract member calls (reference-type T) | JIT-06 |
 | Index computation for hash tables | BIT-02 |
 | Choosing how to hold callbacks and factories | DSP-01 / DSP-02 |
 | Fast raising of multi-subscriber events | DSP-03 |

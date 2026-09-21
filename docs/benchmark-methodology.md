@@ -81,6 +81,8 @@ Debug.Assert(string.IsInterned(probe) is null || !ReferenceEquals(string.IsInter
 
 Before measuring, run a `Verify()` that confirms all variants return the same result (call it before `BenchmarkRunner.Run`). Measuring an implementation that is fast but wrong is pointless. Manual ref walking is especially prone to bugs (miscomputed end refs, forgetting to advance a ref in a dual walk, and so on). As a real example, a loop whose faulty end condition was "always true" had the whole condition removed by the JIT, producing an abnormally fast, bounds-check-free false result that was believed for a long time (after the fix, re-measurement dropped it from fastest to mid-pack).
 
+**Versus BenchmarkDotNet's built-in `[ReturnValueValidator(failOnError: true)]`:** when every benchmark in a class returns **the same value**, the attribute alone catches a mismatch before the run (`Equals` comparison; `void` benchmarks are not covered). This catalog keeps its own `Verify()` because classes mix methods with **different expected values** (hit / miss in `TypeKeyBenchmark`: 496 and 0) and also check state that never reaches the return value (every key present in every map, etc.). Classes whose methods all agree may add the attribute as well
+
 **Equal results are not the same as equal shape.** `Verify()` cannot catch a baseline that is called differently from its variants. In LAB-ColumnMatch the baseline was a direct call that the JIT inlined while every variant went through a `Func<string,int>` per element - worth **1.9-2.2 ns per element**, more than the difference under test, and it inverted the conclusion (the alternative read as 3.0-3.6x slower when the real figure was 1.17-1.19x). Before reading any ratio, check that every variant pays the same call shape: same delegate or no delegate, same inlining outcome. The fix is to add the baseline *through the same harness* as a sixth variant, not to remove the harness.
 
 ### 4. Measuring only the best case
@@ -183,6 +185,7 @@ Families come in two kinds.
 | COL-03 GetAlternateLookup | Has no result file of its own | Stays in COL (one comparative benchmark referenced by several IDs is natural) |
 | BIT-01 vs COL-04 | Two IDs over one artifact | Both stay (how to build the hash vs which implementation to pick - different subjects) |
 | TXT-03 Try pattern | Not a text topic | Stays in TXT (spans several use-case families, so there is no destination) |
+| JIT-06 static abstract calls (added 2026-09-21) | The outcome is a call shape (DSP) | Stays in JIT (same line as JIT-02: the type argument and constraint decide the codegen) |
 
 ---
 
