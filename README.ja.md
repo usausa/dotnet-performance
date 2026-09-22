@@ -69,7 +69,7 @@
 | [JIT-03](#️-jit-03-typeoft-分岐によるジェネリック特殊化) | typeof(T) 分岐特殊化 | ジェネリック変換の分岐除去 | ✅ | [検証済](benchmarks/results/JIT-03-TypeofBranch.md) |
 | [JIT-04](#️-jit-04-コールドパス分離throw-ヘルパー--grow-の-noinlining) | コールドパス分離 | ホットパスのインライン化促進 | ✅ | [実装](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
 | [JIT-05](#️-jit-05-isreferenceorcontainsreferences-による処理スキップ) | IsReferenceOrContainsReferences 分岐 | 参照なし型の後始末スキップ | ✅ | [検証済](benchmarks/results/JIT-05-ReferenceContainsBranch.md) |
-| [JIT-06](#️-jit-06-static-abstract-メンバー呼び出しと型引数の実体) | static abstract メンバー呼び出し | 参照型 T の共有コード経路(辞書 + 間接呼び出し)を避ける | ⚠️ | [仮測定](benchmarks/results/JIT-06-StaticAbstractCall.md) |
+| [JIT-06](#️-jit-06-static-abstract-メンバー呼び出しと型引数の実体) | static abstract メンバー呼び出し | 参照型 T の共有コード経路(辞書 + 間接呼び出し)を避ける | ✅ | [検証済](benchmarks/results/JIT-06-StaticAbstractCall.md) |
 | [DSP-01](#-dsp-01-sealed-による-devirtualization) | sealed による devirtualization | 仮想呼び出しの直接化 | ✅ | [検証済](benchmarks/results/DSP-01-SealedDevirt.md) |
 | [DSP-02](#-dsp-02-呼び出し抽象化の選択指針) | 呼び出し抽象化の選択指針 | delegate/interface/関数ポインタの使い分け | ✅ | [検証済](benchmarks/results/DSP-02-CallAbstraction.md) |
 | [DSP-03](#-dsp-03-ハンドラ列の不変配列化マルチキャストデリゲート回避) | ハンドラ列の不変配列化 | マルチキャストデリゲートの劣化回避 | ✅ | [実装](src/PerformancePatterns/Dsp/HandlerList.cs) |
@@ -479,7 +479,7 @@ foreach (var line in text.SplitLines())
 
 ただし**多相になった瞬間に約 9 倍・確保ありへ戻る**。STK-03 の価値は「PGO の観測に依存せず、多相でも常に確保ゼロ・直接呼び出しを保証する」点へ移った。自分の型の API 設計としては引き続き struct enumerator を既定にし、**他所の `IEnumerable<T>` を消費する側で列挙子確保を気にする必要は単相なら無くなった**、と読む。→ [測定結果](benchmarks/results/LAB-EnumerableEscape.md)
 
-**要素が struct の列挙子は `Current` を `ref readonly` で返す(⏳ 仮測定、B550H):** ループ本体が要素をメソッドに渡す形(`Consume(in entry)`、64 バイト要素)では、`Entry Current` は反復ごとに 64 バイトをスタックへコピーしてから渡す(`vmovdqu` ×4、124 B)。`ref readonly Entry Current` にすると配列スロットのアドレスをそのまま渡し(`lea rcx,[rsi+rcx+10]`、81 B)、`foreach (ref readonly var e in span)` や `for` + `ref readonly` ローカルと同等の **0.80 倍**(1.27 vs 1.62 ns / 要素)。フィールドを 1 つ読むだけの本体では R-04 のとおりどちらもコピーしないので、効くのは「要素を参照で渡す・大きく多フィールド」の場合。呼び出し側は `foreach (ref readonly var x in ...)` と書け、従来の `foreach (var x in ...)` もそのままコンパイルできる(コピーは呼び出し側の選択になる)。→ [LAB-RefEnumerator](benchmarks/results/LAB-RefEnumerator.md)
+**要素が struct の列挙子は `Current` を `ref readonly` で返す:** ループ本体が要素をメソッドに渡す形(`Consume(in entry)`、64 バイト要素)では、`Entry Current` は反復ごとに 64 バイトをスタックへコピーしてから渡す(x86-64-v4 では `vmovdqu32 zmm` の 1 対で 121 B、x86-64-v3 では `vmovdqu` ×4 で 124 B)。`ref readonly Entry Current` にすると配列スロットのアドレスをそのまま渡し(`lea rcx,[rsi+rcx+10]`、81 B)、`foreach (ref readonly var e in span)` や `for` + `ref readonly` ローカルと同じ命令列になる。**時間の差はコア依存**: x86-64-v3 では **0.80 倍**(1.27 vs 1.62 ns / 要素)だが、x86-64-v4 では AVX-512 の 1 対のコピーが `Consume` 呼び出しの影に隠れ、値返し 1.21 ns に対して ref 3 形は 1.19〜1.32 ns(同型の命令列が配置で 10% ばらつく幅)に収まり時間差はない。採用理由は時間ではなく「反復ごとのコピーが生成コードから消える」こと。フィールドを 1 つ読むだけの本体では R-04 のとおりどちらもコピーしないので、効くのは「要素を参照で渡す・大きく多フィールド」の場合。呼び出し側は `foreach (ref readonly var x in ...)` と書け、従来の `foreach (var x in ...)` もそのままコンパイルできる(コピーは呼び出し側の選択になる)。→ [LAB-RefEnumerator](benchmarks/results/LAB-RefEnumerator.md)
 
 ---
 
@@ -1429,22 +1429,22 @@ public void Return(T[] array)
 
 **目的:** `static abstract` インターフェースメンバーを `T.Method()` で呼ぶとき、コストは「メンバーが static であること」ではなく**型引数 `T` の実体**(値型か参照型か、呼び出し元で型が確定しているか)で決まる。参照型 `T` の呼び出しを共有ジェネリックコードに残さない。
 
-**効果(⏳ 仮測定、net10 / B550H x86-64-v3、1 呼び出しあたり。HX 370 と NativeAOT で差し替え):**
+**効果(net10 / x86-64-v4、1 呼び出しあたり):**
 
 | 形 | 時間 | コードサイズ | 中身 |
 |---|---:|---:|---|
-| 直接呼び出し `OpA.Compute(i)`(基準) | 0.450 ns | 19 B | インライン化 |
-| 値型 T(`Saim<AddOp>`、NoInlining 経由) | 1.200 ns(2.67 倍) | 43 B | 専用コード。差は NoInlining の呼び出し分だけ |
-| **参照型 T、呼び出し元に展開**(`AggressiveInlining` + 正確な型引数) | **0.465 ns(1.03 倍)** | **19 B** | 基準と同一コード |
-| **参照型 T、共有コード(`__Canon`)が実行** | **3.799 ns(8.44 倍)** | 354 B | 辞書スロット読み + `call rax`(間接)。初回のみ `GenericsHelpers.Method` |
-| 同上、2 つのインスタンス化を交互 | 3.789 ns | 382 B | 追加コストなし |
-| インスタンス interface 呼び出し(単相) | 1.158 ns(2.57 倍) | 90 B | PGO の GDV で devirt + インライン(`cmp [rcx],MT_OpA`) |
-| 同(多相 2 種) | 2.436 ns(5.41 倍) | 109 B | ガード 2 本 |
+| 直接呼び出し `OpA.Compute(i)`(基準) | 0.386 ns | 19 B | インライン化 |
+| 値型 T(`Saim<AddOp>`、NoInlining 経由) | 1.182 ns(3.07 倍) | 43 B | 専用コード。差は NoInlining の呼び出し分だけ |
+| **参照型 T、呼び出し元に展開**(`AggressiveInlining` + 正確な型引数) | **0.385 ns(1.00 倍)** | **19 B** | 基準と同一コード |
+| **参照型 T、共有コード(`__Canon`)が実行** | **1.829 ns(4.75 倍)** | 354 B | 辞書スロット読み + `call rax`(間接)。初回のみ `GenericsHelpers.Method` |
+| 同上、2 つのインスタンス化を交互 | 2.254 ns(5.85 倍) | 382 B | 間接呼び出し先が交互に変わる分 1.23 倍(x86-64-v3 では差なし) |
+| インスタンス interface 呼び出し(単相) | 1.165 ns(3.02 倍) | 90 B | PGO の GDV で devirt + インライン(`cmp [rcx],MT_OpA`) |
+| 同(多相 2 種) | 1.726 ns(4.48 倍) | 109 B | ガード 1 本 + 外れた側は interface 呼び出しへフォールバック |
 
 - 値型 `T` と、呼び出し元にインライン展開されて型が確定する参照型 `T` は、直接呼び出しと**同一のコード**になる
-- 共有コードに残った参照型 `T` の呼び出しは**辞書経由の間接呼び出し**になり、受け手オブジェクトが存在しないため PGO の GDV でも救えない。.NET 10 では単相の interface 呼び出し(GDV でインライン化される)の 3.3 倍、多相の interface 呼び出しよりも遅い。Coanet が .NET 7 で報告した「単相 VSD よりわずかに遅く、多相 VSD より速い」とは順位が入れ替わっている — 動的 PGO の有無による
+- 共有コードに残った参照型 `T` の呼び出しは**辞書経由の間接呼び出し**になり、受け手オブジェクトが存在しないため PGO の GDV でも救えない。.NET 10 では単相の interface 呼び出し(GDV でインライン化される)の 1.6 倍(x86-64-v3 では 3.3 倍)、多相の interface 呼び出しよりも遅い(1.06 倍、信頼区間非重複)。Coanet が .NET 7 で報告した「単相 VSD よりわずかに遅く、多相 VSD より速い」とは順位が入れ替わっている — 動的 PGO の有無による
 
-**AOT:** ⚠️ 未測定。NativeAOT には動的 PGO がないため interface 呼び出し側の GDV が消え、順位が .NET 7 時代の形(共有 SAIM ≒ 単相 VSD)へ戻る可能性がある。本検証で確認する。
+**AOT:** ✅ NativeAOT でも順位は変わらない(AOT 実行内の直接呼び出し 0.386 ns 比): 共有コードの参照型 T は **5.27 倍(2.04 ns)**、interface 呼び出しは単相 2.67 倍(1.03 ns)・多相 2.89 倍(1.12 ns)。動的 PGO が無くても interface ディスパッチは多相でも単相とほぼ同じ速さで、共有 SAIM は単相の 2.0 倍・多相の 1.8 倍遅い — .NET 7 時代の順位(共有 SAIM ≒ 単相 VSD)へは戻らない。値型 T(1.01 ns)と展開された参照型 T(0.386 ns)は AOT でも直接呼び出しと同じ。
 
 **実装例:**
 
@@ -1470,7 +1470,7 @@ public static object? Convert<TConverter, TDb, TClr>(TClr value)
 - `AggressiveInlining` は「展開されれば」の話。ジェネリックメソッドが大きい、呼び出し元がさらにジェネリック(`__Canon` のまま)、Tier-0 で走っている期間、のいずれでも共有経路に落ちる。逆アセンブルに `GenericsHelpers.Method` / `call rax` が残っていないかを `DisassemblyDiagnoser` で確認する
 - 共有経路を避けられない設計なら、実装オブジェクトをキャッシュして**インスタンス interface 呼び出し**にする方が .NET 10 の JIT では速い(単相なら GDV が効く)。SAIM を選ぶ理由が「速いから」ではなく「API として自然だから」なら、この表を踏まえて選ぶ
 
-**実測結果(⏳ B550H):** 上表のとおり。→ [測定結果](benchmarks/results/JIT-06-StaticAbstractCall.md)
+**実測結果(net10 / x86-64-v4):** 上表のとおり。x86-64-v3(B550H)でも順位は同じで、共有コードの差はより大きい(8.44 倍)。→ [測定結果](benchmarks/results/JIT-06-StaticAbstractCall.md)
 
 ---
 
@@ -2056,24 +2056,24 @@ var index = (int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask;
 - ハンドルが安定なのは「その型がロードされている間」。回収可能な `AssemblyLoadContext` ではアンロードされた型のアドレスが再利用されうるため、生きているエントリすべてについて表が `Type` の強参照を保持している場合にのみ安全
 - 型が**静的に分かる**なら、この話は一切不要 — [TYP-01](#️-typ-01-静的型スロットtypemap--typeslot) のジェネリックスロット(0.09 倍)を使う
 
-**BCL の `Dictionary` を使い続ける場合 — キーの型を `RuntimeTypeHandle` にする(⏳ 仮測定: B550H / x86-64-v3、HX 370 と NativeAOT で差し替え):** 上表は自作表の中の話で、`Dictionary<,>` に留まるライブラリはハッシュ取得元を選べない(選ぶには class の `IEqualityComparer<Type>` を渡すしかなく、インターフェース呼び出しが 1 回戻る)。代わりに**キーの型そのもの**を `Type` から `RuntimeTypeHandle` へ変えると、同じ identity ハッシュのまま `Dictionary` の値型キー高速経路に乗る。
+**BCL の `Dictionary` を使い続ける場合 — キーの型を `RuntimeTypeHandle` にする:** 上表は自作表の中の話で、`Dictionary<,>` に留まるライブラリはハッシュ取得元を選べない(選ぶには class の `IEqualityComparer<Type>` を渡すしかなく、インターフェース呼び出しが 1 回戻る)。代わりに**キーの型そのもの**を `Type` から `RuntimeTypeHandle` へ変えると、同じ identity ハッシュのまま `Dictionary` の値型キー高速経路に乗る。
 
 | 経路(32 件 hit / 8 件 miss、1 探索あたり) | hit | miss | コードサイズ |
 |---|---:|---:|---:|
-| `Dictionary<Type, T>`(基準) | 4.576 ns | 3.567 ns | 1,037 B |
-| **`Dictionary<RuntimeTypeHandle, T>`** | **3.188 ns(0.70 倍)** | **2.749 ns(0.77 倍)** | 797 B |
-| `Dictionary<Type, T>` + `TypeHandle.Value` の class comparer | 3.349 ns(0.73 倍) | 2.342 ns(0.66 倍) | 593 B |
-| `ConcurrentDictionary<Type, T>`(既定比較子、第 2 回実行) | 3.156 ns | 2.050 ns | 787 B |
-| **`ConcurrentDictionary<RuntimeTypeHandle, T>`** | **2.531 ns(上行比 0.80 倍)** | 2.565 ns ⏳❗(StdDev 0.67、Min 1.960 ≒ 同等) | 641 B |
-| 自作表 + `TypeHandle.Value`(上表と同じ) | **1.307 ns(0.29 倍)** | **1.125 ns(0.32 倍)** | 195 B |
+| `Dictionary<Type, T>`(基準) | 2.905 ns | 2.292 ns | 1,037 B |
+| **`Dictionary<RuntimeTypeHandle, T>`** | **2.101 ns(0.72 倍)** | **1.861 ns(0.81 倍)** | 797 B |
+| `Dictionary<Type, T>` + `TypeHandle.Value` の class comparer | 2.098 ns(0.72 倍) | 1.867 ns(0.81 倍) | 593 B |
+| `ConcurrentDictionary<Type, T>`(既定比較子) | 2.221 ns(中央値 2.071) | 1.465 ns | 787 B |
+| **`ConcurrentDictionary<RuntimeTypeHandle, T>`** | **1.884 ns(上行比 0.85 倍、中央値 1.715)** | 1.569 ns(1.07 倍) | 641 B |
+| 自作表 + `TypeHandle.Value`(上表と同じ) | **0.760 ns(0.26 倍)** | **0.679 ns(0.30 倍)** | 195 B |
 
-**なぜ効くか(逆アセンブル):** `Type.GetHashCode()` / `RuntimeHelpers.GetHashCode(type)` / `RuntimeTypeHandle.GetHashCode()` は 3 つとも**同じ identity ハッシュ**を返すので、差はハッシュの質ではなく経路にある。`Dictionary<Type, T>` は 1 探索に **GDV の型チェックを 3 本**(comparer が `ObjectEqualityComparer<Type>` か、`GetHashCode` の受け手が `RuntimeType` か、`Equals` の受け手が `RuntimeType` か)持ち、制約付き `GetHashCode` 呼び出しのために**キーをスタックへ退避**する。`RuntimeTypeHandle` キーは comparer のチェックと退避が消え、エントリ比較は `cmp` 1 命令になる。ただし identity ハッシュの取得(`TryGetHashCode` 呼び出し + ヘッダ読み + 割り当て済み判定)は残るため、それを**フィールド読み 1 回**(`mov rax,[rcx+18]`)で済ませる自作表には 2.4 倍届かない。
+**なぜ効くか(逆アセンブル):** `Type.GetHashCode()` / `RuntimeHelpers.GetHashCode(type)` / `RuntimeTypeHandle.GetHashCode()` は 3 つとも**同じ identity ハッシュ**を返すので、差はハッシュの質ではなく経路にある。`Dictionary<Type, T>` は 1 探索に **GDV の型チェックを 3 本**(comparer が `ObjectEqualityComparer<Type>` か、`GetHashCode` の受け手が `RuntimeType` か、`Equals` の受け手が `RuntimeType` か)持ち、制約付き `GetHashCode` 呼び出しのために**キーをスタックへ退避**する。`RuntimeTypeHandle` キーは comparer のチェックと退避が消え、エントリ比較は `cmp` 1 命令になる。ただし identity ハッシュの取得(`TryGetHashCode` 呼び出し + ヘッダ読み + 割り当て済み判定)は残るため、それを**フィールド読み 1 回**(`mov rax,[rcx+18]`)で済ませる自作表には 2.8 倍届かない。
 
-**`ConcurrentDictionary` の場合(⏳ 第 2 回実行):** 同じキー型変更で **hit 0.80 倍、miss は同等** — 利得はノードごとの `Equals` にあり、miss では走らない。`<Type, T>` は `_comparerIsDefaultForClasses` フラグによりハッシュだけは `key.GetHashCode()` を直接呼ぶ(GDV 1 本)が、`Equals` は comparer 経由で GDV 2 本(comparer 型・ノードキーの `RuntimeType`)が残る。`<RuntimeTypeHandle, T>` は値型キー経路に乗り、ノード比較が `cmp` 1 命令になる(580 B → 434 B)。**⏳❗ 想定外:** この機では `ConcurrentDictionary<Type, T>` の hit(3.16 ns)が `Dictionary<Type, T>`(4.6-5.5 ns)より速かった。ハッシュ側にインターフェース呼び出しが無いためと読めるが、`Dictionary` 系の hit 行は実行間で 30% 動いたので、HX 370 で確認してから引用する。
+**`ConcurrentDictionary` の場合:** 同じキー型変更で **hit 0.85 倍(中央値では 0.83 倍)、miss は 1.07 倍で僅かに遅い**(x86-64-v3: hit 0.80 倍・miss 同等)— 利得はノードごとの `Equals` にあり、miss では走らない。`<Type, T>` は `_comparerIsDefaultForClasses` フラグによりハッシュだけは `key.GetHashCode()` を直接呼ぶ(GDV 1 本)が、`Equals` は comparer 経由で GDV 2 本(comparer 型・ノードキーの `RuntimeType`)が残る。`<RuntimeTypeHandle, T>` は値型キー経路に乗り、ノード比較が `cmp` 1 命令になる(580 B → 434 B)。なお **`ConcurrentDictionary<Type, T>` は `Dictionary<Type, T>` より速い**(hit 2.22 vs 2.91 ns、miss 1.47 vs 2.29 ns)— ハッシュ側にインターフェース呼び出しが無いため。x86-64-v3 でも同じ符号(3.16 vs 4.6〜5.5 ns)で 2 機で確認済み。`ConcurrentDictionary` 系の hit 行は起動間で二峰性(2.03〜2.89 ns)のため中央値も併記した。
 
-**⏳❗ 探索の後に結果でディスパッチする形では逆転する(B550H / Zen 3、`TypeKeyDispatchBenchmark`):** 上の表は探索だけを測っている。実際のレジストリは引いた値(ファクトリのデリゲート)を**呼び出す**。`ConcurrentDictionary<K, Func<object>>` で 5 型を順に引いて呼ぶと、`RuntimeTypeHandle` キーは同一型の繰り返しでは 0.62 倍(4.33 vs 5.70 ns)なのに、**5 型ローテーションでは 2.24 倍(15.64 vs 6.98 ns)** に沈んだ。identity ハッシュを使わないキーにはこのペナルティがない — `IntPtr`(`TypeHandle.Value`)キーは 0.69 倍(4.78 ns、ただし表が `Type` を参照しなくなる)、`Type` キー + `TypeHandle.Value` 比較子は 1.00 倍。ハッシュ取得単体・探索単体はどの経路も速く、逆転は「値型キー + identity ハッシュ FCall」と「型ごとに変わる多態呼び出し」の組み合わせでのみ起きる(命令列は Handle 版が最短)。BunnyTail.DependencyInjection の `ServiceRegistry.Activate` 実コードでも同じ結果(現行 9.79 ns → Handle 18.39 ns、比較子 7.82 ns)。→ [Run 3](benchmarks/results/TYP-07-TypeKey.md)
+**探索の後に結果でディスパッチする形の逆転は Zen 3 固有(`TypeKeyDispatchBenchmark`):** 上の表は探索だけを測っている。実際のレジストリは引いた値(ファクトリのデリゲート)を**呼び出す**。`ConcurrentDictionary<K, Func<object>>` で 5 型を順に引いて呼ぶと、HX 370(Zen 5)では `RuntimeTypeHandle` キーが同一型の繰り返しで 0.82 倍(2.80 vs 3.39 ns)、**5 型ローテーションでも 0.82 倍(4.02 vs 4.89 ns)** と探索単体の利得がそのまま残る(型数 1 / 2 / 3 / 5 のスイープでも 0.77〜0.88 倍で逆転なし)。`IntPtr`(`TypeHandle.Value`)キーは 0.64 倍(3.11 ns、ただし表が `Type` を参照しなくなる)、`Type` キー + `TypeHandle.Value` 比較子は 0.88 倍。ところが B550H(Zen 3)では同じ命令列で `RuntimeTypeHandle` キーだけが **5 型ローテーションで 2.24 倍(15.64 vs 6.98 ns)** に沈み(単一型なら 0.62 倍)、BunnyTail.DependencyInjection の `ServiceRegistry.Activate` 実コードでも再現した(9.79 → 18.39 ns。HX 370 の同じコードでは 6.29 → 5.19 ns の 0.83 倍)。ハッシュ取得単体・探索単体はどの経路も速く、探索部分の生成コードは両機で同じ(Handle 版は `TryGetHashCode` FCall を直接呼ぶ最短の命令列)。異なるのはデリゲート呼び出し先の PGO 推測で、HX 370 の Handle / `IntPtr` 版には 1 ターゲットのガード + `new` のインライン化がある(669 → 759 B / 409 → 480 B)。Zen 3 の逆転は「値型キー + identity ハッシュ FCall」と「型ごとに変わる多態呼び出し(ガード + 間接呼び出し)」の組み合わせで起きる分岐予測側の効果と見られ、コアを跨いで一般化できない。→ [Run 2 / 3b](benchmarks/results/TYP-07-TypeKey.md)
 
-**使い分け:** `Dictionary` / `ConcurrentDictionary` のまま速くするなら、引いた値が**そのまま値として使われる**表では `RuntimeTypeHandle` キー(呼び出し側は `type.TypeHandle` を渡す)。引いた値で**多態呼び出しをする**レジストリでは上記の逆転があるので、`TypeHandle.Value` を使う比較子か `IntPtr` キー(ALC の回収がなければ)を選ぶ。それ以上が要るなら自作表。**2 つの判断は独立している。** NativeAOT では TYP-07 本体と同じく仮想呼び出しの差が消えるため順位が変わりうる — 本検証で確認する。→ [測定結果](benchmarks/results/TYP-07-TypeKey.md)
+**使い分け:** `Dictionary` / `ConcurrentDictionary` のまま速くするなら `RuntimeTypeHandle` キー(呼び出し側は `type.TypeHandle` を渡す)か、`Type` キーのまま `TypeHandle.Value` を使う class comparer — JIT / Zen 5 では両者が hit / miss とも同値(0.72 / 0.81 倍)。ただし **NativeAOT では comparer が効かず**(探索 0.94 / 1.03 倍、ディスパッチ形は 1.11 倍で退行 — comparer へのインターフェース呼び出しを AOT は devirt しない)、`RuntimeTypeHandle` キーは逆に利得が広がる(`Dictionary` hit 0.50 倍・miss 0.62 倍、ディスパッチ形 0.79 倍)。一方で引いた値で**多態呼び出しをする**レジストリでは Zen 3 / JIT で `RuntimeTypeHandle` キーだけが沈んだ。JIT・AOT・コア世代のすべてで勝つのは `IntPtr`(`TypeHandle.Value`)キーだけ(0.64〜0.78 倍、ただし ALC の回収がない場合に限る)。それが使えないなら、AOT を出荷するなら `RuntimeTypeHandle` キー、JIT のみでコアを選べないなら comparer、と割り切る。それ以上が要るなら自作表。**2 つの判断は独立している。** → [測定結果](benchmarks/results/TYP-07-TypeKey.md)
 
 ---
 
@@ -4035,6 +4035,7 @@ Holder フィールドターゲットはコンパイル済みクロージャに�
 | `AggressiveOptimization` | Dynamic PGO を無効化するため**かえって遅くなりうる** | **実測: 予測どおりで、JIT 側の代償は深刻。** PGO に依存する形(ループ内のインターフェースディスパッチ)では JIT で **5.79 倍**、依存しない直線的な算術でも 1.26 倍。AOT では 0.95 / 1.02 倍で完全に不活性 | **新規コードには付けない**が、既存コードから外すかは形状で判断する(JIT-01 の適用実測表を参照)— ホットパスに投機できるディスパッチが無い場合、外すと tier-0 昇格のコストが露出して最大 1.31 倍悪化する。AOT では本当に何も起きない。→ [測定結果](benchmarks/results/LAB-AotAssumptions.md) |
 | 実行時コード生成(GEN-01) | Emit の最良形はコンパイル済みと同等 | `PlatformNotSupportedException`(AOTP-01) | Source Generator(GEN-02)へ置換する |
 | Type キーのハッシュ取得元(TYP-07) | `TypeHandle.Value` が仮想 `GetHashCode` 比 hit 0.62 倍 | **順位が反転する。** 仮想呼び出しが 3 者中最速になる(型グラフが閉じているため静的に脱仮想化される)。それに対し handle は hit 1.08 倍 / miss 1.19 倍、identity は 1.18 倍 / 1.23 倍 | **素の `type.GetHashCode()` を使う。** ハンドル手法はここでは悪化要因。なお 8 バイト整列は AOT でも成立するので `>> 3` 自体は正しいまま、割に合わなくなるだけ |
+| Type キー辞書のキー型(TYP-07 補遺) | `RuntimeTypeHandle` キーが hit 0.72 倍、`TypeHandle.Value` の class comparer も同値 | **前提は変わらず差が広がる。** `Dictionary<Type>` は comparer へのインターフェース呼び出しが devirt されず JIT の 2 倍遅くなり、`RuntimeTypeHandle` キーは値型キー経路のまま hit 0.50 倍・miss 0.62 倍。class comparer は 0.94 / 1.03 倍(ディスパッチ形 1.11 倍)で無効 | **AOT を出荷するなら `RuntimeTypeHandle` キー(ALC の回収がなければ `IntPtr` キー)。** comparer 方式は選ばない |
 
 **逆に AOT で有利になる項目(実測):** TYP-04 / TYP-06 のような型初期化子ベースのキャッシュや静的テーブルは、確かに初回から最適化済みで動く。cold-start プローブでは AOT が**バッチ 1 の時点で定常値 1.20 ns** に到達しその後まったく動かないのに対し、JIT は到達までに約 1 万回の呼び出しを要し、途中で **1 呼び出しあたり 3,418 ns の Tier1 再コンパイルのスパイク**を通過する。AOT の定常値自体も **2.9 倍高速**(1.20 対 3.45 ns)。ただし AOT で型別成果物を事前計算すべき理由としてより強いのは代替手段の方で、呼び出し箇所でリフレクションによって再計算すると **AOT では約 125 ns/回、JIT では約 4.85 ns/回** — 約 26 倍悪く、しかも改善しない。→ [測定結果](benchmarks/results/LAB-AotAssumptions.md)。なお R-01(`typeof` 演算子自体のキャッシュ)の部分は AOT で**未検証**。
 
@@ -4234,6 +4235,7 @@ dotnet-performance/
 ├── tests/PerformancePatterns.Tests/   実装の正しさの検証(xunit)
 └── benchmarks/
     ├── PerformancePatterns.Benchmarks/  BenchmarkDotNet による効果実証(Lab/ は検証用)
+    ├── PerformancePatterns.AotHarness/  JIT vs NativeAOT 比較ハーネス(Lab のクラスをリンク、診断器なし)
     └── results/                         測定結果の記録(パターン ID 対応、英語)
 ```
 

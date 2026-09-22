@@ -51,6 +51,7 @@ public static class Program
         TypeHashSourceBenchmark.Verify();
         TypeKeyBenchmark.Verify();
         TypeKeyDispatchBenchmark.Verify();
+        TypeKeyDispatchSweepBenchmark.Verify();
         StaticAbstractCallBenchmark.Verify();
         RefEnumeratorBenchmark.Verify();
         StringSwitchSmallBenchmark.Verify();
@@ -182,6 +183,7 @@ public static class Program
                 typeof(TypeHashSourceBenchmark),
                 typeof(TypeKeyBenchmark),
                 typeof(TypeKeyDispatchBenchmark),
+                typeof(TypeKeyDispatchSweepBenchmark),
                 typeof(StaticAbstractCallBenchmark),
                 typeof(RefEnumeratorBenchmark),
                 typeof(StringSwitchSmallBenchmark),

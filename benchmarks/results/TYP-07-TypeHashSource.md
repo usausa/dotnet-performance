@@ -92,8 +92,9 @@ CIs do not overlap on either axis (virtual hit [1.418, 1.613] vs handle hit [1.6
 
 ## Reproducing
 
-The repository's `BenchmarkConfig` carries `DisassemblyDiagnoser`, which NativeAOT does not support, so the two-runtime comparison was run from a standalone harness with the diagnoser removed and jobs supplied on the command line:
+The repository's `BenchmarkConfig` carries `DisassemblyDiagnoser`, which NativeAOT does not support, so the two-runtime comparison was run from a standalone harness with the diagnoser removed and jobs supplied on the command line. That harness now lives in the repository as `benchmarks/PerformancePatterns.AotHarness` (it links this class; the MediumRun attribute provides the JIT job):
 
 ```
-dotnet run -c Release -- --filter "*" --runtimes net10.0 nativeaot10.0 --job medium
+cd benchmarks/PerformancePatterns.AotHarness
+dotnet run -c Release -- --filter "*TypeHashSourceBenchmark*" --runtimes nativeaot10.0 --job medium
 ```

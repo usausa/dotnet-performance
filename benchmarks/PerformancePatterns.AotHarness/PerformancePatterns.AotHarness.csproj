@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    JIT vs NativeAOT comparison harness (docs/benchmark-methodology.md, "NativeAOT との比較測定").
+    The main benchmark project's BenchmarkConfig carries DisassemblyDiagnoser, which NativeAOT does not
+    support, so this project links the benchmark sources that have an AOT comparison and supplies its own
+    PerformancePatterns.Benchmarks.BenchmarkConfig without the diagnoser (hence the RootNamespace).
+    The linked classes keep their MediumRunJob attribute, which provides the JIT rows; the NativeAOT job is
+    passed on the command line (see the methodology document for the exact command line).
+    vswhere.exe must be on PATH for the ILCompiler link step (C:\Program Files (x86)\Microsoft Visual Studio\Installer).
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PerformancePatterns.Benchmarks</RootNamespace>
+    <CodeAnalysisRuleSet>..\..\Benchmark.ruleset</CodeAnalysisRuleSet>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\PerformancePatterns.Benchmarks\Lab\StaticAbstractCallBenchmark.cs" Link="Lab\StaticAbstractCallBenchmark.cs" />
+    <Compile Include="..\PerformancePatterns.Benchmarks\Lab\TypeHashSourceBenchmark.cs" Link="Lab\TypeHashSourceBenchmark.cs" />
+    <Compile Include="..\PerformancePatterns.Benchmarks\Lab\TypeKeyBenchmark.cs" Link="Lab\TypeKeyBenchmark.cs" />
+    <Compile Include="..\PerformancePatterns.Benchmarks\Lab\TypeKeyDispatchBenchmark.cs" Link="Lab\TypeKeyDispatchBenchmark.cs" />
+    <Compile Include="..\PerformancePatterns.Benchmarks\Lab\TypeKeyDispatchSweepBenchmark.cs" Link="Lab\TypeKeyDispatchSweepBenchmark.cs" />
+  </ItemGroup>
+
+</Project>

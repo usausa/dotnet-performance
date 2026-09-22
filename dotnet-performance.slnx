@@ -14,6 +14,7 @@
     <File Path="README.ja.md" />
   </Folder>
   <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/PerformancePatterns.AotHarness/PerformancePatterns.AotHarness.csproj" />
     <Project Path="benchmarks/PerformancePatterns.Benchmarks/PerformancePatterns.Benchmarks.csproj" DefaultStartup="true" />
   </Folder>
   <Folder Name="/src/">

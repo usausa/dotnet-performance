@@ -38,24 +38,26 @@ Two things block a naive attempt, and both cost a full run to discover:
 1. **`DisassemblyDiagnoser` is not supported on NativeAOT.** BDN rejects the job at validation and every AOT row comes out `NA` — with exit code 0, so it looks like a successful run. Since the base configuration above always carries the diagnoser, an AOT comparison needs a separate config without it (and therefore no Code Size column)
 2. **`vswhere.exe` must be on `PATH`** for the ILCompiler link step (`C:\Program Files (x86)\Microsoft Visual Studio\Installer`). Without it the link fails inside `Microsoft.NETCore.Native.targets` and, again, every AOT row is `NA`
 
-So an AOT comparison is run from a small standalone harness: copy the benchmark bodies, give them a diagnoser-free config, and supply both runtimes on the command line so the job settings are identical.
+So an AOT comparison is run from the standalone harness `benchmarks/PerformancePatterns.AotHarness`. It does not copy the benchmark bodies: it links the classes that have an AOT comparison (`Lab/StaticAbstractCallBenchmark.cs` / `TypeHashSourceBenchmark.cs` / `TypeKeyBenchmark.cs` / `TypeKeyDispatchBenchmark.cs`) with `<Compile Include>` and substitutes the `PerformancePatterns.Benchmarks.BenchmarkConfig` that their `[Config(typeof(BenchmarkConfig))]` binds to with a diagnoser-free version (which is why its `RootNamespace` matches the main project). To add a class, add one link line to the csproj and its `Verify()` call to `Program.cs`.
 
 ```csharp
-// Diagnoser-free config for AOT comparison. Do not put a job attribute on the class -
-// pass both runtimes on the command line so JIT and AOT get the same MediumRun settings.
-public class AotComparisonConfig : ManualConfig
+// The harness's BenchmarkConfig: same name and namespace as the main one, minus DisassemblyDiagnoser.
+// The linked classes keep [MediumRunJob(RuntimeMoniker.Net10_0)], which provides the JIT job,
+// so the command line adds only the NativeAOT job with the same MediumRun settings.
+public class BenchmarkConfig : ManualConfig
 {
-    public AotComparisonConfig()
+    public BenchmarkConfig()
     {
         AddExporter(MarkdownExporter.GitHub);
+        AddColumn(StatisticColumn.Mean, StatisticColumn.Min, StatisticColumn.Max, StatisticColumn.P90, StatisticColumn.Error, StatisticColumn.StdDev);
         AddDiagnoser(MemoryDiagnoser.Default);
-        AddColumn(StatisticColumn.Min, StatisticColumn.Max, StatisticColumn.P90);
     }
 }
 ```
 
 ```
-dotnet run -c Release -- --filter "*" --runtimes net10.0 nativeaot10.0 --job medium
+cd benchmarks/PerformancePatterns.AotHarness
+dotnet run -c Release -- --filter "*TypeKeyBenchmark*" --runtimes nativeaot10.0 --job medium
 ```
 
 **Reading the result:** BDN computes `Ratio` against the baseline method **on the first runtime**, so every AOT row is scaled to the JIT baseline. To judge the AOT side, re-derive the ratios against the AOT run's own baseline row.
@@ -277,7 +279,7 @@ Differences that measurement could not resolve, listed together with the result 
 | ⑦ | `Unsafe.Unbox<T>` | Can an existing box be updated without reallocating? | STK-05 | ✅ Adopted (STK-05 extension, 0.17-0.18x and zero allocation; the ratio is machine independent because what is removed is an allocation) |
 | ⑦ | `MemoryMarshal.TryGetArray` | Copy-free bridge to `byte[]`-based APIs | BUF-04 | ✅ Adopted (lives in BUF-08, 4,120 → 0 B allocated) |
 | ⑧ | Normalising the probe to enable an ordinal switch (column-name matching) | Does upper-casing the probe first beat `Equals(OrdinalIgnoreCase)` / the sampling-hash switch? | TXT-10 / GEN-02 | ⚠️ **Split verdict.** The conversion is **rejected** - it loses in 12 of 12 conditions (2.0-3.0x at 8 columns, 1.35-2.91x at 24) and costs 2.7-3.2 ns per column. For the match itself the crossover is the column count: the chain wins at 8 (the switch is 1.17-1.19x) and the **un-converted** ordinal switch wins at 24 (0.91x, code 2,212 vs 3,261 B). Measured like for like only after adding a harness-matched baseline - see pitfall 3 → [LAB-ColumnMatch](../benchmarks/results/LAB-ColumnMatch.md) |
-| ⑧ | Key type for a Type-keyed dictionary (`Type` vs `RuntimeTypeHandle`) | TYP-07 compared hash sources inside a hand-written table. For code that stays on the BCL `Dictionary`, does keying by `RuntimeTypeHandle` alone help, and does the gap to the hand-written table remain? | TYP-07 / TYP-01 / R-22 | ⏳ Provisional (B550H): the `RuntimeTypeHandle` key is 0.70x on hit / 0.77x on miss (CIs disjoint, code 1,037 → 797 B). The hand-written table over `TypeHandle.Value` sits 2.4x further ahead at 0.29x. On `ConcurrentDictionary` the key change is 0.80x on hit (equal on miss — the gain is in the node compare). ⏳❗ `ConcurrentDictionary<Type>` beating `Dictionary<Type>` on hit (3.16 vs 4.6-5.5 ns) was unexpected and needs confirming. ⏳❗ When the lookup feeds a dispatch (`TypeKeyDispatchBenchmark`) the `RuntimeTypeHandle` key is **2.24x slower** with 5 alternating types (0.62x with a single type) while an `IntPtr` (`TypeHandle.Value`) key is 0.69x; reproduced in BunnyTail DI `ServiceRegistry.Activate` (9.79 → 18.39 ns). **The two decisions are independent** — finalize on HX 370 (Zen 5) and under NativeAOT |
+| ⑧ | Key type for a Type-keyed dictionary (`Type` vs `RuntimeTypeHandle`) | TYP-07 compared hash sources inside a hand-written table. For code that stays on the BCL `Dictionary`, does keying by `RuntimeTypeHandle` alone help, and does the gap to the hand-written table remain? | TYP-07 / TYP-01 / R-22 | ✅ Recorded (TYP-07 supplement). HX 370 / JIT: the `RuntimeTypeHandle` key is 0.72x on hit / 0.81x on miss (CIs disjoint, code 1,037 → 797 B), and a class comparer over `TypeHandle.Value` ties it (0.72 / 0.81). The hand-written table over `TypeHandle.Value` sits 2.8x further ahead at 0.26x. On `ConcurrentDictionary` the key change is 0.85x on hit / 1.07x on miss. `ConcurrentDictionary<Type>` beating `Dictionary<Type>` (2.22 vs 2.91 ns) reproduced on both machines and is confirmed. The 2.24x flip of the `RuntimeTypeHandle` key when the lookup feeds a dispatch (`TypeKeyDispatchBenchmark`, B550H) **did not reproduce on Zen 5: 0.82x** (0.77-0.88x across a 1-5 target sweep), and the real `ServiceRegistry.Activate` gave 0.83x — Zen 3-specific (same lookup code on both machines; the difference is PGO's delegate-target guess). NativeAOT: the `RuntimeTypeHandle` key gains more (hit 0.50x, dispatch shape 0.79x) while the class comparer does nothing (0.94x / 1.11x). **The two decisions are independent** |
 
 ---
 

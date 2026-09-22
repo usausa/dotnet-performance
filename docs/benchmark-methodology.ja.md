@@ -38,24 +38,26 @@ public class BenchmarkConfig : ManualConfig
 1. **`DisassemblyDiagnoser` は NativeAOT 非対応。** BDN が検証段階でジョブを拒否し、AOT 行はすべて `NA` になる。しかも終了コードは 0 なので成功したように見える。上記の基本構成は常に診断器を含むため、AOT 比較には診断器を外した別 config が必要(その結果 Code Size 列は使えない)
 2. **`vswhere.exe` を `PATH` に通す必要がある**(ILCompiler のリンク段階で使用。実体は `C:\Program Files (x86)\Microsoft Visual Studio\Installer`)。通っていないと `Microsoft.NETCore.Native.targets` 内でリンクが失敗し、やはり AOT 行が全部 `NA` になる
 
-そのため AOT 比較は小さな独立ハーネスで行う。ベンチマーク本体をコピーし、診断器なしの config を与え、両ランタイムをコマンドラインで渡してジョブ設定を揃える。
+そのため AOT 比較は独立ハーネス `benchmarks/PerformancePatterns.AotHarness` で行う。ハーネスはベンチマーク本体をコピーせず、AOT 比較の対象クラス(`Lab/StaticAbstractCallBenchmark.cs` / `TypeHashSourceBenchmark.cs` / `TypeKeyBenchmark.cs` / `TypeKeyDispatchBenchmark.cs`)を `<Compile Include>` でリンクし、`[Config(typeof(BenchmarkConfig))]` が束縛する `PerformancePatterns.Benchmarks.BenchmarkConfig` を診断器なしの版で差し替える(`RootNamespace` を本体側に合わせてあるのはそのため)。対象を増やすには csproj にリンクを 1 行足し、`Program.cs` に `Verify()` を足す。
 
 ```csharp
-// AOT 比較用の診断器なし config。クラスにジョブ属性は付けず、
-// 両ランタイムをコマンドラインで渡して JIT / AOT に同じ MediumRun 設定を適用する
-public class AotComparisonConfig : ManualConfig
+// ハーネス側の BenchmarkConfig: 本体と同名・同名前空間で DisassemblyDiagnoser だけを外す。
+// リンクしたクラスの [MediumRunJob(RuntimeMoniker.Net10_0)] が JIT 側のジョブになるので、
+// コマンドラインでは NativeAOT のジョブだけを同じ MediumRun 設定で足す
+public class BenchmarkConfig : ManualConfig
 {
-    public AotComparisonConfig()
+    public BenchmarkConfig()
     {
         AddExporter(MarkdownExporter.GitHub);
+        AddColumn(StatisticColumn.Mean, StatisticColumn.Min, StatisticColumn.Max, StatisticColumn.P90, StatisticColumn.Error, StatisticColumn.StdDev);
         AddDiagnoser(MemoryDiagnoser.Default);
-        AddColumn(StatisticColumn.Min, StatisticColumn.Max, StatisticColumn.P90);
     }
 }
 ```
 
 ```
-dotnet run -c Release -- --filter "*" --runtimes net10.0 nativeaot10.0 --job medium
+cd benchmarks/PerformancePatterns.AotHarness
+dotnet run -c Release -- --filter "*TypeKeyBenchmark*" --runtimes nativeaot10.0 --job medium
 ```
 
 **結果の読み方:** BDN の `Ratio` は**最初のランタイム側**のベースラインメソッドに対して計算されるため、AOT 行もすべて JIT のベースラインに対する比になる。AOT 側を判断するには、AOT 実行自身のベースライン行に対して比を取り直すこと。
@@ -277,7 +279,7 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ⑦ | `Unsafe.Unbox<T>` | 既存ボックスを再確保せず更新できるか | STK-05 | ✅ 収録(STK-05 拡張、0.17〜0.18 倍・割り当てゼロ。消えるのが割り当てなので比率は機械非依存) |
 | ⑦ | `MemoryMarshal.TryGetArray` | `byte[]` 前提 API への無コピー橋渡し | BUF-04 | ✅ 収録(BUF-08 に同居、割り当て 4,120 → 0 B) |
 | ⑧ | 序数 switch を使うためのプローブ正規化(列名照合) | 先に大文字化する形は `Equals(OrdinalIgnoreCase)` / サンプリングハッシュ switch に勝てるか | TXT-10 / GEN-02 | ⚠️ **判定は二分。** 変換は**不採用** — 測定 12 条件すべてで負け(8 列 2.0〜3.0 倍、24 列 1.35〜2.91 倍)、列あたり 2.7〜3.2 ns を足す。照合そのものの境界は列数で、8 列は連鎖の勝ち(switch が 1.17〜1.19 倍)、24 列は**変換なし**の序数 switch の勝ち(0.91 倍、コード 2,212 対 3,261 B)。等価比較はハーネスを揃えた基準を追加して初めて成立した — 落とし穴 3 を参照 → [LAB-ColumnMatch](../benchmarks/results/LAB-ColumnMatch.md) |
-| ⑧ | Type キー辞書のキー型(`Type` vs `RuntimeTypeHandle`) | TYP-07 は自作表内のハッシュ取得元を比較した。BCL `Dictionary` に留まる場合、キーの型を `RuntimeTypeHandle` にするだけで速くなるか。自作表との差は残るか | TYP-07 / TYP-01 / R-22 | ⏳ 仮測定(B550H)で `RuntimeTypeHandle` キーが hit 0.70 倍・miss 0.77 倍(信頼区間非重複、コード 1,037 → 797 B)。自作表 + `TypeHandle.Value` は 0.29 倍で 2.4 倍先。`ConcurrentDictionary` でも hit 0.80 倍(miss は同等 — 利得はノード比較側)。⏳❗ `ConcurrentDictionary<Type>` の hit が `Dictionary<Type>` より速い(3.16 vs 4.6-5.5 ns)のは想定外で要確認。⏳❗ さらに探索結果でディスパッチする形(`TypeKeyDispatchBenchmark`)では `RuntimeTypeHandle` キーが 5 型ローテーションで **2.24 倍遅く**(単一型なら 0.62 倍)、`IntPtr`(`TypeHandle.Value`)キーは 0.69 倍。BunnyTail DI の `ServiceRegistry.Activate` 実コードで再現(9.79 → 18.39 ns)。**2 つの判断は独立** — HX 370(Zen 5)と NativeAOT で確定 |
+| ⑧ | Type キー辞書のキー型(`Type` vs `RuntimeTypeHandle`) | TYP-07 は自作表内のハッシュ取得元を比較した。BCL `Dictionary` に留まる場合、キーの型を `RuntimeTypeHandle` にするだけで速くなるか。自作表との差は残るか | TYP-07 / TYP-01 / R-22 | ✅ 収録(TYP-07 補遺)。HX 370 / JIT: `RuntimeTypeHandle` キーが hit 0.72 倍・miss 0.81 倍(信頼区間非重複、コード 1,037 → 797 B)、`TypeHandle.Value` の class comparer も同値(0.72 / 0.81)。自作表 + `TypeHandle.Value` は 0.26 倍で 2.8 倍先。`ConcurrentDictionary` では hit 0.85 倍・miss 1.07 倍。`ConcurrentDictionary<Type>` が `Dictionary<Type>` より速い(2.22 vs 2.91 ns)のは 2 機で再現し確定。探索結果でディスパッチする形(`TypeKeyDispatchBenchmark`)で B550H が示した `RuntimeTypeHandle` キーの 2.24 倍の逆転は **Zen 5 では再現せず 0.82 倍**(型数 1〜5 のスイープでも 0.77〜0.88 倍)、実コード `ServiceRegistry.Activate` でも 0.83 倍 — Zen 3 固有と確定(探索部分の命令列は両機で同じ、差はデリゲート呼び出し先の PGO 推測)。NativeAOT: `RuntimeTypeHandle` キーは hit 0.50 倍・ディスパッチ形 0.79 倍と利得が拡大、class comparer は 0.94 / 1.11 倍で無効。**2 つの判断は独立** |
 
 ---
 
