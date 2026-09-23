@@ -3,7 +3,7 @@
 - Verdict (Dictionary, JIT): keying the BCL Dictionary by `RuntimeTypeHandle` instead of `Type` is 0.72x on hit / 0.81x on miss (2.905 -> 2.101 ns, 2.292 -> 1.861 ns; CIs disjoint) with 1,037 -> 797 B of code, at no change in hash quality (all three of `Type.GetHashCode`, `RuntimeHelpers.GetHashCode` and `RuntimeTypeHandle.GetHashCode` return the same identity hash). A class comparer over `TypeHandle.Value` lands on the same numbers (2.098 / 1.867 ns, 593 B): the interface dispatch it adds costs what the cheaper hash saves. The B550H (x86-64-v3) provisional run agreed (0.70x / 0.77x)
 - Verdict (ConcurrentDictionary, JIT): `ConcurrentDictionary<RuntimeTypeHandle,_>` is **0.85x on hit** (2.221 -> 1.884 ns; medians 2.071 -> 1.715) and **1.07x on miss** (1.465 -> 1.569 ns). The gain sits in the per-node compare, which only runs on hit. Both ConcurrentDictionary hit rows are bimodal between launches on this machine (2.03-2.89 / 1.68-2.11 ns), hence the medians; the `Dictionary` rows that moved 30% between launches on B550H are stable here (StdDev 0.03 ns)
 - Confirmed on both machines (was flagged unexpected on B550H): `ConcurrentDictionary<Type,_>` **beats** `Dictionary<Type,_>` on hit (2.22 vs 2.91 ns) and on miss (1.47 vs 2.29 ns). ConcurrentDictionary's `_comparerIsDefaultForClasses` flag lets it hash with `key.GetHashCode()` directly (one GDV guard to `RuntimeType`) instead of the `comparer.GetHashCode` interface call, so only its `Equals` still goes through the comparer
-- **Run 2 (lookup + dispatch): the Zen 3 flip does not reproduce on Zen 5.** With five factory delegates alternating, `ConcurrentDictionary<RuntimeTypeHandle,_>` is **0.82x** of `<Type,_>` (4.02 vs 4.89 ns), the `IntPtr` key 0.64x (3.11 ns), the `Type` key with a `TypeHandle.Value` comparer 0.88x, and the single-type handle case 0.57x. On B550H (Zen 3) the same code put the handle key at 2.24x (15.64 vs 6.98 ns). The lookup code is the same on both machines (`TypeRotating`: GDV guards on `ObjectEqualityComparer<Type>` / `RuntimeType` and a virtual `call [rax+18]` for the hash; `HandleRotating`: a direct call to the `TryGetHashCode` FCall with the `GetHashCodeWorker` fallback and a single `cmp` per node). The code sizes differ only in PGO's delegate-target guess: HX 370's `HandleRotating` and `PtrRotating` carry a one-target guard (`Target2` / `Target1`) with the `new` inlined, 759 / 480 B against 669 / 409 B on B550H, while `TypeRotating`, the comparer variant and both single-type variants have byte-identical sizes. So the Zen 3 penalty is a run-time (branch prediction / speculation) effect around that guard and the indirect delegate call, not a property of the lookup code. Hypothesis, not yet confirmed: Zen 3's predictor stops learning the period-5 target pattern once the guard, the native FCall and the indirect call are all in the history, while Zen 5's longer history does; the residual +3 ns with `DOTNET_JitEnableGuardedDevirtualization=0` on B550H fits the indirect call alone mispredicting. `DOTNET_TieredPGO=0` (no delegate guess at all), the type-count sweep in Run 4a (`TypeKeyDispatchSweepBenchmark`, 1 / 2 / 3 / 5 distinct targets in the same five-call sequence — no flip at any count on Zen 5: handle 0.77-0.88x, `IntPtr` 0.64-0.72x) and the branch-miss counters on B550H would settle it; `docs/verification-handoff.ja.md` carries that procedure. The real `ServiceRegistry.Activate` in BunnyTail.DependencyInjection agrees with the benchmark on both cores: handle key 0.83x on Zen 5 against 1.88x on Zen 3
+- **Run 2 (lookup + dispatch): the Zen 3 flip does not reproduce on Zen 5.** With five factory delegates alternating, `ConcurrentDictionary<RuntimeTypeHandle,_>` is **0.82x** of `<Type,_>` (4.02 vs 4.89 ns), the `IntPtr` key 0.64x (3.11 ns), the `Type` key with a `TypeHandle.Value` comparer 0.88x, and the single-type handle case 0.57x. On B550H (Zen 3) the same code put the handle key at 2.24x (15.64 vs 6.98 ns). The lookup code is the same on both machines (`TypeRotating`: GDV guards on `ObjectEqualityComparer<Type>` / `RuntimeType` and a virtual `call [rax+18]` for the hash; `HandleRotating`: a direct call to the `TryGetHashCode` FCall with the `GetHashCodeWorker` fallback and a single `cmp` per node). The code sizes differ only in PGO's delegate-target guess: HX 370's `HandleRotating` and `PtrRotating` carry a one-target guard (`Target2` / `Target1`) with the `new` inlined, 759 / 480 B against 669 / 409 B on B550H, while `TypeRotating`, the comparer variant and both single-type variants have byte-identical sizes. **Run 4b on B550H isolated the cause (the guard hypothesis did not survive):** the flip appears only with 5 distinct targets (0.67-0.82x at 1 / 2 / 3), the delegate guard is absent from both the handle and the `IntPtr` variant at 5 targets yet `IntPtr` stays at 0.76x, and adding a single `RuntimeHelpers.GetHashCode(type)` — the same `TryGetHashCode` FCall the handle path inlines — to the `IntPtr`-keyed loop sinks it from 0.57x to 1.52x (6.19 → 16.56 ns; the `Type`-keyed loop goes 1.01x → 1.30x). The trigger is therefore the direct native FCall sharing an iteration with a 5-target indirect delegate call on Zen 3; guard presence varies per process and does not track the slowdown, and `DOTNET_TieredPGO=0` hides the flip only by making every variant ~2x slower (the lookup stops being inlined). Branch-miss counters were not collected (they need an elevated terminal), so which predictor structure fails remains inferred. The real `ServiceRegistry.Activate` in BunnyTail.DependencyInjection agrees with the benchmark on both cores: handle key 0.83x on Zen 5 against 1.88x on Zen 3
 - The hand-written table reading `TypeHandle.Value` directly stays 2.8x ahead of the best Dictionary option (0.26x / 0.30x, 195 B): it never computes the identity hash at all
 - Why (DisassemblyDiagnoser): `Dictionary<Type,_>` carries three guarded-devirtualization type checks per lookup (comparer type, `GetHashCode` receiver, `Equals` receiver) and spills the key to the stack for the constrained `GetHashCode` call; `Dictionary<RuntimeTypeHandle,_>` drops the comparer guard and the spills and compares the entry with a plain `cmp`; the custom table replaces the `TryGetHashCode` call with one field load (`mov rax,[rcx+18]`)
 - Why (ConcurrentDictionary): `<Type,_>` = flag test + GDV(`RuntimeType`) for the hash + `call TryGetHashCode` + hash spill + per node GDV(`ObjectEqualityComparer<Type>`) + GDV(`RuntimeType`) before the reference compare, 580 B. `<RuntimeTypeHandle,_>` = GDV(`RuntimeType`) for `type.TypeHandle` + GDV for `m_type.GetHashCode()` + `call TryGetHashCode`, then the per-node compare is a single `cmp` (`EqualityComparer<RuntimeTypeHandle>.Default.Equals` inlined to a reference compare of `m_type`), 434 B. Both still pay the identity-hash call
@@ -193,6 +193,107 @@ LaunchCount=2  WarmupCount=10
 | **TypeRotating**   | **5**           | **4.777 ns** | **0.0455 ns** | **0.0681 ns** | **4.770 ns** | **4.643 ns** | **4.863 ns** | **4.856 ns** |  **1.00** |    **0.02** | **0.0029** |     **587 B** |      **24 B** |        **1.00** |
 | HandleRotating | 5           | 4.004 ns | 0.0614 ns | 0.0901 ns | 3.975 ns | 3.775 ns | 4.145 ns | 4.121 ns |  0.84 |    0.02 | 0.0029 |     724 B |      24 B |        1.00 |
 | PtrRotating    | 5           | 3.230 ns | 0.0910 ns | 0.1246 ns | 3.154 ns | 3.075 ns | 3.380 ns | 3.371 ns |  0.68 |    0.03 | 0.0029 |     387 B |      24 B |        1.00 |
+
+## Run 4b (B550H): root cause of the Zen 3 flip (`TypeKeyDispatchSweepBenchmark` + a throwaway FCall probe, x86-64-v3, JIT)
+
+Three experiments on the B550H (Ryzen 9 5900X, Zen 3), run after the HX 370 results above. The machine was noisier than during the provisional runs (Visual Studio + ReSharper open), so absolute times are 20-60% above the 2026-09-20 numbers; every conclusion below rests on ratios inside one run.
+
+1. **Target-count sweep, dynamic PGO on:** the handle key wins at 1 / 2 / 3 distinct targets (0.78 / 0.67 / 0.82x) and flips only at 5 (**2.15x**, 16.75 vs 7.84 ns). Disassembly at 5 targets: the handle and `IntPtr` variants have **no delegate-target guard** (PGO treats the call as megamorphic) while the `Type` variant guards on `Target4`; at 1-3 targets all three variants carry a one-target guard with the `new` inlined. `IntPtr` at 5 targets, guard-less like the handle variant, is still 0.76x — so the missing guard is not the cause.
+2. **Same sweep with `DOTNET_TieredPGO=0`:** no flip (handle 0.99x at 5 targets), but every variant runs 12-16 ns because `ConcurrentDictionary.TryGetValue` is no longer inlined and no call is devirtualized. It removes the pathology together with the optimized shape, so it isolates nothing.
+3. **FCall probe (throwaway, not committed):** the sweep's `Type` and `IntPtr` loops with one extra `RuntimeHelpers.GetHashCode(type)` per iteration — the same `TryGetHashCode` FCall (`call 00007FF…` into coreclr, `GetHashCodeWorker` fallback) that the handle path inlines. At 5 targets `PtrRotatingFCall` goes from 0.57x to **1.52x** (6.19 → 16.56 ns) and `TypeRotatingFCall` from 1.01x to **1.30x** (10.98 → 14.19 ns); at 3 targets the effect is small (1.07x / 1.48x with a noisy baseline). In the disassembly the guard decision varied per process (`PtrRotatingFCall` had a `Target1` guard in one launch and `Target4` in another) without changing the outcome.
+
+**Verdict:** the Zen 3 flip needs two things in the same loop iteration — the direct native `TryGetHashCode` FCall and an indirect delegate call whose target cycles through 5 values — and nothing else in the handle path matters. The `RuntimeTypeHandle` key is exposed because its value-type-key path inlines that FCall into the loop; the `Type` key is not, because its identity hash is taken one call deeper, inside the virtually called `RuntimeType.GetHashCode`. Which Zen 3 predictor structure gives up (return-stack or indirect-target history) is inferred, not measured: the branch-miss counters need an elevated terminal and were not collected. Zen 5 shows none of this at any target count (Run 4a). Corroboration from the other side: NativeAOT computes the identity hash in managed code (no FCall), and there the real `ServiceRegistry.Activate` with the handle key shows no Zen 3 flip either — 0.82x on B550H (18.64 → 15.22 ns) against 0.84x on HX 370.
+
+### Sweep, PGO on
+
+```
+
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.9445/25H2/2025Update/HudsonValley2)
+AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+.NET SDK 10.0.401
+  [Host]              : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+  MediumRun-.NET 10.0 : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+
+Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
+LaunchCount=2  WarmupCount=10  
+
+```
+| Method         | TargetCount | Mean      | Error     | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
+|--------------- |------------ |----------:|----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|-------:|----------:|----------:|------------:|
+| **TypeRotating**   | **1**           |  **9.208 ns** | **0.3211 ns** | **0.4605 ns** |  **9.247 ns** |  **8.246 ns** | **10.372 ns** |  **9.809 ns** |  **1.00** |    **0.07** | **0.0014** |     **608 B** |      **24 B** |        **1.00** |
+| HandleRotating | 1           |  7.130 ns | 0.2075 ns | 0.3106 ns |  7.141 ns |  6.617 ns |  7.615 ns |  7.509 ns |  0.78 |    0.05 | 0.0014 |     720 B |      24 B |        1.00 |
+| PtrRotating    | 1           |  6.426 ns | 0.2367 ns | 0.3542 ns |  6.544 ns |  5.747 ns |  6.978 ns |  6.813 ns |  0.70 |    0.05 | 0.0014 |     455 B |      24 B |        1.00 |
+|                |             |           |           |           |           |           |           |           |       |         |        |           |           |             |
+| **TypeRotating**   | **2**           |  **9.663 ns** | **0.3899 ns** | **0.5714 ns** |  **9.711 ns** |  **8.465 ns** | **10.842 ns** | **10.431 ns** |  **1.00** |    **0.08** | **0.0014** |     **590 B** |      **24 B** |        **1.00** |
+| HandleRotating | 2           |  6.419 ns | 0.7884 ns | 1.1801 ns |  5.780 ns |  4.953 ns |  8.425 ns |  8.081 ns |  0.67 |    0.13 | 0.0014 |     720 B |      24 B |        1.00 |
+| PtrRotating    | 2           |  6.199 ns | 0.7118 ns | 1.0654 ns |  6.568 ns |  4.426 ns |  7.551 ns |  7.209 ns |  0.64 |    0.12 | 0.0014 |     459 B |      24 B |        1.00 |
+|                |             |           |           |           |           |           |           |           |       |         |        |           |           |             |
+| **TypeRotating**   | **3**           |  **9.794 ns** | **0.4165 ns** | **0.6234 ns** |  **9.695 ns** |  **8.858 ns** | **11.039 ns** | **10.623 ns** |  **1.00** |    **0.09** | **0.0014** |     **590 B** |      **24 B** |        **1.00** |
+| HandleRotating | 3           |  8.021 ns | 0.6244 ns | 0.9346 ns |  8.206 ns |  5.363 ns |  9.215 ns |  8.836 ns |  0.82 |    0.11 | 0.0014 |     705 B |      24 B |        1.00 |
+| PtrRotating    | 3           |  6.659 ns | 0.5884 ns | 0.8625 ns |  6.784 ns |  5.226 ns |  8.124 ns |  7.663 ns |  0.68 |    0.10 | 0.0014 |     459 B |      24 B |        1.00 |
+|                |             |           |           |           |           |           |           |           |       |         |        |           |           |             |
+| **TypeRotating**   | **5**           |  **7.844 ns** | **0.4496 ns** | **0.6729 ns** |  **7.903 ns** |  **6.613 ns** |  **9.869 ns** |  **8.393 ns** |  **1.01** |    **0.12** | **0.0014** |     **594 B** |      **24 B** |        **1.00** |
+| HandleRotating | 5           | 16.751 ns | 0.7033 ns | 1.0527 ns | 16.797 ns | 14.797 ns | 18.989 ns | 17.892 ns |  2.15 |    0.22 | 0.0014 |     633 B |      24 B |        1.00 |
+| PtrRotating    | 5           |  5.901 ns | 0.6446 ns | 0.9648 ns |  5.682 ns |  4.789 ns |  7.947 ns |  7.478 ns |  0.76 |    0.14 | 0.0014 |     387 B |      24 B |        1.00 |
+
+### Sweep, `DOTNET_TieredPGO=0`
+
+```
+
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.9445/25H2/2025Update/HudsonValley2)
+AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+.NET SDK 10.0.401
+  [Host]              : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+  MediumRun-.NET 10.0 : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+
+Job=MediumRun-.NET 10.0  EnvironmentVariables=DOTNET_TieredPGO=0  Runtime=.NET 10.0  
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method         | TargetCount | Mean      | Error     | StdDev    | Min       | Max      | P90      | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
+|--------------- |------------ |----------:|----------:|----------:|----------:|---------:|---------:|------:|--------:|-------:|----------:|----------:|------------:|
+| **TypeRotating**   | **1**           | **12.497 ns** | **0.9511 ns** | **1.4236 ns** | **10.467 ns** | **16.18 ns** | **14.23 ns** |  **1.01** |    **0.16** | **0.0014** |     **689 B** |      **24 B** |        **1.00** |
+| HandleRotating | 1           | 11.875 ns | 0.5291 ns | 0.7588 ns | 10.576 ns | 13.52 ns | 12.97 ns |  0.96 |    0.12 | 0.0014 |     444 B |      24 B |        1.00 |
+| PtrRotating    | 1           | 11.342 ns | 0.9784 ns | 1.4644 ns |  8.325 ns | 13.26 ns | 12.60 ns |  0.92 |    0.15 | 0.0014 |     430 B |      24 B |        1.00 |
+|                |             |           |           |           |           |          |          |       |         |        |           |           |             |
+| **TypeRotating**   | **2**           | **16.417 ns** | **0.5277 ns** | **0.7735 ns** | **14.814 ns** | **17.58 ns** | **17.31 ns** |  **1.00** |    **0.07** | **0.0014** |     **689 B** |      **24 B** |        **1.00** |
+| HandleRotating | 2           | 15.805 ns | 0.5648 ns | 0.8454 ns | 14.226 ns | 17.90 ns | 16.91 ns |  0.96 |    0.07 | 0.0014 |     444 B |      24 B |        1.00 |
+| PtrRotating    | 2           | 11.528 ns | 0.4715 ns | 0.6911 ns | 10.299 ns | 13.11 ns | 12.44 ns |  0.70 |    0.05 | 0.0014 |     430 B |      24 B |        1.00 |
+|                |             |           |           |           |           |          |          |       |         |        |           |           |             |
+| **TypeRotating**   | **3**           | **15.062 ns** | **0.5901 ns** | **0.8832 ns** | **13.188 ns** | **17.06 ns** | **16.07 ns** |  **1.00** |    **0.08** | **0.0014** |     **689 B** |      **24 B** |        **1.00** |
+| HandleRotating | 3           | 12.980 ns | 1.3229 ns | 1.9391 ns | 10.443 ns | 16.17 ns | 15.16 ns |  0.86 |    0.14 | 0.0014 |     444 B |      24 B |        1.00 |
+| PtrRotating    | 3           |  9.485 ns | 0.4967 ns | 0.7434 ns |  8.290 ns | 11.13 ns | 10.47 ns |  0.63 |    0.06 | 0.0014 |     430 B |      24 B |        1.00 |
+|                |             |           |           |           |           |          |          |       |         |        |           |           |             |
+| **TypeRotating**   | **5**           | **15.827 ns** | **1.3900 ns** | **2.0805 ns** | **10.621 ns** | **17.63 ns** | **17.20 ns** |  **1.02** |    **0.22** | **0.0014** |     **689 B** |      **24 B** |        **1.00** |
+| HandleRotating | 5           | 15.399 ns | 0.5808 ns | 0.8693 ns | 13.068 ns | 16.86 ns | 16.31 ns |  0.99 |    0.18 | 0.0014 |     444 B |      24 B |        1.00 |
+| PtrRotating    | 5           | 11.692 ns | 0.3606 ns | 0.5398 ns | 10.403 ns | 12.47 ns | 12.30 ns |  0.76 |    0.13 | 0.0014 |     430 B |      24 B |        1.00 |
+
+### FCall probe (MediumRun rows; the class added `RuntimeHelpers.GetHashCode(type)` to the `Type` and `IntPtr` loops of the sweep and was deleted after the run)
+
+```
+
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.9445/25H2/2025Update/HudsonValley2)
+AMD Ryzen 9 5900X 3.70GHz, 1 CPU, 24 logical and 12 physical cores
+.NET SDK 10.0.401
+  [Host]              : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+  MediumRun-.NET 10.0 : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+
+Job=MediumRun-.NET 10.0  Runtime=.NET 10.0  IterationCount=15  
+LaunchCount=2  WarmupCount=10  
+
+```
+| Method            | IterationCount | LaunchCount | WarmupCount | TargetCount | Mean      | Error      | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
+|------------------ |--------------- |------------ |------------ |------------ |----------:|-----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
+| TypeRotating      | 15 | 2 | 10 | 3           |  8.072 ns |  0.8833 ns | 1.2668 ns |  7.441 ns |  6.629 ns | 10.461 ns | 10.078 ns |  1.02 |    0.21 |     594 B | 0.0014 |      24 B |        1.00 |
+| TypeRotatingFCall | 15 | 2 | 10 | 3           | 11.712 ns |  0.7715 ns | 1.1548 ns | 12.010 ns |  8.311 ns | 12.989 ns | 12.676 ns |  1.48 |    0.25 |     914 B | 0.0014 |      24 B |        1.00 |
+| HandleRotating    | 15 | 2 | 10 | 3           |  8.773 ns |  0.3788 ns | 0.5552 ns |  8.685 ns |  7.605 ns |  9.995 ns |  9.601 ns |  1.11 |    0.17 |     724 B | 0.0014 |      24 B |        1.00 |
+| PtrRotating       | 15 | 2 | 10 | 3           |  7.529 ns |  0.3282 ns | 0.4913 ns |  7.586 ns |  6.343 ns |  8.686 ns |  8.084 ns |  0.95 |    0.15 |     459 B | 0.0014 |      24 B |        1.00 |
+| PtrRotatingFCall  | 15 | 2 | 10 | 3           |  8.487 ns |  0.3279 ns | 0.4806 ns |  8.546 ns |  7.511 ns |  9.544 ns |  9.025 ns |  1.07 |    0.16 |     739 B | 0.0014 |      24 B |        1.00 |
+| TypeRotating      | 15 | 2 | 10 | 5           | 10.982 ns |  0.5034 ns | 0.7535 ns | 11.145 ns |  8.224 ns | 12.405 ns | 11.561 ns |  1.01 |    0.10 |     522 B | 0.0014 |      24 B |        1.00 |
+| TypeRotatingFCall | 15 | 2 | 10 | 5           | 14.185 ns |  0.5885 ns | 0.8809 ns | 13.628 ns | 13.192 ns | 15.633 ns | 15.370 ns |  1.30 |    0.13 |     914 B | 0.0014 |      24 B |        1.00 |
+| HandleRotating    | 15 | 2 | 10 | 5           | 18.284 ns |  0.8280 ns | 1.2136 ns | 18.498 ns | 15.863 ns | 20.343 ns | 19.794 ns |  1.67 |    0.17 |     633 B | 0.0014 |      24 B |        1.00 |
+| PtrRotating       | 15 | 2 | 10 | 5           |  6.187 ns |  0.6477 ns | 0.9695 ns |  5.808 ns |  4.882 ns |  7.767 ns |  7.598 ns |  0.57 |    0.10 |     459 B | 0.0014 |      24 B |        1.00 |
+| PtrRotatingFCall  | 15 | 2 | 10 | 5           | 16.555 ns |  0.5168 ns | 0.7735 ns | 16.820 ns | 15.431 ns | 17.907 ns | 17.503 ns |  1.52 |    0.14 |     739 B | 0.0014 |      24 B |        1.00 |
 
 ## Reproducing
 
