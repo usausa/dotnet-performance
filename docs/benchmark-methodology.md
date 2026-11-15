@@ -10,7 +10,8 @@ The "measured examples" in [README](../README.md) assume measurements taken acco
 - **Keep MemoryDiagnoser enabled at all times** — always judge speed and allocation together
 - **Enable DisassemblyDiagnoser (printSource, exportDiff)** — to inspect generated code and code size. Even when the speed difference is at the measurement-noise level, code size can settle which variant is better (the impact on inlining shows up in code size)
 - To look at generated code as a one-off without going through a benchmark, set the environment variable `DOTNET_JitDisasm="MethodName"` and run: the JIT assembly goes to stdout (a Release build plus `DOTNET_TieredCompilation=0` lets you inspect the final code directly)
-- **By default, measure on the latest runtime (net10.0) alone**. Reserve running multiple runtimes side by side for verifications that specifically ask whether the effect changes across generations (optimizations that disappear in a newer generation, such as bounds-check elimination idioms or uint-cast tricks)
+- **By default, measure on the latest runtime (net11.0) alone**. Reserve running multiple runtimes side by side for verifications that specifically ask whether the effect changes across generations (optimizations that disappear in a newer generation, such as bounds-check-elimination idioms and the uint-cast trick)
+- **Performance verdicts are made on .NET 10 and later only.** The supported targets are now `net11.0;net10.0`, so net9 and earlier are out of scope. Results measured on net8 / net9 in the past stay as a record but are not used as input to new verdicts, and generation comparisons run between net10 and net11
 
 ```csharp
 public class BenchmarkConfig : ManualConfig
@@ -101,7 +102,7 @@ We have measured cases where a 30x difference on an isolated primitive dilutes t
 
 ### 7. Mixing TFM-dependent methods via #if (when running multiple runtimes)
 
-If you mix benchmarks for APIs that exist only on newer runtimes into one class with `#if NET9_0_OR_GREATER` and the like, the child build for the older runtime cannot resolve the methods the host (latest TFM) discovered, and **every case on that runtime comes out NA**. Separate TFM-dependent comparisons into their own classes behind `#if`, and attach only the corresponding runtime's job to each class.
+If you mix benchmarks for APIs that exist only on newer runtimes into one class with `#if NET11_0_OR_GREATER` and the like, the child build for the older runtime cannot resolve the methods the host (latest TFM) discovered, and **every case on that runtime comes out NA**. Separate TFM-dependent comparisons into their own classes behind `#if`, and attach only the corresponding runtime's job to each class.
 
 ### 8. Setup work leaking into the measurement
 
@@ -132,7 +133,7 @@ The decision rule "overlapping confidence intervals plus identical generated cod
 
 - Evaluate on **three axes: speed, allocation, and code size**. An improvement on one axis alone is weak justification for adoption
 - Make the Ratio baseline "the straightforward implementation you have today" so the improvement reads off directly
-- Record optimizations whose effect vanished in a newer generation as patterns that are "no longer needed" (move them to [rejected-patterns.md](rejected-patterns.md))
+- Record optimizations whose effect vanished in a newer generation as patterns that are "no longer needed" (judged across net10 and later) (move them to [rejected-patterns.md](rejected-patterns.md))
 
 ### Handling measurements that fall within measurement noise
 
@@ -197,7 +198,7 @@ The following are candidates to be adopted or rejected once a sample has been bu
 
 1. For each candidate, build a verification benchmark (plus a minimal implementation if needed) and measure it on net10 / net11
 2. **Effective** → document it in the main text as a pattern (with an implementation example and measurements)
-3. **Ineffective** → record it in [docs/rejected-patterns.md](rejected-patterns.md) together with "which generation it stayed effective through"
+3. **Ineffective** → record it in [docs/rejected-patterns.md](rejected-patterns.md) together with "which generation from net10 onward it stayed effective through"
 4. **Conditional** → document it with the conditions for applying it spelled out
 5. **Measurement within measurement noise** → go down to the generated code (disassembly) and split the case in two. **If the generated code differs, record it as "➖ measurement noise"** (do not reject it — a difference below measurement resolution really exists, so keep the numbers on record along with the room it has to pay off on a different axis or in a different environment). **If the generated code matches as well, it is "no difference" and gets rejected** (recorded with the code match as the basis). For the procedure, see the decision criteria above. Note that **a nanosecond-scale difference is not in itself measurement noise** — if the confidence intervals do not overlap, even 0.2 ns is treated as a real difference. It is "measurement noise" only when the confidence intervals overlap and the difference cannot be resolved statistically
 
@@ -264,7 +265,7 @@ Differences that measurement could not resolve, listed together with the result 
 | ⑤ | System.Threading.Channels | Producer-consumer queues. Effect of the Bounded/Unbounded and SingleReader/SingleWriter options | DSP-03 | ✅ Documented ([ASY-02](../README.md#-asy-02-producerconsumer-with-systemthreadingchannels), ~45ns/element. Bounded is 2x) |
 | ⑤ | System.IO.Pipelines | I/O pipelines via PipeReader/PipeWriter. Compared against processing a Stream directly | BUF-02 | ✅ Documented conditionally ([ASY-03](../README.md#-asy-03-systemiopipelines), 1.63x on small data / 1/80 the allocation. Watch out for the 64KB deadlock) |
 | ⑤ | The cost of IAsyncEnumerable | Per-element overhead of await foreach (vs IEnumerable / Channel), and the conventions around \[EnumeratorCancellation\] | SEQ-03 | ✅ Documented ([ASY-04](../README.md#-asy-04-knowing-the-cost-of-iasyncenumerable-and-when-to-use-it), being aware of the 11.6x per-element cost) |
-| ⑥ | net11 generation watch | Re-measure after net11 GA: (1) enum boxing through Equals disappears via JIT specialization (add a generation note to STK-05's implicit-boxing list), (2) LINQ Min/Max vectorization (reinforces VEC-01's prefer-BCL-APIs guidance) → further items in "Items to re-verify at net11 GA" below (A1-G2) | STK-05 / VEC-01 and others | ⏳ Waiting for net11 GA |
+| ⑥ | net11 generation watch | Re-measure after net11 GA: (1) enum boxing through Equals disappears via JIT specialization (add a generation note to STK-05's implicit-boxing list), (2) LINQ Min/Max vectorization (backs VEC-01's prefer-BCL-APIs guidance; **the guidance does not change, so this is not measured** and it is absent from A-G) → further items in "Items to re-verify at net11 GA" below (A1-G2) | STK-05 / VEC-01 and others | 🔬 Re-measure in P4 (GA shipped) |
 | ⑦ | `scoped` / `[UnscopedRef]` (C# 11) | Does it show in codegen? Does a ref-returning accessor beat a get/set pair? | STK-01 | ❌ No difference / rejected (R-20). `scoped` documented in STK-01 |
 | ⑦ | ref field cursor for structured reads | Does it beat the indexed form in the field-granular shape R-12 named? | STK-01 / R-12 | ✅ Adopted ([STK-10](../README.md), 0.81x on x86-64-v4 / 0.75x on v3, identical codegen) |
 | ⑦ | `GetValueRefOrNullRef` + `IsNullRef` | Can an existence-checked update collapse into one probe? | COL-01 | ✅ Adopted ([COL-07](../README.md), update 0.44-0.59x. Read path: no difference for a single-field read, 0.93x for a 32 B value read through two fields on x86-64-v4) |
@@ -345,6 +346,17 @@ Source: [Performance Improvements in .NET 11](https://devblogs.microsoft.com/dot
 |---|---|---|
 | G1 | `volatile` on fields already protected by a lock, `Interlocked`, or one-time initialization is redundant (#125274 removed them across the BCL). No extra instructions on x64, but **fences on Arm** | Record as a CON-family guideline. State explicitly that it cannot be measured on x64 and the verdict rests on the article |
 | G2 | In fixed-format parsing and formatting, **slicing to the exact length up front** (`span = span[..N]`) lets the JIT drop every later constant-index bounds check (#119254 applied it to `Decimal` / `Guid` / `IPAddress`) | **Verifiable on net10 without waiting.** Measure first as a candidate for TXT-09 (fixed-width formatting idioms) |
+
+**External measurements (reference only, not ours):** [davepcallan/Dotnet11Benchmarks](https://github.com/davepcallan/Dotnet11Benchmarks) (the article's benchmarks run against net10 and net11). It uses **.NET 11 RC3, EPYC 7763, x86-64-v3 and `SimpleJob`**, so it matches neither our reference environment (HX 370, x86-64-v4, `MediumRunJob`) nor the GA runtime; treat it as an expectation, not as input to the P4 verdicts. Four rows have a counterpart.
+
+| Their benchmark | Our row | Their measurement (net10 → net11) | Difference from this row's text |
+|---|---|---|---|
+| `SpanSortStructComparer` | E2 | 15,197 → 2,751 ns (0.18x), 88 → 0 B | Larger than the article's 0.30x; the zero allocation agrees |
+| `ToFrozenDictionary` (4,096 entries) | F1 | 89.45 → 31.79 μs (0.36x), 347 → 127 KB | Construction costs under a third, which relaxes COL-02's adoption condition |
+| `FormatNullableInt` / `BoxNullableValue` | B2 | 21.6 → 4.0 ns (0.19x), 24 → **0 B** / 19.6 → 6.8 ns (0.35x), **still 24 B** | The allocation disappears through `T is IFormattable` but **not through an explicit `(object?)` cast**. Measure the two shapes separately for B2 |
+| `EqualityComparerDefaultEquals` | B3 | 6.56 → 2.82 ns (0.43x), 24 → **0 B** | Agrees with the article's 0.46x; escape analysis removes the argument instance itself |
+
+Their remaining benchmarks — `HashSet.UnionWith` (into an empty set, 0.04x), `Array.FindAll` (small result, 0.45x, 112 → 40 B), `DateTime.Now` (0.46x), the IgnoreCase `Regex` cases (0.01-0.02x), `Json`, `Numerics`, `Uri` and `string.Concat` — are all speedups that do not change how code is written, so by the exclusion rule above they stay out of this table.
 
 **Excluded (faster, but the way code is written does not change):** the 8 B delegate shrink (#99200 — DSP-04's table numbers move, the guidance does not), same-block assertion tracking (#121527), bounds checks in list patterns (#121273), relaxed inlining budget for intrinsic types (#127433), class-handle preservation across spills (#128485), better register passing of small structs (#112740 — MEM-04's numbers move), R2R / NativeAOT GVM devirtualization, Arm64 codegen in general (paired loads, shrn, ubfx, …), SVE (experimental), Tier0 Nullable boxing, the `string.Concat` / `string.Split` / `Ascii.Equals` speedups, the value-type-key optimization in `Dictionary.Remove` (#125884 — it only reinforces R-22's "Dictionary is already fast"), internal improvements to `HashSet.UnionWith` / `Array.FindAll` / `ImmutableArray`, the `[NoInlining]` on `Random` (#131714 — the article itself calls it a stopgap until the JIT if-converts inside loops), BigInteger / TensorPrimitives / TimeZoneInfo / Regex / Networking / Diagnostics, LINQ in general.
 

@@ -10,7 +10,8 @@
 - **MemoryDiagnoser を常時有効化** — 速度とアロケーションは常にセットで判断する
 - **DisassemblyDiagnoser(printSource, exportDiff)を有効化** — 生成コードとコードサイズを確認する。速度差が誤差レベルでも、コードサイズで優劣を判断できるケースがある(インライン化への影響はコードサイズに現れる)
 - ベンチマークを介さず単発で生成コードを見たい場合は、環境変数 `DOTNET_JitDisasm="メソッド名"` を設定して実行すると JIT アセンブリが標準出力に出る(Release ビルド + `DOTNET_TieredCompilation=0` 併用で最終コードを直接確認)
-- **既定は最新ランタイム(net10.0)単独で測定する**。複数ランタイム並走は「世代で効果が変わるか」自体を問う検証(境界チェック除去イディオム、uint キャスト小細工のように新世代で消える最適化)に限定して使う
+- **既定は最新ランタイム(net11.0)単独で測定する**。複数ランタイム並走は「世代で効果が変わるか」自体を問う検証(境界チェック除去イディオム、uint キャスト小細工のように新世代で消える最適化)に限定して使う
+- **性能の判断は .NET 10 以降でのみ行う。** 対応ターゲットが `net11.0;net10.0` になったため、net9 以前は考慮事項から外す。過去に net8 / net9 で測った結果は記録として残すが、新規の判定材料にはしない(世代比較も net10 と net11 の間で行う)
 
 ```csharp
 public class BenchmarkConfig : ManualConfig
@@ -101,7 +102,7 @@ Debug.Assert(string.IsInterned(probe) is null || !ReferenceEquals(string.IsInter
 
 ### 7. #if による TFM 依存メソッドの混在(複数ランタイム実行時)
 
-新しいランタイムにしかない API のベンチマークを `#if NET9_0_OR_GREATER` 等で同一クラスに混在させると、ホスト(最新 TFM)が発見したメソッドを下位ランタイムの子ビルドが解決できず、**そのランタイムの全ケースが NA になる**。TFM 依存の比較はクラスごと `#if` で分離し、そのクラスには対応するランタイムのジョブだけを付ける。
+新しいランタイムにしかない API のベンチマークを `#if NET11_0_OR_GREATER` 等で同一クラスに混在させると、ホスト(最新 TFM)が発見したメソッドを下位ランタイムの子ビルドが解決できず、**そのランタイムの全ケースが NA になる**。TFM 依存の比較はクラスごと `#if` で分離し、そのクラスには対応するランタイムのジョブだけを付ける。
 
 ### 8. 準備処理の混入
 
@@ -132,7 +133,7 @@ Dynamic PGO はプロセスごとに収束の仕方が変わるため、**多態
 
 - **速度・アロケーション・コードサイズの 3 軸**で評価する。1 軸だけの改善は採用理由として弱い
 - Ratio のベースラインは「現状の素直な実装」にし、改善幅がそのまま読めるようにする
-- 効果が世代で消えた最適化は、パターンとしては「不要になった」と記録する([rejected-patterns.md](rejected-patterns.md) へ)
+- 効果が世代で消えた最適化は、パターンとしては「不要になった」と記録する(判断は net10 以降の世代で行う)([rejected-patterns.md](rejected-patterns.md) へ)
 
 ### 計測が誤差範囲だった場合の扱い
 
@@ -197,7 +198,7 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 
 1. 候補ごとに検証ベンチマーク(+必要なら最小実装)を作成し、net10 / net11 で測定する
 2. **有効** → パターンとして本文へ収録(実装例・実測付き)
-3. **無効** → [docs/rejected-patterns.md](rejected-patterns.md)へ「どの世代まで有効だったか」を付けて記録する
+3. **無効** → [docs/rejected-patterns.md](rejected-patterns.md)へ「net10 以降のどの世代まで有効だったか」を付けて記録する
 4. **条件付き** → 適用条件を明記して収録する
 5. **計測が誤差範囲** → 生成コード(逆アセンブリ)まで確認して二分する。**生成コードに差があれば「➖誤差」として記録**(不採用にしない — 計測分解能以下の差が実在するため、別の軸・環境で効く余地を数値つきで残す)。**生成コードも一致すれば「差なし」として不採用**(コード一致を根拠に記録)。手順は [docs/benchmark-methodology.md](benchmark-methodology.md) の判断基準を参照。なお**ナノ秒単位の差そのものは誤差ではない** — 信頼区間が重ならなければ 0.2 ns でも実差として扱う。「誤差」は信頼区間が重なり統計的に分解できない場合のみ
 
@@ -264,7 +265,7 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ⑤ | System.Threading.Channels | 生産者消費者キュー。Bounded/Unbounded・SingleReader/SingleWriter オプションの効果 | DSP-03 | ✅ 収録([ASY-02](../README.ja.md#-asy-02-systemthreadingchannels-による生産者消費者)、~45ns/要素・Bounded は 2 倍) |
 | ⑤ | System.IO.Pipelines | PipeReader/PipeWriter による I/O パイプライン。Stream 直接処理との比較 | BUF-02 | ✅ 条件付き収録([ASY-03](../README.ja.md#-asy-03-systemiopipelines)、小データは 1.63 倍・アロケーション 1/80。64KB デッドロック注意) |
 | ⑤ | IAsyncEnumerable のコスト | await foreach の要素あたりオーバーヘッド(vs IEnumerable / Channel)、\[EnumeratorCancellation\] の作法 | SEQ-03 | ✅ 収録([ASY-04](../README.ja.md#-asy-04-iasyncenumerable-のコスト認知と使い分け)、要素あたり 11.6 倍のコスト認知) |
-| ⑥ | net11 世代ウォッチ | net11 GA 後に再測定: ① enum の Equals 経由ボックス化が JIT 特殊化で消える(STK-05 の暗黙ボックス化リストへ世代注記)② LINQ Min/Max のベクトル化(VEC-01 の「BCL 済み API 優先」指針の裏付け強化) → 追加分は下記「net11 GA 時の再検証項目」(A1〜G2) | STK-05 / VEC-01 ほか | ⏳ net11 GA 待ち |
+| ⑥ | net11 世代ウォッチ | net11 GA 後に再測定: ① enum の Equals 経由ボックス化が JIT 特殊化で消える(STK-05 の暗黙ボックス化リストへ世代注記)② LINQ Min/Max のベクトル化(VEC-01 の「BCL 済み API 優先」指針の裏付け。**指針は不変なので測定対象外**で、A〜G にも入れていない) → 追加分は下記「net11 GA 時の再検証項目」(A1〜G2) | STK-05 / VEC-01 ほか | 🔬 P4 で再測定(GA 済み) |
 | ⑦ | `scoped` / `[UnscopedRef]`(C# 11) | codegen に出るか。ref 返しアクセサは get/set ペアに勝つか | STK-01 | ❌ 差なし / 不採用(R-20)。`scoped` は STK-01 の注記へ |
 | ⑦ | ref フィールドの構造読み | R-12 が名指しした「フィールド粒度の読み」で索引形に勝つか | STK-01 / R-12 | ✅ 収録([STK-10](../README.ja.md)、x86-64-v4 で 0.81 倍 / v3 で 0.75 倍、生成コードは同一) |
 | ⑦ | `GetValueRefOrNullRef` + `IsNullRef` | 存在確認つき更新を探索 1 回に畳めるか | COL-01 | ✅ 収録([COL-07](../README.ja.md)、更新 0.44〜0.59 倍。読み取りは 1 フィールドなら差なし、32 バイト値を 2 フィールド読む形は x86-64-v4 で 0.93 倍) |
@@ -345,6 +346,17 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 |---|---|---|
 | G1 | ロック / `Interlocked` / 一度きり初期化で既に保護されているフィールドの `volatile` は冗長(#125274 で BCL 全体から除去)。x64 では命令に出ないが **Arm ではフェンスになる** | CON 系の指針として注記する。x64 環境では計測できないため、判定は記事の記述に依拠すると明記 |
 | G2 | 固定書式の解析・整形で**先頭に `span = span[..N]` を置いて厳密な長さを確定**させると、後続の定数添字の境界チェックが全て消える(#119254 が `Decimal` / `Guid` / `IPAddress` に適用) | **net11 を待たず net10 で検証可能。** TXT-09(固定長整形の応用イディオム)の候補として先に測る |
+
+**外部の実測(参考、当方の測定ではない):** [davepcallan/Dotnet11Benchmarks](https://github.com/davepcallan/Dotnet11Benchmarks)(上記記事のベンチを net10 と net11 で比べたもの)。**.NET 11 RC3・EPYC 7763・x86-64-v3・`SimpleJob`** で、当方の基準環境(HX 370・x86-64-v4・`MediumRunJob`)とも GA 版とも異なるため、P4 の判定には使わず**期待値の目安**として扱う。対応する行は 4 つ。
+
+| 相手のベンチ | 当方の行 | 相手の実測(net10 → net11) | 本行の記述との差 |
+|---|---|---|---|
+| `SpanSortStructComparer` | E2 | 15,197 → 2,751 ns(0.18 倍)、88 → 0 B | 記事の 0.30 倍より大きい。割り当て 0 は一致 |
+| `ToFrozenDictionary`(4,096 件) | F1 | 89.45 → 31.79 μs(0.36 倍)、347 → 127 KB | 構築コストが 1/3 弱。COL-02 の採用条件を緩める方向 |
+| `FormatNullableInt` / `BoxNullableValue` | B2 | 21.6 → 4.0 ns(0.19 倍)、24 → **0 B** / 19.6 → 6.8 ns(0.35 倍)、**24 B のまま** | `T is IFormattable` 経由は確保が消えるが、**明示的な `(object?)` キャストでは消えない**。B2 の判定はこの差を分けて測ること |
+| `EqualityComparerDefaultEquals` | B3 | 6.56 → 2.82 ns(0.43 倍)、24 → **0 B** | 記事の 0.46 倍と整合。引数のクラスインスタンスごとエスケープ解析で消えている |
+
+相手のベンチのうち `HashSet.UnionWith`(空集合へ 0.04 倍)・`Array.FindAll`(小結果 0.45 倍、112 → 40 B)・`DateTime.Now`(0.46 倍)・`Regex` の IgnoreCase 系(0.01〜0.02 倍)・`Json` / `Numerics` / `Uri` / `string.Concat` は、いずれも**書き方が変わらない性能向上**なので上の除外基準どおり本表には入れない。
 
 **除外したもの(性能向上のみで書き方は変わらない):** デリゲートの 8 B 縮小(#99200。DSP-04 の表の数値は動くが指針は不変)、同一ブロック内アサーション追跡(#121527)、list pattern の境界チェック(#121273)、intrinsic 型のインライン予算緩和(#127433)、spill 越しの型情報保持(#128485)、小さな struct のレジスタ渡し改善(#112740。MEM-04 の数値は動く)、R2R / NativeAOT の GVM devirt、Arm64 のコード生成全般(ペアロード・shrn・ubfx 等)、SVE(実験的)、Tier0 の Nullable ボックス化、`string.Concat` / `string.Split` / `Ascii.Equals` の高速化、`Dictionary.Remove` の値型キー最適化(#125884。R-22 の「Dictionary は既に速い」を補強するのみ)、`HashSet.UnionWith` / `Array.FindAll` / `ImmutableArray` の内部改善、`Random` の `[NoInlining]`(#131714。JIT がループ内 if 変換に対応するまでの暫定策と記事自身が明記)、BigInteger / TensorPrimitives / TimeZoneInfo / Regex / Networking / Diagnostics、LINQ 全般。
 

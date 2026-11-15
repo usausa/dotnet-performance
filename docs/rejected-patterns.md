@@ -4,7 +4,7 @@
 
 A record of techniques that measurement showed to be ineffective, counterproductive, or not worth the risk.
 "Why it is not adopted / why it does not improve anything" is documented at the same granularity as the patterns in [README](../README.md).
-Measurement environment: .NET 10 / x86-64-v4 (Ryzen AI 9 HX 370; generation-dependent items are noted individually).
+Measurement environment: .NET 10 and later / x86-64-v4 (Ryzen AI 9 HX 370; new measurements run on net11, and existing entries note the generation they were measured on). Results from net9 and earlier stay as a record but are not used as input to verdicts.
 
 ---
 
