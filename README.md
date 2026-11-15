@@ -4017,7 +4017,7 @@ A list of hand-written optimizations that were once effective (or were held to b
 | Hand-written digit formatting loops (right-align shifting, reverse writing) | `TryFormat` internally computes the digit count, uses a two-digit table, and is unrolled | 2.5-4.8x slower than TryFormat | [R-16](docs/rejected-patterns.md) |
 | Hand-rolled hash loops (FNV-1a and similar) | `string.GetHashCode` / XxHash3 are already vectorized | From 64 characters up, the hand-rolled version loses | [BIT-04](benchmarks/results/BIT-04-XxHash3.md) |
 | Avoiding boxes that do not escape | Escape analysis moves them to the stack (0.004 ns) | STK-05 measurement | [STK-05](#-stk-05-boxing-avoidance-and-hot-value-caching) |
-| Touching the last element first to coax bounds-check elimination | Identical without the hint (no difference across any variant) | Measured on net10 / net8 | [R-15](docs/rejected-patterns.md) |
+| Touching the last element first to coax bounds-check elimination | Identical without the hint (no difference across any variant) | Measured on net10 / net8 (at the time) | [R-15](docs/rejected-patterns.md) |
 
 **How to read this:** The forms listed here still work if you write them, but **there is no longer a reason to**. For the boundaries where hand-writing is still required (range checks with compound conditions, masks over runtime sizes, walking multiple Spans at once, boxes that escape), see the "what to do instead" notes in each pattern and in the rejection records.
 
@@ -4063,7 +4063,7 @@ Techniques measured and judged to have no effect or to be counterproductive. **D
 | R-12 | ref field cursors for iteration (C# 11) | Cannot beat Span + for; 1.21x |
 | R-13 | Pinned (POH) buffers for performance | fixed measures as free, while POH allocation costs 17.5x plus Gen2 |
 | R-14 | Replacing `Span.CopyTo` with `Unsafe.CopyBlockUnaligned` | Same speed for variable lengths, and only a marginal difference for constant lengths |
-| R-15 | Touching the last element first to coax bounds-check elimination | No difference across any variant on either net10 or net8 |
+| R-15 | Touching the last element first to coax bounds-check elimination | No difference across any variant on either net10 or net8 (at the time) |
 | R-16 | Hand-written digit-ordering tricks (right-align then shift, reverse writing) | 2.5-4.8x slower than TryFormat + Fill |
 | R-17 | Substituting Call for a delegate Invoke (to avoid Callvirt) | JIT codegen confirmed byte-identical (net10) |
 | R-18 | Hand-written unsigned-overflow range checks | The JIT already fuses the two comparisons; codegen is effectively identical |

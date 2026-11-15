@@ -9,7 +9,7 @@ using PerformancePatterns.Buf;
 
 // BUF-04 example: comparing the rent -> write -> aggregate -> release lifecycle of a 4 KB buffer
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class MemoryOwnerBenchmark
 {
     private const int Size = 4096;

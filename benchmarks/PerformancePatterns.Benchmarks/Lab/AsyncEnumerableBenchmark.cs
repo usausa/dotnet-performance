@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 // Question: for data that can be enumerated with synchronous completion, how large is the
 // per-element overhead of await foreach compared with a plain IEnumerable foreach?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class AsyncEnumerableBenchmark
 {
     private const int N = 1024;

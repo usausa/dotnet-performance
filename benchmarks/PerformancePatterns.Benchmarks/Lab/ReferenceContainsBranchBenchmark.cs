@@ -9,7 +9,7 @@ using BenchmarkDotNet.Jobs;
 // Question: does the JIT constant-fold the branch that skips clearing for a T holding no references, so that
 // unnecessary work is removed at zero check cost (the standard idiom for clearing on pool return)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ReferenceContainsBranchBenchmark
 {
     private const int Size = 1024;

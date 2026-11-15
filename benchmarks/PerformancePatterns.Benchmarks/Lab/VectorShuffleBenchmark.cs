@@ -19,7 +19,7 @@ using BenchmarkDotNet.Jobs;
 // Question C: how close does the width agnostic Vector<T> arithmetic form get without a shuffle at all?
 // Note: the element count is deliberately not a multiple of the vector width so the scalar tail is exercised.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class VectorShuffleBenchmark
 {
     private const int Count = 1021;

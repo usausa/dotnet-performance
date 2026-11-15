@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // TYP-06 study: comparing rebuild-every-time / dictionary cache / generic static for a string determined by type (a SQL fragment)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StaticArtifactBenchmark
 {
     private static readonly Dictionary<Type, string> Cache = [];

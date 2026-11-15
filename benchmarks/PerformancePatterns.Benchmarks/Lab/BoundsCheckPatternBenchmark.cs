@@ -18,7 +18,7 @@ using BenchmarkDotNet.Jobs;
 //
 // All variants are NoInlining so each one is disassembled on its own.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class BoundsCheckPatternBenchmark
 {
     private const int N = 256;

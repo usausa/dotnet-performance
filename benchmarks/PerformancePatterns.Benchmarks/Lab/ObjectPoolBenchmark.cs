@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // BUF-07 study: allocating a StringBuilder every time vs a [ThreadStatic] single-slot pool
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ObjectPoolBenchmark
 {
     private const int Capacity = 256;

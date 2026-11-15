@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 // Study queue 2: measuring COL-01 (CollectionsMarshal) on this machine
 // Question: record on net10 the effect of iterating a List through AsSpan and of doing dictionary read-modify-write by ref.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ListIterationBenchmark
 {
     private List<int> list = default!;
@@ -70,7 +70,7 @@ public class ListIterationBenchmark
 }
 
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class DictionaryCountBenchmark
 {
     private string[] keys = default!;

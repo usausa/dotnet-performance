@@ -9,7 +9,7 @@ using PerformancePatterns.Txt;
 
 // TXT-07 study: comparing ways to build a string whose length is known in advance
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StringBuildBenchmark
 {
     private string prefix = default!;

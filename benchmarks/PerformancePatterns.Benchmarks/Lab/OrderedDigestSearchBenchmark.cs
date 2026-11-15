@@ -19,7 +19,7 @@ public enum DigestKeyShape
 // full SequenceCompareTo probes vs order-preserving 8-byte digest array probes.
 // Table size (64/256/1024) x key shape (random / shared-prefix worst case).
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class OrderedDigestSearchBenchmark
 {
     private const int HitProbeCount = 256;

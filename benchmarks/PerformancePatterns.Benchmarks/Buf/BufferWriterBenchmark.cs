@@ -8,7 +8,7 @@ using PerformancePatterns.Buf;
 // BUF-02 example: moving output assembly from MemoryStream accumulation to direct IBufferWriter writes
 // (scenario: write 64 chunks of 16 bytes, then finalize the content)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class BufferWriterBenchmark
 {
     private const int ChunkSize = 16;

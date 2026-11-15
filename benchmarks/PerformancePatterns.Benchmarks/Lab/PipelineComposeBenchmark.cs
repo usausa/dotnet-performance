@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // DSP-05 study: composing the pipeline on every call vs composing it once at initialization
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class PipelineComposeBenchmark
 {
     private Func<Func<int, int>, Func<int, int>>[] middlewares = default!;

@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // STK-04 study: capturing vs non-capturing local functions (closure allocation on delegate conversion)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class LocalFunctionClosureBenchmark
 {
     private const int N = 100;

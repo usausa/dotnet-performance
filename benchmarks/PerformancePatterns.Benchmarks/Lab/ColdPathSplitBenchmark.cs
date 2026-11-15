@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // JIT-04 study: keeping a rare path (growth) inside the hot method vs splitting it out with NoInlining
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ColdPathSplitBenchmark
 {
     private FatWriter fat = default!;

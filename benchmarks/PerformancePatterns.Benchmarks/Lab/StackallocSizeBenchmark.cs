@@ -9,7 +9,7 @@ using BenchmarkDotNet.Jobs;
 // Question: what is the cost difference between a constant allocation plus a slice (a fixed frame) and a variable-size allocation (the localloc instruction),
 // and how much of it is the zero-initialization cost, with and without SkipLocalsInit?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StackallocSizeBenchmark
 {
     [Params(64, 512)]

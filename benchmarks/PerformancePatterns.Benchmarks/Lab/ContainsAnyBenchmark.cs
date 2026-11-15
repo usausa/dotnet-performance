@@ -10,7 +10,7 @@ using BenchmarkDotNet.Jobs;
 // question is whether that saving is measurable. Measured at three match positions, because an early
 // match makes the index extraction a larger share of the total.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ContainsAnyBenchmark
 {
     private static readonly SearchValues<char> Values = SearchValues.Create("!?;:,|\t\n");

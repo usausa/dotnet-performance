@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // TXT-03 study: Parse using exceptions for control flow vs TryParse (10% invalid input)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TryPatternBenchmark
 {
     private const int N = 100;

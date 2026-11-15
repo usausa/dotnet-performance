@@ -10,7 +10,7 @@ using PerformancePatterns.Col;
 
 // BIT-04 study: comparing general-purpose hash options by input length
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class HashCompareBenchmark
 {
     private string value = default!;

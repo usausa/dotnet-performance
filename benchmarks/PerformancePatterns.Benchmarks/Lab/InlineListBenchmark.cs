@@ -15,7 +15,7 @@ using BenchmarkDotNet.Jobs;
 // The struct is a ref struct so it cannot be copied into a field or captured — the article's own caveat
 // is that a copied instance in buffer mode silently diverges from the original.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class InlineListBenchmark
 {
     [Params(4, 32)]

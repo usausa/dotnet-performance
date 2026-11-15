@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 // Compares the naive "rescan everything and compact after every line" approach with "incremental search plus lazy compaction".
 // (the two-segment wraparound of a ring buffer is not measured — a flat buffer isolates the effect of the incremental search)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class RingSplitBenchmark
 {
     private const byte Delimiter = (byte)'\n';

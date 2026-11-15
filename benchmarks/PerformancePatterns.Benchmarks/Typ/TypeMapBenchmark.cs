@@ -9,7 +9,7 @@ using PerformancePatterns.Typ;
 
 // TYP-01 example: moving type-keyed lookup from a dictionary to a static slot array
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TypeMapBenchmark
 {
     private Dictionary<Type, string> dictionary = default!;

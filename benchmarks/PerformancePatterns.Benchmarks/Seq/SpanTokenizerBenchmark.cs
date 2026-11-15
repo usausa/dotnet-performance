@@ -6,7 +6,7 @@ using BenchmarkDotNet.Jobs;
 using PerformancePatterns.Seq;
 
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SpanTokenizerBenchmark
 {
     private string input = default!;
@@ -46,10 +46,8 @@ public class SpanTokenizerBenchmark
     }
 }
 
-// The net8.0 build has no MemoryExtensions.Split, so the whole class is excluded (methodology pitfall 7)
-#if NET9_0_OR_GREATER
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SpanTokenizerBclComparisonBenchmark
 {
     private string input = default!;
@@ -88,4 +86,3 @@ public class SpanTokenizerBclComparisonBenchmark
         return total;
     }
 }
-#endif

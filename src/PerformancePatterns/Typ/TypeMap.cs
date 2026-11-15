@@ -10,11 +10,7 @@ using System.Runtime.CompilerServices;
 /// </summary>
 public sealed class TypeMap<TValue>
 {
-#if NET9_0_OR_GREATER
     private readonly Lock sync = new();
-#else
-    private readonly object sync = new();
-#endif
 
     // Fallback that resolves a slot from a runtime Type (without the AOT-incompatible MakeGenericType)
     private readonly Dictionary<Type, int> slotOfType = [];

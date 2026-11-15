@@ -10,7 +10,7 @@ using BenchmarkDotNet.Jobs;
 // Question: what is the difference between pinning with fixed on every call and using a pointer into a POH-resident buffer directly,
 // and what does the POH allocation itself cost (compared with a normal allocation)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class PinnedArrayBenchmark
 {
     private const int Size = 4096;

@@ -10,7 +10,7 @@ using PerformancePatterns.Col;
 
 // Scale: 64 keys - the range where Roslyn switches to an FNV hash dispatch
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StringSwitch64Benchmark
 {
     private const int Count = 64;
@@ -243,7 +243,7 @@ public class StringSwitch64Benchmark
 
 // Scale: 128 keys
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StringSwitch128Benchmark
 {
     private const int Count = 128;

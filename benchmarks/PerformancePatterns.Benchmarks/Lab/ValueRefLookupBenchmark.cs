@@ -21,7 +21,7 @@ public enum LookupProbe
 // Note: the ContainsKey + indexer (two probe) shape is deliberately not measured -- CA1854 already rejects it
 //       at build time in this repository, so TryGetValue is the honest baseline for the read path.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ValueRefLookupBenchmark
 {
     private const int EntryCount = 1024;
@@ -141,7 +141,7 @@ public class ValueRefLookupBenchmark
 
 // The same shapes over a 32-byte value, where copying the value out is supposed to be the deciding cost
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ValueRefLargeLookupBenchmark
 {
     private const int EntryCount = 1024;

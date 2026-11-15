@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // MEM-03 study: Slice(offset, length) vs the range operator [a..b]
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SliceStyleBenchmark
 {
     private byte[] data = default!;

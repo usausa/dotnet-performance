@@ -17,7 +17,7 @@ using BenchmarkDotNet.Jobs;
 // Question B: does it show up at the call boundary (MEM-04 measures size, this measures the same size reached
 //             by layout rather than by removing fields)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StructLayoutBenchmark
 {
     private const int Count = 16384;

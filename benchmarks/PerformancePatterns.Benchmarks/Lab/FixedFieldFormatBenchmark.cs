@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // TXT-09 study: left-aligned numeric formatting into fixed-length fields, and trimming
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class FixedFieldFormatBenchmark
 {
     private const int FieldWidth = 12;

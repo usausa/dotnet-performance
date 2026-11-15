@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // STK-08 study: a fixed-length buffer inside a struct (InlineArray) versus other allocation options
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class InlineArrayBenchmark
 {
     private const int Size = 8;

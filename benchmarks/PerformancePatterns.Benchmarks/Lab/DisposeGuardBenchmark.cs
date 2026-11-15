@@ -7,16 +7,12 @@ using BenchmarkDotNet.Jobs;
 // Question: for preventing repeated Dispose, does Interlocked have a clear advantage over the alternatives
 // (plain bool / volatile bool / lock)? The measurement is the steady-state path of calling again on an already disposed instance.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class DisposeGuardBenchmark
 {
     private const int N = 100;
 
-#if NET9_0_OR_GREATER
     private readonly Lock sync = new();
-#else
-    private readonly object sync = new();
-#endif
 
     private bool boolFlag = true;
 

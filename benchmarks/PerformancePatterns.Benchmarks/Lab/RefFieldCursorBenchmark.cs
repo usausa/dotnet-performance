@@ -11,7 +11,7 @@ using PerformancePatterns.Seq;
 // Study queue 5: ref struct design based on ref fields (C# 11)
 // Question: is a cursor faster when held as "ref T + end ref" instead of "Span + index"?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class RefFieldCursorBenchmark
 {
     private int[] values = default!;

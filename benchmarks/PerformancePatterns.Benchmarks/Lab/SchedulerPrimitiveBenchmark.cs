@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // ASY-06 study: creating a Timer per job vs a single-loop wake-up primitive (swapping the TCS)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SchedulerPrimitiveBenchmark
 {
     private TaskCompletionSource wakeup = new(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // JIT-01 study: AggressiveInlining on a helper containing a loop (not inlined by default)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class InliningBenchmark
 {
     private uint[] seeds = default!;

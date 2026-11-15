@@ -16,7 +16,7 @@ using BenchmarkDotNet.Jobs;
 // Note: time scales with Workers, so ratios are only meaningful inside one Workers value.
 //       A strided long[] (stride 8) is the allocation-shaped equivalent of Padded64 and is expected to match it.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class FalseSharingBenchmark
 {
     private const int Iterations = 50000;

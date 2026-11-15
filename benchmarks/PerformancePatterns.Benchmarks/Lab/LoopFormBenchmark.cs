@@ -23,7 +23,7 @@ using BenchmarkDotNet.Jobs;
 // the reference to a local first. If the JIT cannot prove the field is unchanged, only the local form
 // gets bounds-check elimination.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class LoopFormSpanBenchmark
 {
     private int[] values = default!;
@@ -133,7 +133,7 @@ public class LoopFormSpanBenchmark
 // List<T>.Enumerator.MoveNext compares _version against the list's version on every step, which the
 // indexer form does not do. AsSpan is included as the known-good reference (COL-01).
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class LoopFormListBenchmark
 {
     private List<int> values = default!;
@@ -207,7 +207,7 @@ public class LoopFormListBenchmark
 // is the whole point of the comparison; MEM-02 already prescribes ref access, and this measures what
 // choosing the copying form actually costs.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class LoopFormStructBenchmark
 {
     private Entry[] values = default!;

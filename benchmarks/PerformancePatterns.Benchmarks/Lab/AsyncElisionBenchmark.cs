@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 // Question: when simply forwarding an inner call that completes synchronously, how much is gained by returning
 // the Task/ValueTask directly instead of writing async/await (including the re-wrapping of an already cached Task)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class AsyncElisionBenchmark
 {
     private const int N = 100;

@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 
 // TYP-03 study: accessing a private field (UnsafeAccessor vs reflection)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class UnsafeAccessorBenchmark
 {
     private const int N = 100;

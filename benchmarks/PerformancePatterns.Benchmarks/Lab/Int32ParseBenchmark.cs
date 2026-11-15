@@ -19,7 +19,7 @@ using BenchmarkDotNet.Jobs;
 //
 // Each variant sums the decoded values so Verify can compare them.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class Int32ParseBenchmark
 {
     private const int Count = 1024;

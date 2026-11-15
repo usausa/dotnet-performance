@@ -20,7 +20,7 @@ using BenchmarkDotNet.Jobs;
 //
 //   Rotating: 5 distinct types in sequence, so the delegate call has 5 targets. Single: one type 5 times.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TypeKeyDispatchBenchmark
 {
     private static readonly Type[] Types = [typeof(Target1), typeof(Target2), typeof(Target3), typeof(Target4), typeof(Target5)];

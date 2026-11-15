@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // MEM-04 study: passing struct arguments by value / by in, and defensive copies with a non-readonly struct
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StructPassBenchmark
 {
     private const int N = 100;

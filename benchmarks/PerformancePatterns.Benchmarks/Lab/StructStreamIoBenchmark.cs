@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // SEQ-03 study: reading and writing a struct array over a Stream — field by field (BinaryReader/Writer) vs bulk reinterpretation
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StructStreamIoBenchmark
 {
     private const int Count = 1024;

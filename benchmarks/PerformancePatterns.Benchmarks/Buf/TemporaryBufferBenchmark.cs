@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 using PerformancePatterns.Buf;
 
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TemporaryBufferBenchmark
 {
     // 64 represents the stackalloc path and 4096 the pool path

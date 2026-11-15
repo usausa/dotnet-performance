@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // STK-07 study: allocating the error list up front vs lazily (10% failure rate)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class LazyAllocationBenchmark
 {
     private int[] items = default!;
@@ -70,7 +70,7 @@ public class LazyAllocationBenchmark
 
 // STK-07 study: a shared singleton for empty results
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SharedEmptyBenchmark
 {
     private const int N = 100;

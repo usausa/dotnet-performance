@@ -13,7 +13,7 @@ using BenchmarkDotNet.Jobs;
 //           and the index arithmetic cannot be turned into a single counted loop?
 // Record layout: [byte tag][ushort length][length bytes payload]
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class RefFieldStructReadBenchmark
 {
     private const int RecordCount = 512;

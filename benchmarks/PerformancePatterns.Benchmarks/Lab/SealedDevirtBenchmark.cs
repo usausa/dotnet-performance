@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // DSP-01 study: devirtualization through sealed (call via an interface, single implementation)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SealedDevirtBenchmark
 {
     private IAccumulator openViaInterface = default!;

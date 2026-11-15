@@ -6,7 +6,7 @@ using BenchmarkDotNet.Jobs;
 // CON-02 study: retain/release cost without contention
 // CAS retry loop vs optimistic increment-first (DeadBias)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class RefCountUncontendedBenchmark
 {
     private const int Operations = 1000;
@@ -82,7 +82,7 @@ public class RefCountUncontendedBenchmark
 
 // CON-02 contended shape: 4 threads hammering retain/release on the same instance
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class RefCountContendedBenchmark
 {
     private const int Threads = 4;

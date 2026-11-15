@@ -9,7 +9,7 @@ using BenchmarkDotNet.Jobs;
 // Question: is it worth replacing an Add loop (N capacity checks plus version bumps) with
 // SetCount plus direct Span writes? Also check how it combines with a preset capacity.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ListSetCountBenchmark
 {
     [Params(16, 1024)]

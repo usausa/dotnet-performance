@@ -10,7 +10,7 @@ using BenchmarkDotNet.Jobs;
 // Question: where ASCII input is guaranteed (HTTP header names and the like),
 // how should string.Equals(OrdinalIgnoreCase) / Ascii.EqualsIgnoreCase / a handwritten | 0x20 comparison be chosen between?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class AsciiBenchmark
 {
     private string[] lowerStrings = default!;

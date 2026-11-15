@@ -273,7 +273,7 @@ internal static class StringSwitchSamplingHash
 
 // Lower bound: 4 keys - does the Equals chain still beat a switch at the smallest size?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StringSwitchSmallBenchmark
 {
     private const int Count = 4;
@@ -419,7 +419,7 @@ public class StringSwitchSmallBenchmark
 
 // Reproduction: 16 keys - Equals chain / string switch / span switch / Dictionary / SampledNameTable
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StringSwitchBenchmark
 {
     private const int Count = 16;
@@ -657,7 +657,7 @@ public class StringSwitchBenchmark
 
 // Long keys: 16 keys of 58-62 characters - FNV reads every character, the sampling hash reads length + 3
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StringSwitchLongKeyBenchmark
 {
     private const int Count = 16;

@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // BIT-02 study: bucket index computation with modulo (runtime size) vs mask vs modulo (constant size)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class PowerOfTwoMaskBenchmark
 {
     private const int ConstSize = 64;

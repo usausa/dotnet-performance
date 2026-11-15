@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 // GEN-01 study: target strategies for an Emit-generated factory
 // closure array (object[] + castclass) vs direct Holder field read, chained child delegates vs inline expansion, Callvirt vs Call
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class EmitStrategyBenchmark
 {
     private GenDepA depA = default!;

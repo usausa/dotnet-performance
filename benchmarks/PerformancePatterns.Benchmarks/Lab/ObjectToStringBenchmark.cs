@@ -18,7 +18,7 @@ public enum ValueShape
 }
 
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ObjectToStringBenchmark
 {
     private const int Count = 16;

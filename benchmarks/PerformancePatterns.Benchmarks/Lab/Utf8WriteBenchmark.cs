@@ -10,7 +10,7 @@ using BenchmarkDotNet.Jobs;
 // Question: how much faster is formatting directly into a Span<byte> with the UTF-8 interpolation handler
 // than string interpolation + Encode or char interpolation TryWrite + Encode?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class Utf8WriteBenchmark
 {
     private int id;

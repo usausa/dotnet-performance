@@ -7,7 +7,7 @@ using PerformancePatterns.Seq;
 
 // SEQ-04 / STK-03 example: splitting 1024 elements into chunks of 100 and summing them
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class BatchBenchmark
 {
     private const int ChunkSize = 100;

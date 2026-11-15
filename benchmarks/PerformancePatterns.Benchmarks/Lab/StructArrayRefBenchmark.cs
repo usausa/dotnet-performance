@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // MEM-02 study: an array of class elements vs an array of struct elements (copy / ref access)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StructArrayRefBenchmark
 {
     private ClassEntry[] classEntries = default!;

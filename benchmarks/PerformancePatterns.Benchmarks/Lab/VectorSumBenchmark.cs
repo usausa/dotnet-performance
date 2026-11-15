@@ -11,7 +11,7 @@ using BenchmarkDotNet.Jobs;
 // Study queue 5: SIMD example (Vector<T> / Vector256)
 // Question: what does explicit SIMD buy for aggregation, and how does it relate to the vectorization already in the BCL (Enumerable.Sum)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class VectorSumBenchmark
 {
     private int[] values = default!;

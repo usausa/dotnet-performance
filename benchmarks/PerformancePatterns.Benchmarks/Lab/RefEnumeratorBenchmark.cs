@@ -16,7 +16,7 @@ using BenchmarkDotNet.Jobs;
 //   SpanRefForeach  - foreach (ref readonly var e in span) over the same array (the BCL reference shape)
 //   ForRef          - for + ref readonly local over the array (MEM-02 shape)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class RefEnumeratorBenchmark
 {
     private const int Count = 1024;

@@ -9,7 +9,7 @@ using BenchmarkDotNet.Jobs;
 // Question: what is the fixed cost of handing data over through PipeWriter/PipeReader
 // (compared with MemoryStream over a same-thread, synchronously completing transfer of 16 chunks of 4KB)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class PipelinesBenchmark
 {
     private const int ChunkSize = 4096;

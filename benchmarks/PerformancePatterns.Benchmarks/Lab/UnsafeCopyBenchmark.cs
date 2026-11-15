@@ -9,7 +9,7 @@ using BenchmarkDotNet.Jobs;
 // Study queue 1: Unsafe.CopyBlockUnaligned
 // Question: are there conditions where it beats Span.CopyTo / Array.Copy (variable length and constant length)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class CopyVariableBenchmark
 {
     private byte[] source = default!;
@@ -58,7 +58,7 @@ public class CopyVariableBenchmark
 // Constant length: the case where the JIT knows the length and can expand the copy into a sequence of movs.
 // R-14 revival check: how far up the constant sizes does CopyBlockUnaligned keep a real advantage (8 / 16 / 64 B)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class CopyConstantBenchmark
 {
     private const int BufferSize = 64;

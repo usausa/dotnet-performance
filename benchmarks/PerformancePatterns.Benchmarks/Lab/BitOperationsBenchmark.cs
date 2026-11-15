@@ -10,7 +10,7 @@ using BenchmarkDotNet.Jobs;
 // Question: what is gained by replacing naive loops for bitmap scanning and bit counting with
 // TrailingZeroCount / PopCount (hardware instructions)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class BitOperationsBenchmark
 {
     private ulong[] masks = default!;

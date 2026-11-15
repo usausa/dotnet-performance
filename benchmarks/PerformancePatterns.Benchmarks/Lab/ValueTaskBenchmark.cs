@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // ASY-05 study: Task vs ValueTask on a synchronously completing path (equivalent to a cache hit)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ValueTaskBenchmark
 {
     private const int N = 100;

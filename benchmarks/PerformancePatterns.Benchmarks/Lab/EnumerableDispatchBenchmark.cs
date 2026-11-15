@@ -10,7 +10,7 @@ using BenchmarkDotNet.Jobs;
 // Question: how much does branching with `is T[]` / `is List<T>` into a Span path help for arrays and Lists, and
 // is there a penalty for enumerator sources where the branch misses (validating the idiom used inside LINQ)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class EnumerableDispatchBenchmark
 {
     private const int Size = 1024;

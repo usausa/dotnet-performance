@@ -34,7 +34,7 @@ internal static class ColumnMatchKeys
 
 // 8 columns, PascalCase literals: the generated narrow form (chain) is the baseline
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ColumnMatchPascal8Benchmark
 {
     private const int Columns = 8;
@@ -333,7 +333,7 @@ public class ColumnMatchPascal8Benchmark
 
 // 8 columns, snake_case literals: the same shape under a different naming convention
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ColumnMatchSnake8Benchmark
 {
     private const int Columns = 8;
@@ -632,7 +632,7 @@ public class ColumnMatchSnake8Benchmark
 
 // 24 columns, PascalCase literals: the generated wide form (sampling-hash switch) is the baseline
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ColumnMatchPascal24Benchmark
 {
     private const int Columns = 24;
@@ -906,7 +906,7 @@ public class ColumnMatchPascal24Benchmark
 
 // 24 columns, snake_case literals
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ColumnMatchSnake24Benchmark
 {
     private const int Columns = 24;

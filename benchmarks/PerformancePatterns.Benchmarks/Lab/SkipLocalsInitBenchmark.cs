@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // MEM-01 study: the zero-initialization cost of stackalloc and skipping it with SkipLocalsInit
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SkipLocalsInitBenchmark
 {
     private const int N = 16;

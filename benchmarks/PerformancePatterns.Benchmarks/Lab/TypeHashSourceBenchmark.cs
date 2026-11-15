@@ -12,7 +12,7 @@ using BenchmarkDotNet.Jobs;
 // hash acquisition path - type.GetHashCode() (virtual) vs RuntimeHelpers.GetHashCode (static, inlined)
 // vs type.TypeHandle.Value (plain field read of the type handle)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TypeHashSourceBenchmark
 {
     private NodeTypeHashMap<int> map = default!;

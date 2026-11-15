@@ -27,7 +27,7 @@ using BenchmarkDotNet.Jobs;
 // The caller holds a Type (the common shape: obj.GetType() or a Type flowing as data), so the handle
 // variants pay for type.TypeHandle at the call site. 32 hits / 8 misses, as in TYP-07.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TypeKeyBenchmark
 {
     private Dictionary<Type, int> byType = default!;

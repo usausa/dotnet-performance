@@ -25,8 +25,8 @@ public class BenchmarkConfig : ManualConfig
     }
 }
 
-// クラス側: 既定は net10.0 のみ。世代検証の対象クラスに限り net8 等のジョブを追加する
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+// クラス側: 既定は net11.0 のみ。世代検証の対象クラスに限り net10 のジョブを追加する
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 ```
 
 ## 🅰️ NativeAOT との比較測定
@@ -195,7 +195,7 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 
 以下はサンプル作成とベンチマーク実行を行った上で採否を判定する候補。判定の流れ:
 
-1. 候補ごとに検証ベンチマーク(+必要なら最小実装)を作成し、net8 / net9 / net10 で測定する
+1. 候補ごとに検証ベンチマーク(+必要なら最小実装)を作成し、net10 / net11 で測定する
 2. **有効** → パターンとして本文へ収録(実装例・実測付き)
 3. **無効** → [docs/rejected-patterns.md](rejected-patterns.md)へ「どの世代まで有効だったか」を付けて記録する
 4. **条件付き** → 適用条件を明記して収録する

@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // BIT-01 study: the two comparisons of min <= v && v <= max vs a single unsigned comparison
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class RangeCheckBenchmark
 {
     private const int Min = 100;

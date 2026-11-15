@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // TYP-05 study: castclass vs Unsafe.As vs an is pattern for a reference whose type is already guaranteed
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class UnsafeAsCastBenchmark
 {
     private object[] values = default!;

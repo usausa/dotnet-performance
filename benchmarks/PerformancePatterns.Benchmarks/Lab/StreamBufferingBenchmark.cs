@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // ASY-07 study: buffering everything vs processing chunk by chunk (a 1 MB payload)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StreamBufferingBenchmark
 {
     private const int PayloadSize = 1024 * 1024;

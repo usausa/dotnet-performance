@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 
 // COL-06 study: ways to build an ImmutableArray (MoveToImmutable vs ToImmutable vs ToImmutableArray)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ImmutableBuildBenchmark
 {
     private int[] source = default!;
@@ -57,7 +57,7 @@ public class ImmutableBuildBenchmark
 
 // COL-06 study: ways to allocate the destination List (new every time vs a preset capacity vs reuse with Clear + EnsureCapacity)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ListReuseBenchmark
 {
     private int[] source = default!;

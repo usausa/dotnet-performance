@@ -25,8 +25,8 @@ public class BenchmarkConfig : ManualConfig
     }
 }
 
-// On the class: net10.0 only by default. Add jobs for net8 and the like only on classes targeted for generation verification
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+// On the class: net11.0 only by default. Add a net10 job only on classes targeted for generation verification
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 ```
 
 ## 🅰️ Comparing against NativeAOT
@@ -195,7 +195,7 @@ Families come in two kinds.
 
 The following are candidates to be adopted or rejected once a sample has been built and benchmarks have been run. The decision flow:
 
-1. For each candidate, build a verification benchmark (plus a minimal implementation if needed) and measure it on net8 / net9 / net10
+1. For each candidate, build a verification benchmark (plus a minimal implementation if needed) and measure it on net10 / net11
 2. **Effective** → document it in the main text as a pattern (with an implementation example and measurements)
 3. **Ineffective** → record it in [docs/rejected-patterns.md](rejected-patterns.md) together with "which generation it stayed effective through"
 4. **Conditional** → document it with the conditions for applying it spelled out

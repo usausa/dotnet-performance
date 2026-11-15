@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // DSP-04 study: a lambda capturing locals vs a static lambda with TState
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StaticLambdaBenchmark
 {
     private const int N = 100;

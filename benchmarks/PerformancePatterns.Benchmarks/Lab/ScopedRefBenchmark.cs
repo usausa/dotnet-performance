@@ -11,7 +11,7 @@ using BenchmarkDotNet.Jobs;
 //             Judge on Code Size first: if the instruction stream matches, it is a safety tool, not a perf tool.
 // Question B: does an [UnscopedRef] ref-returning accessor beat a get/set pair for read-modify-write on struct state?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ScopedRefBenchmark
 {
     private const int N = 64;

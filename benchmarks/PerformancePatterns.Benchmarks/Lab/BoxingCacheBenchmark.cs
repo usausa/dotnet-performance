@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // STK-05 study: boxing at an object boundary vs a pre-boxed cache of frequent values
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class BoxingCacheBenchmark
 {
     private const int N = 100;

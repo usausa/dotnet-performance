@@ -7,11 +7,7 @@ namespace PerformancePatterns.Dsp;
 /// </summary>
 public sealed class HandlerList<T>
 {
-#if NET9_0_OR_GREATER
     private readonly Lock sync = new();
-#else
-    private readonly object sync = new();
-#endif
 
     private Action<T>[] handlers = [];
 

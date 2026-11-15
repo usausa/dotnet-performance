@@ -10,7 +10,7 @@ using BenchmarkDotNet.Jobs;
 // MemoryStream accumulation + ToArray (grow-copy chain) vs pooled-chunk ReadOnlySequence segments (one copy, no LOH)
 // vs PipeReader (ASY-03), which is the shape SEQ-05 actually recommends.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StreamSequenceBenchmark
 {
     private const int DataSize = 256 * 1024;

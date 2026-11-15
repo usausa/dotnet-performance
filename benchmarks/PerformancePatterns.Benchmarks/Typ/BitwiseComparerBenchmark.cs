@@ -8,7 +8,7 @@ using PerformancePatterns.Typ;
 // TYP-02 example: comparing dictionary lookups with a 16-byte struct key across comparers
 // (using a struct without IEquatable with the default comparer boxes on every Equals call)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class BitwiseComparerBenchmark
 {
     private const int Keys = 16;

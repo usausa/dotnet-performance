@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // COL-02 study: the build cost of FrozenDictionary (the denominator of the adoption trade-off)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class FrozenBuildBenchmark
 {
     private KeyValuePair<string, int>[] pairs = default!;
@@ -48,7 +48,7 @@ public class FrozenBuildBenchmark
 
 // COL-02 study: the lookup cost (the numerator of the adoption trade-off) — a full scan with non-interned keys
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class FrozenLookupBenchmark
 {
     private Dictionary<string, int> dictionary = default!;

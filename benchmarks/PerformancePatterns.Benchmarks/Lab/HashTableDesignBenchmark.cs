@@ -17,7 +17,7 @@ using BenchmarkDotNet.Jobs;
 //   LookupMiss - no key present (probe until the Robin Hood invariant proves absence)
 //   Build      - insert all 1024 keys into a freshly sized table
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class HashTableDesignBenchmark
 {
     private const int Count = 1024;

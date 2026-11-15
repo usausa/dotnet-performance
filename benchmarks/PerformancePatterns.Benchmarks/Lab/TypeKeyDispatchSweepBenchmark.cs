@@ -16,7 +16,7 @@ using BenchmarkDotNet.Jobs;
 //   Handle - ConcurrentDictionary<RuntimeTypeHandle, Func<object>>
 //   Ptr    - ConcurrentDictionary<IntPtr, Func<object>> keyed by TypeHandle.Value (no identity hash at all)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TypeKeyDispatchSweepBenchmark
 {
     private const int CallsPerInvoke = 5;

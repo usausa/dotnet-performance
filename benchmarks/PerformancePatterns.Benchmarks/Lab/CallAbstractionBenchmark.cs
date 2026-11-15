@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // DSP-02 study: overhead of five call abstraction approaches (1024 additions)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public unsafe class CallAbstractionBenchmark
 {
     private SealedAdder sealedAdder = default!;

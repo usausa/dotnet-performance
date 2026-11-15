@@ -17,7 +17,7 @@ using BenchmarkDotNet.Jobs;
 // The delegate is invoked directly (not passed to an opaque callee) because escape analysis can only
 // prove non-escape when it sees every use.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class DelegateEscapeBenchmark
 {
     private const int N = 64;

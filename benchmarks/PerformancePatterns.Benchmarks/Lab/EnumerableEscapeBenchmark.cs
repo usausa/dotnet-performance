@@ -16,7 +16,7 @@ using BenchmarkDotNet.Jobs;
 //
 // Every variant sums the same 1024 values.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class EnumerableEscapeBenchmark
 {
     private int[] array = default!;

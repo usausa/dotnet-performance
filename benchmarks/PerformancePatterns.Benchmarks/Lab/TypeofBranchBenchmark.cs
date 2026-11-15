@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // JIT-03 study: does the JIT fold a typeof(T) branch inside a generic down to zero cost
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TypeofBranchBenchmark
 {
     private int[] values = default!;

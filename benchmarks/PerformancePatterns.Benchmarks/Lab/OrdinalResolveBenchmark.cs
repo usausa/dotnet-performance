@@ -5,7 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 // DAT-01 study: column resolution strategies for row mapping (GetOrdinal per row / an ordinal-cache struct) and GetValue boxing
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class OrdinalResolveBenchmark
 {
     private const int Rows = 1000;

@@ -9,7 +9,7 @@ using PerformancePatterns.Buf;
 
 // BUF-03 example: comparing the sequential write lifecycle (create -> write 16 bytes x N -> read -> dispose)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class BufferWriterSlimBenchmark
 {
     private byte[] chunk = default!;

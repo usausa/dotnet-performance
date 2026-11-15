@@ -14,7 +14,7 @@ using BenchmarkDotNet.Jobs;
 // Question B: does it still cost nothing inside a generic method, where its size check cannot be folded until
 //             the instantiation is known (this is the JIT-03 shape)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class BitCastBenchmark
 {
     private const int Count = 1024;
@@ -128,7 +128,7 @@ public class BitCastBenchmark
 // that it silently truncates when the element sizes differ.
 // Question: is Cast actually free against the element-at-a-time alternatives, and how do the alternatives read?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SpanReinterpretBenchmark
 {
     private const int IntCount = 1024;
@@ -219,7 +219,7 @@ public class SpanReinterpretBenchmark
 //             loses, so the expectation here is that carrying the index also wins)?
 // Question B: what does an aliasing guard cost, comparing Unsafe.AreSame on the first elements against Overlaps?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class RefIdentityBenchmark
 {
     private const int Count = 1024;
@@ -328,7 +328,7 @@ public class RefIdentityBenchmark
 // handed to you (an object field, a dictionary of object, an interop boundary).
 // Question: how much does the rebox cost, and does the in place form stay allocation free?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class UnboxInPlaceBenchmark
 {
     private const int Count = 256;

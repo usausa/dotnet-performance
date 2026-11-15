@@ -1,7 +1,7 @@
 # LAB: Tail-touch bounds check hint (rejected, R-15)
 
 - Verdict: rejected
-- No difference across all variants on net10 and net8 (1024-int sum)
+- No difference across all variants on net10 and net8 (1024-int sum; measured when the class ran net10 + net8 jobs, it now runs net10 + net11)
 - array.Length loop form has the smallest code (34 B vs 94-140 B)
 
 ```

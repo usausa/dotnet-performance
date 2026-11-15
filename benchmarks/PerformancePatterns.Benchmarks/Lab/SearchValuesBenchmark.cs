@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 // TXT-08 study: comparing IndexOfAny(array) with SearchValues by number of candidates
 // (the advantage of the dedicated overloads for 2-3 candidates was already measured in R-07)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SearchValuesBenchmark
 {
     private string text = default!;

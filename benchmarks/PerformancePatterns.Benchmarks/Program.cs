@@ -85,9 +85,7 @@ public static class Program
             .FromTypes(
             [
                 typeof(SpanTokenizerBenchmark),
-#if NET9_0_OR_GREATER
                 typeof(SpanTokenizerBclComparisonBenchmark),
-#endif
                 typeof(TemporaryBufferBenchmark),
                 typeof(ValueStringBuilderBenchmark),
                 typeof(Utf8DateTimeFormatterBenchmark),
@@ -210,9 +208,7 @@ public static class Program
                 typeof(RefIdentityBenchmark),
                 typeof(UnboxInPlaceBenchmark),
                 typeof(VectorShuffleBenchmark),
-#if NET9_0_OR_GREATER
                 typeof(SampledNameTableSpanKeyBenchmark),
-#endif
             ])
             .Run(args);
     }
@@ -522,7 +518,6 @@ public static class Program
             throw new InvalidOperationException("Verify failed. SampledNameTable");
         }
 
-#if NET9_0_OR_GREATER
         var spanKeyTable = new SampledNameTableSpanKeyBenchmark { Columns = 16 };
         spanKeyTable.Setup();
         if ((spanKeyTable.DictionaryAlternateLookup() != expected) ||
@@ -531,7 +526,6 @@ public static class Program
         {
             throw new InvalidOperationException("Verify failed. SampledNameTableSpanKey");
         }
-#endif
     }
 
     private static void VerifyUnmeasuredBatch()

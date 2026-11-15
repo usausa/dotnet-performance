@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 
 // STK-09 study: call cost of params T[] versus params ReadOnlySpan<T>
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ParamsSpanBenchmark
 {
     private string a = default!;

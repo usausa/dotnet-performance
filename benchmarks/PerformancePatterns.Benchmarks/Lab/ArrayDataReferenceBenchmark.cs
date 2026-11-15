@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 
 // MEM-02 study: GetArrayDataReference — a sequential walk (anti-pattern check) and random access with a guaranteed range
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ArrayDataReferenceBenchmark
 {
     private int[] data = default!;

@@ -7,11 +7,11 @@ using BenchmarkDotNet.Jobs;
 
 // Study queue 1: bounds check elimination by touching the last element first
 // Question: in a loop whose length comes from a parameter, are the "touch the last element first" and
-// "unsigned guard" idioms still effective? Compare generations to confirm they help on .NET 8 and are expected to disappear on .NET 10 (likely an anti-pattern going forward).
-// Only this class additionally runs a net8 job so the generations can be compared.
+// "unsigned guard" idioms still effective? Compare generations to confirm the net10 result carries over to net11.
+// Only this class additionally runs a net10 job so the generations can be compared.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net80)]
 [MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class BoundsCheckHintBenchmark
 {
     private int[] array = default!;

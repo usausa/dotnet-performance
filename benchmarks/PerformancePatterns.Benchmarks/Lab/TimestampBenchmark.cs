@@ -9,7 +9,7 @@ using BenchmarkDotNet.Jobs;
 // Question: for cache TTL and timeout checks, how much is gained by replacing DateTime.UtcNow with
 // Environment.TickCount64 / Stopwatch.GetTimestamp?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TimestampBenchmark
 {
     private const int N = 100;

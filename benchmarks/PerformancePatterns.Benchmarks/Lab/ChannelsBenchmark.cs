@@ -9,7 +9,7 @@ using BenchmarkDotNet.Jobs;
 // Question: what is the per-element cost as a producer-consumer queue, and what impact do the
 // SingleReader/SingleWriter options and bounded channels have?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ChannelsBenchmark
 {
     private const int N = 10_000;

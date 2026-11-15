@@ -10,7 +10,7 @@ using BenchmarkDotNet.Jobs;
 // ReadOnlyCollection<int> wrapping an array now beats the indexer, reversing the usual advice for
 // wrapper collections. Measured here over the same 1024 values.
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ReadOnlyCollectionLoopBenchmark
 {
     private ReadOnlyCollection<int> collection = default!;

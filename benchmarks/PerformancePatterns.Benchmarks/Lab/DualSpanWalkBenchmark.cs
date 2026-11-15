@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 
 // MEM-01 study: walking several Spans at once (for a single Span the plain for loop is optimal = R-02)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class DualSpanWalkBenchmark
 {
     private int[] first = default!;

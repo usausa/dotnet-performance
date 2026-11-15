@@ -20,7 +20,7 @@ using BenchmarkDotNet.Jobs;
 //   InstanceMono        - op.Apply(i) through a NoInlining helper, one implementation (monomorphic interface call)
 //   InstancePoly        - op.Apply(i) alternating between two implementations (polymorphic interface call)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class StaticAbstractCallBenchmark
 {
     private const int Count = 1024;

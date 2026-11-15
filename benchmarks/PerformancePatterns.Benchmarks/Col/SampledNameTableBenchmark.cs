@@ -7,7 +7,7 @@ using PerformancePatterns.Col;
 
 // BIT-01 / COL-04 example: comparing name -> value resolution with a dictionary / a linear scan / a sampling hash table
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SampledNameTableBenchmark
 {
     private string[] names = default!;
@@ -74,10 +74,8 @@ public class SampledNameTableBenchmark
     }
 }
 
-// net8.0 has no AlternateLookup, so the whole class is kept separate (methodology pitfall 7)
-#if NET9_0_OR_GREATER
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class SampledNameTableSpanKeyBenchmark
 {
     private string[] probes = default!;
@@ -140,7 +138,6 @@ public class SampledNameTableSpanKeyBenchmark
         return total;
     }
 }
-#endif
 
 internal static class NameTableFixture
 {

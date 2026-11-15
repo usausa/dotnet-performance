@@ -15,7 +15,7 @@ using BenchmarkDotNet.Jobs;
 // Question B: does the backing store change that cost (array backed versus MemoryManager backed)?
 // Question C: is slicing Memory<T> measurably worse than slicing the hoisted Span<T>?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class MemorySpanCostBenchmark : IDisposable
 {
     private const int Length = 4096;
@@ -184,7 +184,7 @@ public class MemorySpanCostBenchmark : IDisposable
 // Question: how large is the copy that TryGetArray removes, and what does the fallback path cost when the
 //           Memory is not array backed (the case that forces the copy to stay)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class MemoryInteropBenchmark : IDisposable
 {
     private const int Length = 4096;

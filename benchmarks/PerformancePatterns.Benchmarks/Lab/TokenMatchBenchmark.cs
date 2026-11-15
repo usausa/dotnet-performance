@@ -11,7 +11,7 @@ using BenchmarkDotNet.Jobs;
 // Question: for matching a 4-byte ASCII token (an HTTP method and the like), which is fastest:
 // converting to string, SequenceEqual("..."u8), or a single uint constant comparison?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class TokenMatchBenchmark
 {
     // static readonly is treated as a JIT constant at Tier1 (and it also avoids mistakes in handwritten hex constants)

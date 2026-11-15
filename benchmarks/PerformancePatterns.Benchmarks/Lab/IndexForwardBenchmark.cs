@@ -8,7 +8,7 @@ using BenchmarkDotNet.Jobs;
 // PrecomposedChain = ASP.NET Core middleware style (delegate chain folded once at build time)
 // IndexForward = Azure.Core HttpPipeline style (policy array + index advancing, no delegate at all)
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class IndexForwardBenchmark
 {
     private const int InterceptorCount = 4;

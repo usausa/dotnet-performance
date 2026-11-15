@@ -7,7 +7,7 @@ using PerformancePatterns.Dsp;
 
 // DSP-03 example: multicast delegate vs immutable array with a Volatile read
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class HandlerListBenchmark
 {
     private Action<int>? multicast;

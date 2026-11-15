@@ -6,7 +6,7 @@ using BenchmarkDotNet.Jobs;
 // Study queue 1: GC.AllocateUninitializedArray<T>
 // Question: at what size threshold does skipping zero-initialization pay off (for small sizes the runtime falls back to a normal allocation)?
 [Config(typeof(BenchmarkConfig))]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
 public class UninitializedArrayBenchmark
 {
     [Params(256, 2048, 4096, 65536, 1048576)]
