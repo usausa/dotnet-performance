@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// Study queue 7-7: Unsafe.BitCast (.NET 8+) as the safe successor to Unsafe.As<TFrom, TTo>(ref v).
+// Study queue 7-7: Unsafe.BitCast as the safe successor to Unsafe.As<TFrom, TTo>(ref v).
 // The catalog uses Unsafe.As in the body of JIT-03 and SEQ-02 but only lists BitCast in the API table, which
 // puts the unsafe form in front of readers and the checked form out of sight.
 // Question A: does BitCast cost anything over Unsafe.As for a concrete value type pair?

@@ -6,7 +6,7 @@ using System.Text;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// Study queue 3: ASCII-specialized processing (the Ascii class in .NET 8)
+// Study queue 3: ASCII-specialized processing (the Ascii class)
 // Question: where ASCII input is guaranteed (HTTP header names and the like),
 // how should string.Equals(OrdinalIgnoreCase) / Ascii.EqualsIgnoreCase / a handwritten | 0x20 comparison be chosen between?
 [Config(typeof(BenchmarkConfig))]

@@ -6,7 +6,7 @@ using System.Text.Unicode;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// Study queue 3: Utf8.TryWrite (.NET 8+)
+// Study queue 3: Utf8.TryWrite
 // Question: how much faster is formatting directly into a Span<byte> with the UTF-8 interpolation handler
 // than string interpolation + Encode or char interpolation TryWrite + Encode?
 [Config(typeof(BenchmarkConfig))]

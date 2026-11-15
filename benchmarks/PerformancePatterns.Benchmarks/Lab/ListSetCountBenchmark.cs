@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-// Study queue 2: CollectionsMarshal.SetCount (.NET 8+)
+// Study queue 2: CollectionsMarshal.SetCount
 // Question: is it worth replacing an Add loop (N capacity checks plus version bumps) with
 // SetCount plus direct Span writes? Also check how it combines with a preset capacity.
 [Config(typeof(BenchmarkConfig))]
