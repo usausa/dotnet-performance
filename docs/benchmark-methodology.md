@@ -39,11 +39,11 @@ Two things block a naive attempt, and both cost a full run to discover:
 1. **`DisassemblyDiagnoser` is not supported on NativeAOT.** BDN rejects the job at validation and every AOT row comes out `NA` — with exit code 0, so it looks like a successful run. Since the base configuration above always carries the diagnoser, an AOT comparison needs a separate config without it (and therefore no Code Size column)
 2. **`vswhere.exe` must be on `PATH`** for the ILCompiler link step (`C:\Program Files (x86)\Microsoft Visual Studio\Installer`). Without it the link fails inside `Microsoft.NETCore.Native.targets` and, again, every AOT row is `NA`
 
-So an AOT comparison is run from the standalone harness `benchmarks/PerformancePatterns.AotHarness`. It does not copy the benchmark bodies: it links the classes that have an AOT comparison (`Lab/StaticAbstractCallBenchmark.cs` / `TypeHashSourceBenchmark.cs` / `TypeKeyBenchmark.cs` / `TypeKeyDispatchBenchmark.cs`) with `<Compile Include>` and substitutes the `PerformancePatterns.Benchmarks.BenchmarkConfig` that their `[Config(typeof(BenchmarkConfig))]` binds to with a diagnoser-free version (which is why its `RootNamespace` matches the main project). To add a class, add one link line to the csproj and its `Verify()` call to `Program.cs`.
+So an AOT comparison is run from the standalone harness `benchmarks/PerformancePatterns.AotHarness`. It does not copy the benchmark bodies: it links the classes that have an AOT comparison (`Lab/ReflectionInvokeBenchmark.cs` / `StaticAbstractCallBenchmark.cs` / `TypeHashSourceBenchmark.cs` / `TypeKeyBenchmark.cs` / `TypeKeyDispatchBenchmark.cs` / `TypeKeyDispatchSweepBenchmark.cs`) with `<Compile Include>` and substitutes the `PerformancePatterns.Benchmarks.BenchmarkConfig` that their `[Config(typeof(BenchmarkConfig))]` binds to with a diagnoser-free version (which is why its `RootNamespace` matches the main project). To add a class, add one link line to the csproj and its `Verify()` call to `Program.cs`.
 
 ```csharp
 // The harness's BenchmarkConfig: same name and namespace as the main one, minus DisassemblyDiagnoser.
-// The linked classes keep [MediumRunJob(RuntimeMoniker.Net10_0)], which provides the JIT job,
+// The linked classes keep [MediumRunJob(RuntimeMoniker.Net11_0)], which provides the JIT job,
 // so the command line adds only the NativeAOT job with the same MediumRun settings.
 public class BenchmarkConfig : ManualConfig
 {
@@ -58,7 +58,7 @@ public class BenchmarkConfig : ManualConfig
 
 ```
 cd benchmarks/PerformancePatterns.AotHarness
-dotnet run -c Release -- --filter "*TypeKeyBenchmark*" --runtimes nativeaot10.0 --job medium
+dotnet run -c Release -- --filter "*TypeKeyBenchmark*" --runtimes nativeaot11.0 --job medium
 ```
 
 **Reading the result:** BDN computes `Ratio` against the baseline method **on the first runtime**, so every AOT row is scaled to the JIT baseline. To judge the AOT side, re-derive the ratios against the AOT run's own baseline row.

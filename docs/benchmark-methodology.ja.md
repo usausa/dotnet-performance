@@ -39,11 +39,11 @@ public class BenchmarkConfig : ManualConfig
 1. **`DisassemblyDiagnoser` は NativeAOT 非対応。** BDN が検証段階でジョブを拒否し、AOT 行はすべて `NA` になる。しかも終了コードは 0 なので成功したように見える。上記の基本構成は常に診断器を含むため、AOT 比較には診断器を外した別 config が必要(その結果 Code Size 列は使えない)
 2. **`vswhere.exe` を `PATH` に通す必要がある**(ILCompiler のリンク段階で使用。実体は `C:\Program Files (x86)\Microsoft Visual Studio\Installer`)。通っていないと `Microsoft.NETCore.Native.targets` 内でリンクが失敗し、やはり AOT 行が全部 `NA` になる
 
-そのため AOT 比較は独立ハーネス `benchmarks/PerformancePatterns.AotHarness` で行う。ハーネスはベンチマーク本体をコピーせず、AOT 比較の対象クラス(`Lab/StaticAbstractCallBenchmark.cs` / `TypeHashSourceBenchmark.cs` / `TypeKeyBenchmark.cs` / `TypeKeyDispatchBenchmark.cs`)を `<Compile Include>` でリンクし、`[Config(typeof(BenchmarkConfig))]` が束縛する `PerformancePatterns.Benchmarks.BenchmarkConfig` を診断器なしの版で差し替える(`RootNamespace` を本体側に合わせてあるのはそのため)。対象を増やすには csproj にリンクを 1 行足し、`Program.cs` に `Verify()` を足す。
+そのため AOT 比較は独立ハーネス `benchmarks/PerformancePatterns.AotHarness` で行う。ハーネスはベンチマーク本体をコピーせず、AOT 比較の対象クラス(`Lab/ReflectionInvokeBenchmark.cs` / `StaticAbstractCallBenchmark.cs` / `TypeHashSourceBenchmark.cs` / `TypeKeyBenchmark.cs` / `TypeKeyDispatchBenchmark.cs` / `TypeKeyDispatchSweepBenchmark.cs`)を `<Compile Include>` でリンクし、`[Config(typeof(BenchmarkConfig))]` が束縛する `PerformancePatterns.Benchmarks.BenchmarkConfig` を診断器なしの版で差し替える(`RootNamespace` を本体側に合わせてあるのはそのため)。対象を増やすには csproj にリンクを 1 行足し、`Program.cs` に `Verify()` を足す。
 
 ```csharp
 // ハーネス側の BenchmarkConfig: 本体と同名・同名前空間で DisassemblyDiagnoser だけを外す。
-// リンクしたクラスの [MediumRunJob(RuntimeMoniker.Net10_0)] が JIT 側のジョブになるので、
+// リンクしたクラスの [MediumRunJob(RuntimeMoniker.Net11_0)] が JIT 側のジョブになるので、
 // コマンドラインでは NativeAOT のジョブだけを同じ MediumRun 設定で足す
 public class BenchmarkConfig : ManualConfig
 {
@@ -58,7 +58,7 @@ public class BenchmarkConfig : ManualConfig
 
 ```
 cd benchmarks/PerformancePatterns.AotHarness
-dotnet run -c Release -- --filter "*TypeKeyBenchmark*" --runtimes nativeaot10.0 --job medium
+dotnet run -c Release -- --filter "*TypeKeyBenchmark*" --runtimes nativeaot11.0 --job medium
 ```
 
 **結果の読み方:** BDN の `Ratio` は**最初のランタイム側**のベースラインメソッドに対して計算されるため、AOT 行もすべて JIT のベースラインに対する比になる。AOT 側を判断するには、AOT 実行自身のベースライン行に対して比を取り直すこと。
