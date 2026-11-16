@@ -361,3 +361,16 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 **除外したもの(性能向上のみで書き方は変わらない):** デリゲートの 8 B 縮小(#99200。DSP-04 の表の数値は動くが指針は不変)、同一ブロック内アサーション追跡(#121527)、list pattern の境界チェック(#121273)、intrinsic 型のインライン予算緩和(#127433)、spill 越しの型情報保持(#128485)、小さな struct のレジスタ渡し改善(#112740。MEM-04 の数値は動く)、R2R / NativeAOT の GVM devirt、Arm64 のコード生成全般(ペアロード・shrn・ubfx 等)、SVE(実験的)、Tier0 の Nullable ボックス化、`string.Concat` / `string.Split` / `Ascii.Equals` の高速化、`Dictionary.Remove` の値型キー最適化(#125884。R-22 の「Dictionary は既に速い」を補強するのみ)、`HashSet.UnionWith` / `Array.FindAll` / `ImmutableArray` の内部改善、`Random` の `[NoInlining]`(#131714。JIT がループ内 if 変換に対応するまでの暫定策と記事自身が明記)、BigInteger / TensorPrimitives / TimeZoneInfo / Regex / Networking / Diagnostics、LINQ 全般。
 
 **確認範囲:** 記事全文(Benchmarking Setup 〜 What's Next、379 KB)を通読した上での選別。A〜D は JIT 節、E〜G は Vectorization / Threading / Numerics / Strings and Spans / Collections 節に基づく。
+
+### 🧹 稼働中ライブラリの見直しから収録したパターン(初回測定)
+
+[docs/waste-review-checklist.md](waste-review-checklist.md) の元になった見直し(実運用 7 ライブラリ、2026-11)から収録した 6 パターン。本文には**参考実測(Zen 3 機・.NET 10 の JIT)**を「本リポジトリ未計測」と明記して載せてあるので、基準環境で初回測定して置き換える。再検証ではなく初回測定なので、A〜G とは別に扱う。
+
+| パターン | ベンチマーク | 測定時の注意 |
+|---|---|---|
+| MEM-06 | `ArrayRangeCopyBenchmark`(`TotalBytes` = 64 KB / 1 MB)・`ArraySliceStyleBenchmark` | gen2 GC の回数が主眼。1 MB では**写し元と写し先の 4096 での剰余差**で 1 回の `CopyTo` が 2 倍動く(落とし穴 10 と同種)ので、`Gen2Collections` 列も記録する |
+| TYP-08 | `CacheLookupOrderBenchmark`・`TypeMetadataLookupBenchmark` | `LookupFirstCapturingLambda` が**ヒット経路でも確保する**ことが要点。確保が 0 B に見えたら Tier1 のエスケープ解析が働いているので、`[MethodImpl(NoInlining)]` 版も足して切り分ける |
+| SEQ-06 | `StreamOverrideBenchmark` | 既定の非同期はスレッドプールを通るため、**他プロセスの負荷で大きく揺れる**。負荷のない状態で測る |
+| GEN-03 | `ReflectionConstructBenchmark`・`ReflectionAccessorBenchmark` | **JIT と NativeAOT の両方**で測る(AotHarness に登録済み)。`SetValue` の差は CoreCLR では出ず、AOT でだけ出る |
+| STK-11 | `ScopeBoxingBenchmark` | 同期の `using` は Tier1 で 0 B になるのが期待値。**`BoxedScopeAsync` と `BoxedScopeNoInline` で 24 B が出ること**を確認してから、構造体版と比べる |
+| COL-08 | `NegativeCacheBenchmark` | 定常状態(`MissWith*`)と初回(`ColdMisses*`)は**別の判断軸**。初回が重くなる側の数値も本文へ残す |

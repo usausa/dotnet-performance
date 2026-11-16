@@ -37,6 +37,8 @@ A pattern catalog for building libraries that work under Native AOT and trimming
 | [AOTP-08](#aotp-08-reflection-based-serialization) | System.Text.Json reflection mode, etc. | High | `NotSupportedException` | JsonSerializerContext (SG) |
 | [AOTP-09](#aotp-09-reflection-based-configuration-binding-and-di) | ConfigurationBinder / reflection-based DI | Medium | Binding and resolution failures | Binder SG / generic registration |
 | [AOTP-10](#aotp-10-regexoptionscompiled--dynamic-patterns) | RegexOptions.Compiled / dynamic patterns | Low–Medium | Exception or slowdown | \[GeneratedRegex\] |
+| [AOTP-11](#aotp-11-metadata-of-a-property-reached-through-an-interface) | Metadata of a property reached through an interface | Medium | `GetRuntimeProperty` returns null, then `NullReferenceException` | Widen the requirement / generated accessor |
+| [AOTP-12](#aotp-12-creating-an-array-of-a-value-type-at-runtime) | Creating an array of a value type at runtime | Medium | `'S[]' is missing native code or metadata` | Reference the array type so it survives |
 
 ### AOTP-01: Reflection.Emit
 
@@ -148,6 +150,22 @@ private static partial Regex LikeEscapePattern();
 ```
 
 For dynamic patterns, consider replacing the regex with `string.StartsWith` / `char` checks, `SearchValues<T>`, and the like.
+
+### AOTP-11: Metadata of a property reached through an interface
+
+**Problem:** keeping an interface with `[DynamicallyAccessedMembers(Interfaces)]` does **not** keep the metadata of that interface's properties. `GetRuntimeProperty("Value")` on an `IValueHolder<T>` found through `type.GetInterfaces()` **returns null**, and passing it on through `!` turns into a `NullReferenceException`. It happens under trimming (self-contained publish with `TrimMode=full` or `partial`, and Native AOT) and never under JIT. Code that only tests for the interface, such as `IsAssignableTo`, keeps working — so **a suppression justified by "the interface survives" is still wrong once a property is read**.
+
+**Mitigation:** if the members of the discovered type are read, widen the requirement from `Interfaces` to **the members actually read** (`PublicProperties`, say). On the reading side, either propagate the annotation by putting `[DynamicallyAccessedMembers]` on the return value, or replace it with a generated accessor (AOTS-01). Adding the assembly to `TrimmerRootAssembly` also works, but that makes correctness depend on the consumer's publish settings.
+
+**Detection:** unit tests do not show it. Run the self-contained trimmed output (both `TrimMode=full` and `partial`) and the Native AOT output for real. Also build with the `UnconditionalSuppressMessage` removed and check whether the warning is actually gone.
+
+### AOTP-12: Creating an array of a value type at runtime
+
+**Problem:** `Array.CreateInstance(elementType, n)` throws `NotSupportedException` under Native AOT (`'S[]' is missing native code or metadata`) when `elementType` is a value type and **`S[]` is never constructed anywhere in the program**. It works for types used elsewhere, such as `int[]` / `long[]`, and for arrays of reference types, so **the outcome depends on what else is in the executable**.
+
+**Mitigation:** **do not reject it up front.** Referencing `typeof(S[])` — as a constructor parameter type, as `new S[0]`, through a `GetAll<S>()` call, anything that puts the array type in the executable — is enough to make it work, so throwing at runtime on "no dynamic code, so no value types" also closes the paths that do work. From .NET 9 on, when **the array type itself** is at hand, use `Array.CreateInstanceFromArrayType(arrayType, n)` (which carries no `RequiresDynamicCode`). A type built with `MakeArrayType()`, or the element type, will not do.
+
+**Detection:** a project with `PublishAot` set reports `RuntimeFeature.IsDynamicCodeSupported` as false even under JIT, so the same failure reproduces before publishing with Native AOT. The feature switch is read once per process, so unit tests cannot flip it.
 
 ---
 

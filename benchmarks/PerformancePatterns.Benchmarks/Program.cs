@@ -80,7 +80,18 @@ public static class Program
         UnboxInPlaceBenchmark.Verify();
         VectorShuffleBenchmark.Verify();
 
-        // Example: dotnet run -c Release --framework net10.0 -- --filter "*"
+        // Study queue 8: waste review of a shipped library (docs/waste-review-checklist.md)
+        ArrayRangeCopyBenchmark.Verify();
+        ArraySliceStyleBenchmark.Verify();
+        CacheLookupOrderBenchmark.Verify();
+        TypeMetadataLookupBenchmark.Verify();
+        StreamOverrideBenchmark.Verify();
+        ReflectionConstructBenchmark.Verify();
+        ReflectionAccessorBenchmark.Verify();
+        ScopeBoxingBenchmark.Verify();
+        NegativeCacheBenchmark.Verify();
+
+        // Example: dotnet run -c Release --framework net11.0 -- --filter "*"
         BenchmarkSwitcher
             .FromTypes(
             [
@@ -209,6 +220,16 @@ public static class Program
                 typeof(UnboxInPlaceBenchmark),
                 typeof(VectorShuffleBenchmark),
                 typeof(SampledNameTableSpanKeyBenchmark),
+                // Study queue 8: waste review of a shipped library
+                typeof(ArrayRangeCopyBenchmark),
+                typeof(ArraySliceStyleBenchmark),
+                typeof(CacheLookupOrderBenchmark),
+                typeof(TypeMetadataLookupBenchmark),
+                typeof(StreamOverrideBenchmark),
+                typeof(ReflectionConstructBenchmark),
+                typeof(ReflectionAccessorBenchmark),
+                typeof(ScopeBoxingBenchmark),
+                typeof(NegativeCacheBenchmark),
             ])
             .Run(args);
     }

@@ -9,6 +9,8 @@ public static class Program
     public static void Main(string[] args)
     {
         // Verify all variants agree before measuring (benchmark-methodology.md)
+        ReflectionConstructBenchmark.Verify();
+        ReflectionAccessorBenchmark.Verify();
         StaticAbstractCallBenchmark.Verify();
         TypeHashSourceBenchmark.Verify();
         TypeKeyBenchmark.Verify();

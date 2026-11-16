@@ -37,6 +37,8 @@ Native AOT・トリミング対応ライブラリを実装するためのパタ�
 | [AOTP-08](#aotp-08-リフレクションベースのシリアライズ) | System.Text.Json リフレクションモード等 | 高 | `NotSupportedException` | JsonSerializerContext(SG) |
 | [AOTP-09](#aotp-09-リフレクションベースの設定バインドdi) | ConfigurationBinder / リフレクション DI | 中 | バインド失敗・解決失敗 | Binder SG / ジェネリック登録 |
 | [AOTP-10](#aotp-10-regexoptionscompiled--動的パターン) | RegexOptions.Compiled / 動的パターン | 低〜中 | 例外または低速化 | \[GeneratedRegex\] |
+| [AOTP-11](#aotp-11-インターフェース経由のプロパティのメタデータ) | インターフェース経由のプロパティのメタデータ | 中 | `GetRuntimeProperty` が null を返し `NullReferenceException` | 要求を広げる / 生成アクセサ |
+| [AOTP-12](#aotp-12-値型の配列の実行時生成) | 値型の配列の実行時生成 | 中 | `'S[]' is missing native code or metadata` | 配列の型を参照して残す |
 
 ### AOTP-01: Reflection.Emit
 
@@ -148,6 +150,22 @@ private static partial Regex LikeEscapePattern();
 ```
 
 動的パターンの場合は `string.StartsWith` / `char` 判定、`SearchValues<T>` 等での代替を検討する。
+
+### AOTP-11: インターフェース経由のプロパティのメタデータ
+
+**問題:** `[DynamicallyAccessedMembers(Interfaces)]` でインターフェースを残しても、**そのインターフェースのプロパティのメタデータは残らない**。`type.GetInterfaces()` から見つけた `IValueHolder<T>` の `GetRuntimeProperty("Value")` が **null を返し**、`!` で素通りすると `NullReferenceException` になる。トリミング(`TrimMode=full` / `partial` の自己完結発行、Native AOT)で起き、JIT では起きない。`IsAssignableTo` などインターフェースの有無を見るだけの処理は正しく動くので、**抑止の理由に「インターフェースは残る」と書いてあっても、プロパティまでは残らない**。
+
+**対策:** 見つけた型のメンバーを読むなら、要求を `Interfaces` から**実際に読むメンバー**(`PublicProperties` など)へ広げる。読む側の注釈も、戻り値に `[DynamicallyAccessedMembers]` を付けて伝播させるか、生成アクセサ(AOTS-01)へ置き換える。`TrimmerRootAssembly` に入れれば動くが、それは利用側の発行設定への依存になる。
+
+**検出:** 単体テストでは出ない。自己完結のトリム発行物(`TrimMode=full` と `partial` の両方)と Native AOT 発行物を実際に動かして確かめる。抑止(`UnconditionalSuppressMessage`)を外してビルドし、警告が消えていないかも見る。
+
+### AOTP-12: 値型の配列の実行時生成
+
+**問題:** `Array.CreateInstance(elementType, n)` は、`elementType` が値型で **`S[]` がプログラムのどこでも作られていない**と Native AOT で `NotSupportedException`(`'S[]' is missing native code or metadata`)。`int[]` / `long[]` のように他で使われている型や、参照型の配列は動くため、**結果が実行ファイルの内容で変わる**。
+
+**対策:** **前もって断らない。** `typeof(S[])` を参照する(コンストラクターの引数の型・`new S[0]`・`GetAll<S>()` の呼び出しなど、配列の型が実行ファイルに入る形)だけで作れるようになるので、「動的コードがなければ値型は不可」と実行時に例外にすると、使える経路まで塞ぐ。.NET 9 以降で**配列の型そのもの**が手元にあるなら `Array.CreateInstanceFromArrayType(arrayType, n)`(`RequiresDynamicCode` が付かない)を使う。`MakeArrayType()` で作った型や要素の型からは生成できない。
+
+**検出:** `PublishAot` を書いたプロジェクトは JIT 実行でも `RuntimeFeature.IsDynamicCodeSupported` が false になるため、Native AOT 発行前に同じ失敗を再現できる。機能スイッチはプロセスで 1 回しか読まれないので、単体テストでは切り替えられない。
 
 ---
 
