@@ -16,7 +16,7 @@ The pattern catalog in the [README](../README.md) covers how to write something 
 | W-04 | Returning a rebuilt copy of the same thing | A conversion returns a new string or array even when the result equals the input | [below](#w-04-returning-a-rebuilt-copy-of-the-same-thing) |
 | W-05 | Work in front of the cache lookup | Reflection, key building and a closure run even on a hit | TYP-08 / TYP-04 |
 | W-06 | Not remembering absence | Every miss pays the lock, the type-metadata copy and a fresh empty instance | COL-08 |
-| W-07 | Querying type metadata every call | `GetUnderlyingType` / `GetInterfaces` / `GenericTypeArguments` / `GetConstructor(Type[])` all copy an array | TYP-08 |
+| W-07 | Querying type metadata every call | `GetUnderlyingType` (through net10) / `GetInterfaces` / `GenericTypeArguments` / `GetConstructor(Type[])` all copy an array | TYP-08 |
 | W-08 | An argument array per reflection call | `Invoke(object?[])` / `SetValue`. It stays on the AOT path, where Emit is unavailable | GEN-03 / GEN-01 |
 | W-09 | Exceptions used as control flow | Particular inputs go through try/catch every time; a BCL API with no Try version is wrapped | TXT-03 |
 | W-10 | Leaving it to the base class default | `Stream`'s `ReadByte` / `CopyTo` / async members. The defaults were written for a different device | SEQ-06 |

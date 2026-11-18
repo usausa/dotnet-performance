@@ -9,7 +9,7 @@ using BenchmarkDotNet.Jobs;
 // work through the thread pool behind a semaphore. For a memory-backed stream, how much do the overrides recover?
 [Config(typeof(BenchmarkConfig))]
 [MediumRunJob(RuntimeMoniker.Net11_0)]
-public sealed class StreamOverrideBenchmark : IDisposable
+public class StreamOverrideBenchmark : IDisposable
 {
     private const int PayloadSize = 64 * 1024;
 
@@ -40,12 +40,19 @@ public sealed class StreamOverrideBenchmark : IDisposable
     }
 
     [GlobalCleanup]
-    public void Cleanup() => Dispose();
-
     public void Dispose()
     {
-        defaultStream?.Dispose();
-        overridingStream?.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            defaultStream?.Dispose();
+            overridingStream?.Dispose();
+        }
     }
 
     // ❌ Stream.ReadByte allocates new byte[1] per call

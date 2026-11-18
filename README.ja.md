@@ -46,7 +46,7 @@
 | [MEM-03](#-mem-03-sliceoffset-length-による明示的スライス) | Slice(offset, length) 明示スライス | 範囲演算子より引き締まったスライスのコード生成 | ✅ | [検証済](benchmarks/results/MEM-03-SliceStyle.md) |
 | [MEM-04](#-mem-04-構造体引数の-in--ref-渡し戦略) | 構造体引数の in / ref 渡し | 大きな構造体の値コピー回避 | ✅ | [検証済](benchmarks/results/MEM-04-StructPass.md) |
 | [MEM-05](#-mem-05-struct-レイアウトの最適化サイズフィールド順) | struct レイアウトの最適化 | サイズ・フィールド順によるフットプリント削減 | ✅ | [検証済](benchmarks/results/MEM-05-StructLayout.md) |
-| [MEM-06](#-mem-06-配列の範囲演算子とスライスの作り分け) | 配列の範囲演算子の作り分け | `array[..n]` の確保を避けるスライス記法の選択 | ✅ | [未計測](benchmarks/PerformancePatterns.Benchmarks/Lab/ArrayRangeCopyBenchmark.cs) |
+| [MEM-06](#-mem-06-配列の範囲演算子とスライスの作り分け) | 配列の範囲演算子の作り分け | `array[..n]` の確保を避けるスライス記法の選択 | ✅ | [検証済](benchmarks/results/MEM-06-ArrayRangeCopy.md) |
 | [STK-01](#-stk-01-ref-structスタック専用型) | ref struct(スタック専用型) | ヒープエスケープの型レベル禁止 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-spant--readonlyspant-によるゼロコピーアクセス) | Span\<T\> / ReadOnlySpan\<T\> | ゼロコピーの型付きビュー | ✅ | [実装](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [STK-03](#-stk-03-struct-iterator-パターン) | struct iterator パターン | foreach の仮想呼び出し・ヒープ確保除去 | ✅ | [実装](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -57,7 +57,7 @@
 | [STK-08](#-stk-08-inlinearray-による構造体内固定長バッファ) | InlineArray | 構造体内固定長バッファ(.NET 8+) | ✅ | [検証済](benchmarks/results/STK-08-InlineArray.md) |
 | [STK-09](#-stk-09-params-readonlyspant) | params ReadOnlySpan\<T\> | 可変長引数の配列確保除去(C# 13) | ✅ | [検証済](benchmarks/results/STK-09-ParamsSpan.md) |
 | [STK-10](#-stk-10-ref-フィールドカーソルによる構造読み) | ref フィールドカーソル | 幅の違うフィールドの逐次読み出し | ✅ | [検証済](benchmarks/results/STK-10-RefFieldStructRead.md) |
-| [STK-11](#-stk-11-using-スコープの戻り値の型) | using スコープの戻り値の型 | `IDisposable` 返しの箱を構造体返しで消す | ✅ | [未計測](benchmarks/PerformancePatterns.Benchmarks/Lab/ScopeBoxingBenchmark.cs) |
+| [STK-11](#-stk-11-using-スコープの戻り値の型) | using スコープの戻り値の型 | `IDisposable` 返しの箱を構造体返しで消す | ✅ | [検証済](benchmarks/results/STK-11-ScopeBoxing.md) |
 | [BUF-01](#-buf-01-arraypoolt-によるバッファ再利用) | ArrayPool\<T\> | 使い捨てバッファの GC 圧力削減 | ✅ | [実装](src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
 | [BUF-02](#-buf-02-ibufferwritert--getspan--advance-パターン) | IBufferWriter\<T\> + GetSpan / Advance | 出力バッファへの直接書き込み | ✅ | [実装](src/PerformancePatterns/Buf/PooledBufferWriter.cs) |
 | [BUF-03](#-buf-03-bufferwriterslimtスタックファースト書き込み) | BufferWriterSlim\<T\> | スタックファーストのバッファ書き込み | ✅ | [実装](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
@@ -85,7 +85,7 @@
 | [TYP-05](#️-typ-05-unsafeas-による型チェック省略キャスト) | Unsafe.As キャスト | 型保証済みキャストの高速化 | ✅ | [検証済](benchmarks/results/TYP-05-UnsafeAsCast.md) |
 | [TYP-06](#️-typ-06-型別成果物の静的事前組み立て) | 型別成果物の静的事前組み立て | 型ごとの文字列・SQL を初期化時に確定 | ✅ | [検証済](benchmarks/results/TYP-06-StaticArtifact.md) |
 | [TYP-07](#️-typ-07-type-キーのハッシュ取得元の選択) | Type キーのハッシュ取得元 | 仮想 GetHashCode より TypeHandle.Value | ⚠️ | [検証済](benchmarks/results/TYP-07-TypeHashSource.md) |
-| [TYP-08](#️-typ-08-キャッシュ参照を最初に置く) | キャッシュ参照を最初に置く | ヒット経路のリフレクションとクロージャの排除 | ✅ | [未計測](benchmarks/PerformancePatterns.Benchmarks/Lab/CacheLookupOrderBenchmark.cs) |
+| [TYP-08](#️-typ-08-キャッシュ参照を最初に置く) | キャッシュ参照を最初に置く | ヒット経路のリフレクションとクロージャの排除 | ✅ | [検証済](benchmarks/results/TYP-08-CacheLookupOrder.md) |
 | [BIT-01](#-bit-01-ドメイン制約を活かした軽量ハッシュ生成) | ドメイン制約を活かした軽量ハッシュ | 既知キー集合の O(1) ハッシュ | ✅ | [実装](src/PerformancePatterns/Col/SampledNameTable.cs) |
 | [BIT-02](#-bit-02-2-の累乗サイズ--マスクによる剰余置換) | 2 の累乗サイズ + マスク | 剰余(除算)のビット AND 化 | ✅ | [検証済](benchmarks/results/BIT-02-PowerOfTwoMask.md) |
 | [BIT-03](#-bit-03-bitoperations-によるビット走査計数) | BitOperations | ビット走査・計数のハードウェア命令化 | ✅ | [検証済](benchmarks/results/BIT-03-BitOperations.md) |
@@ -98,7 +98,7 @@
 | [SEQ-03](#-seq-03-遅延評価シーケンス処理batch--segment--traverse) | Batch / Segment / Traverse | 低アロケーションのシーケンス処理 | ✅ | [実装](src/PerformancePatterns/Seq/BatchExtensions.cs) |
 | [SEQ-04](#-seq-04-リングバッファ--増分デリミタ探索) | リングバッファ + 増分探索 | ストリーミング受信の分割 | ✅ | [検証済](benchmarks/results/SEQ-04-RingSplit.md) |
 | [SEQ-05](#-seq-05-長さ未知ストリームの読み出し再確保コピー連鎖の排除) | 長さ未知ストリーム → ReadOnlySequence | 再確保コピー連鎖と LOH 流入の排除 | ✅ | [検証済](benchmarks/results/SEQ-05-StreamSequence.md) |
-| [SEQ-06](#-seq-06-stream-派生型で上書きすべきメンバー) | Stream 派生型の上書き範囲 | 既定実装の 1 バイト配列・中継バッファ・スレッドプール往復の排除 | ✅ | [未計測](benchmarks/PerformancePatterns.Benchmarks/Lab/StreamOverrideBenchmark.cs) |
+| [SEQ-06](#-seq-06-stream-派生型で上書きすべきメンバー) | Stream 派生型の上書き範囲 | 既定実装の 1 バイト配列・中継バッファ・スレッドプール往復の排除 | ✅ | [検証済](benchmarks/results/SEQ-06-StreamOverride.md) |
 | [COL-01](#️-col-01-collectionsmarshal-による内部直接アクセス) | CollectionsMarshal | List/Dictionary 内部への直接アクセス | ✅ | [検証済](benchmarks/results/COL-01-CollectionsMarshal.md) |
 | [COL-02](#️-col-02-frozendictionary-の条件付き採用) | FrozenDictionary 条件付き採用 | 不変辞書の検索高速化 | ✅ | [検証済](benchmarks/results/COL-02-FrozenCondition.md) |
 | [COL-03](#️-col-03-getalternatelookup-による-span-キー検索) | GetAlternateLookup | Span キーでの辞書検索 | ✅ | [検証済](benchmarks/results/COL-04-SampledNameTable.md) |
@@ -106,7 +106,7 @@
 | [COL-05](#️-col-05-ienumerable-引数の具象型ディスパッチ) | IEnumerable 具象型ディスパッチ | List/配列入力の Span パス化 | ✅ | [検証済](benchmarks/results/COL-05-EnumerableDispatch.md) |
 | [COL-06](#️-col-06-コレクション変換の形状特化) | コレクション変換の形状特化 | 生成先の確保・コピー戦略の最適化 | ✅ | [検証済](benchmarks/results/COL-06-CollectionConvert.md) |
 | [COL-07](#️-col-07-getvaluerefornullref-による存在確認つき-ref-取得) | GetValueRefOrNullRef | 存在確認つき更新の探索 1 回化 | ✅ | [検証済](benchmarks/results/COL-07-ValueRefLookup.md) |
-| [COL-08](#️-col-08-不在のキャッシュと空結果の共有) | 不在のキャッシュと空結果の共有 | 外れるたびのロック・確保の排除 | ✅ | [未計測](benchmarks/PerformancePatterns.Benchmarks/Lab/NegativeCacheBenchmark.cs) |
+| [COL-08](#️-col-08-不在のキャッシュと空結果の共有) | 不在のキャッシュと空結果の共有 | 外れるたびのロック・確保の排除 | ✅ | [検証済](benchmarks/results/COL-08-NegativeCache.md) |
 | [TXT-01](#-txt-01-ルックアップテーブルによる整形変換) | ルックアップテーブル整形 | 固定書式整形のテーブル化 | ✅ | [実装](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#-txt-02-文字列構築の-stackalloc-ファースト化) | 文字列構築の stackalloc ファースト | StringBuilder 代替の低アロケーション構築 | ✅ | [実装](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [TXT-03](#-txt-03-try-パターンによる例外回避) | Try パターン | 例外を制御フローに使わない | ✅ | [検証済](benchmarks/results/TXT-03-TryPattern.md) |
@@ -132,7 +132,7 @@
 | [DAT-01](#️-dat-01-db-アクセスの列解決最適化) | DB アクセスの列解決最適化 | 序数キャッシュ・1 パス列解決 | ✅ | [検証済](benchmarks/results/DAT-01-OrdinalResolve.md) |
 | [GEN-01](#-gen-01-emit-生成コードの高速化戦略) | Emit 生成コードの高速化戦略 | 生成デリゲートのインライン展開等 | ❌ | [検証済](benchmarks/results/GEN-01-EmitStrategy.md) |
 | [GEN-02](#-gen-02-source-generator-生成コードの設計) | Source Generator 生成コードの設計 | 何を生成すれば速いかの指針集 | ✅ | [指針集](docs/generated-code-patterns.md) |
-| [GEN-03](#-gen-03-リフレクション呼び出しの引数配列の排除) | リフレクション呼び出しの引数配列の排除 | AOT 経路の `object?[]` を Invoker で消す | ✅ | [未計測](benchmarks/PerformancePatterns.Benchmarks/Lab/ReflectionInvokeBenchmark.cs) |
+| [GEN-03](#-gen-03-リフレクション呼び出しの引数配列の排除) | リフレクション呼び出しの引数配列の排除 | AOT 経路の `object?[]` を Invoker で消す | ✅ | [検証済](benchmarks/results/GEN-03-ReflectionInvoke.md) |
 
 ## 💾 MEM: メモリアクセス最適化
 
@@ -390,7 +390,7 @@ buffer[..index].CopyTo(grown.AsSpan());
 buffer.AsSpan(0, index).CopyTo(grown);
 ```
 
-**実測結果(本リポジトリ未計測 — `ArrayRangeCopyBenchmark` / `ArraySliceStyleBenchmark` を P4 で測定する):** 実運用ライブラリ(プール上の `IBufferWriter<T>` 実装の伸長)での参考値は、4 KB から 4 KB ずつ 64 KB まで書くと **4.93 µs・61,568 B → 1.61 µs・32 B**、1 MB まで書くと **113.45 µs・1,291,947 B(2,000 回で gen2 GC 540 回)→ 20.65 µs・32 B(gen2 GC 0 回)**。Zen 3 機での測定で、本書の基準環境の値ではない。
+**実測結果(net11 / x86-64-v4、4 KB の配列から 4 KB ずつ書き進める伸長):** 64 KB まで書くと **2.25 µs・61,536 B → 1.03〜1.12 µs・0 B(0.46〜0.50 倍)**、1 MB まで書くと **74.1 µs・1,045,414 B(1,000 回あたり gen2 GC 176 回)→ 23.0 µs・0 B(gen2 GC 0 回)(0.31 倍)**。4 KB の配列から 1 KB を切り出す単体は **25.6 ns・1,048 B → 0.81 ns・0 B**。範囲演算子側は確保ヘルパーと `Memmove` 2 回、AsSpan 側は `Memmove` 1 回。→ [測定結果](benchmarks/results/MEM-06-ArrayRangeCopy.md)
 
 **注意:**
 
@@ -887,7 +887,7 @@ public static IDisposable Begin(this IBusyState state) => new BusyStateScope(sta
 public static BusyStateScope Begin(this IBusyState state) => new(state);
 ```
 
-**実測結果(本リポジトリ未計測 — `ScopeBoxingBenchmark` を P4 で測定する):** 実運用ライブラリでの参考値は、同期の `using` が Tier1 で **0 B**(インライン化されない形では 24 B → 0 B)、`UsingAsync` が **21.2 ns・24 B → 9.6 ns・0 B**、委譲を持つスコープが **10.3 ns・64 B → 1.1 ns・0 B**。Zen 3 機での測定。
+**実測結果(net11 / x86-64-v4):** インライン化される同期の `using` は、箱あり・構造体とも **0 B・0.80 ns で命令列も一致**する(エスケープ解析が箱を消す)。箱が残る形では、インライン化されないヘルパーが **3.86 ns・24 B → 1.60 ns・0 B(0.42 倍)**、`async` メソッドが **9.62 ns・96 B → 8.09 ns・72 B(0.84 倍。差の 24 B が箱で、72 B は呼び出しごとに作られる `Task<int>`)**、委譲を持つスコープが **3.29 ns・56 B → 0.80 ns・0 B**。→ [測定結果](benchmarks/results/STK-11-ScopeBoxing.md)
 
 **注意:**
 
@@ -2142,7 +2142,7 @@ var index = (int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask;
 
 **目的:** 型・メンバーごとの成果物をキャッシュするファクトリで、**キャッシュを引く前に走るもの**(キー生成のリフレクション、`GetOrAdd` に渡すラムダのクロージャ)を排除し、ヒット経路をキャッシュ参照だけにする。
 
-- キャッシュがあっても、ヒット時に前段のリフレクションが毎回走る。`Nullable.GetUnderlyingType` / `Type.GetInterfaces()` / `Type.GenericTypeArguments` / `GetConstructor(Type[])` はいずれも**呼び出しごとに配列をコピーする**
+- キャッシュがあっても、ヒット時に前段のリフレクションが毎回走る。`Type.GetInterfaces()` / `Type.GenericTypeArguments` / `GetConstructor(Type[])` はいずれも**呼び出しごとに配列をコピーする**(`Nullable.GetUnderlyingType` も net10 までは同じだが、net11 では確保しなくなり、キャッシュするとかえって遅い)
 - `GetOrAdd(key, x => Build(key, state))` のようにローカルを捕捉するラムダは、**メソッドの入口でクロージャが確保される**ため、引いて即 return する経路でも確保が残る。`GetOrAdd(key, static (k, s) => …, state)` の状態渡しにすると消える
 - 直す順序は「先に引く → 外れたら作る」。ファクトリのラムダを `static` にするのはその後
 
@@ -2160,7 +2160,7 @@ if (cache.TryGetValue(property, out var cached))
 return cache.GetOrAdd(property, static (key, state) => Build(key, FindHolder(state)), property.PropertyType);
 ```
 
-**実測結果(本リポジトリ未計測 — `CacheLookupOrderBenchmark` / `TypeMetadataLookupBenchmark` を P4 で測定する):** 実運用ライブラリ(動的デリゲートのファクトリ)での参考値は、ヒット 1 回が **129〜146 ns・376〜384 B → 8〜16 ns・0 B**、コンストラクタ版が **53〜168 ns・0〜232 B → 6.3〜6.5 ns・0 B**。最初の試作(引く順だけを直しラムダは捕捉のまま)は**ヒットでも 32〜40 B 残った**。Zen 3 機での測定。
+**実測結果(net11 / x86-64-v4):** ヒット 1 回が **33.4 ns・368 B → 4.15 ns・0 B(0.12 倍)**。引く順だけを直してラムダを捕捉のまま残すと、**ヒットでも 32 B 残る**(5.44 ns。Tier1 でも消えない)。型ごとのキャッシュは `GetInterfaces` が **42.8 ns・120 B → 3.0 ns・0 B**、`GetConstructor` が **36.2 ns・128 B → 3.0 ns・0 B**。署名の配列を使い回すだけでは確保が 32 B 減るだけで時間は変わらない(`GetConstructor` 自体が 96 B 確保する)。`Nullable.GetUnderlyingType` は net10 で **29.1 ns・32 B → 3.5 ns・0 B** だが、net11 では毎回呼んでも **2.7 ns・0 B** で、キャッシュ(3.0 ns)の方が遅い。→ [測定結果](benchmarks/results/TYP-08-CacheLookupOrder.md)
 
 **注意:**
 
@@ -2760,7 +2760,7 @@ public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationTo
 }
 ```
 
-**実測結果(本リポジトリ未計測 — `StreamOverrideBenchmark` を P4 で測定する):** 実運用ライブラリ(プール上のメモリストリーム)での参考値は、`ReadByte` 1,000 回が **6,552 ns・32,000 B → 583 ns・0 B**、`WriteByte` が **4,702 ns・32,000 B → 1,596 ns・0 B**、64 バイトの `WriteAsync` が **1,026 ns・112 B → 8.0 ns・0 B**、`FlushAsync` が **897 ns・64 B → 0.5 ns・0 B**、1 MB の `CopyTo` が **42.0 µs → 21.6 µs**(割り当てはどちらも 0 B)。Zen 3 機での測定。
+**実測結果(net11 / x86-64-v4、1 回あたり):** `ReadByte` が **3.12 ns・32 B → 0.42 ns・0 B**、`WriteByte` が **1.91 ns・32 B → 0.62 ns・0 B**、64 バイトの `WriteAsync` が **191.8 ns・113 B → 2.7 ns・1 B**、`FlushAsync` が **156.6 ns・65 B → 1.0 ns・0 B**、64 KB の `CopyTo` が **2,221 ns → 1,404 ns(0.63 倍)**(割り当ては写し先の分だけで、どちらも同じ)。→ [測定結果](benchmarks/results/SEQ-06-StreamOverride.md)
 
 **注意:**
 
@@ -3107,7 +3107,7 @@ lock (sync)
 }
 ```
 
-**実測結果(本リポジトリ未計測 — `NegativeCacheBenchmark` を P4 で測定する):** 実運用ライブラリ(部品の容器の `IEnumerable<T>` 解決)での参考値は、未登録の 2 回目以降が **263.7 ns・56 B → 16.4 ns・0 B**、4 スレッドで 300 ms 回し続けたときのロック競合が **2,477 回 → 1 回**(スループットは 114 万回 → 1 億 2,920 万回)。代償は初回で、20 種を 1 回ずつ引くと **5,726 ns・1,984 B → 12,228 ns・14,963 B**。Zen 3 機での測定。
+**実測結果(net11 / x86-64-v4):** 未登録の 2 回目以降が **63.1 ns・56 B → 4.4 ns・0 B(0.07 倍)**で、登録済みのヒット(4.5 ns)と同じ経路になる。代償は初回で、20 種を 1 回ずつ引くと **1,477 ns・1,688 B → 2,762 ns・13,168 B(1.87 倍)**。キーごとの初回の上乗せ(約 64 ns)と 2 回目以降の節約(約 59 ns)がほぼ等しく、**同じキーを 2 回引けば元が取れる**。ロック競合は別環境(Zen 3 機・実運用ライブラリ)の値で、4 スレッドで 300 ms 回し続けると **2,477 回 → 1 回**(スループットは 114 万回 → 1 億 2,920 万回)。→ [測定結果](benchmarks/results/COL-08-NegativeCache.md)
 
 **注意:**
 
@@ -4186,7 +4186,7 @@ private static readonly ConstructorInvoker Invoker = ConstructorInvoker.Create(c
 var instance = Invoker.Invoke(boxedValue);
 ```
 
-**実測結果(本リポジトリ未計測 — `ReflectionConstructBenchmark` / `ReflectionAccessorBenchmark` を P4 で、JIT と NativeAOT の両方で測定する。AotHarness に登録済み):** 実運用ライブラリでの参考値(Native AOT)は、引数 1 個のコンストラクタが **41.1 ns・56 B → 26.2 ns・24 B**、16 個が **225.0 ns・264 B → 145.9 ns・112 B**、setter が **54.2 ns・32 B → 27.8 ns・0 B**、getter は変わらない(30.9 → 31.3 ns)。残る 24 B は値型引数と戻り値の箱で、リフレクション経由では消えない。Zen 3 機での測定。
+**実測結果(net11 / x86-64-v4、JIT と NativeAOT):** 引数 1 個のコンストラクタは JIT で **9.43 ns・56 B → Invoker 5.25 ns・24 B(0.56 倍)→ 型つきデリゲート 3.21 ns・24 B(0.34 倍)**、NativeAOT で **18.0 ns・56 B → 15.4 ns・24 B(0.86 倍)→ 3.58 ns・24 B(0.20 倍)**。setter は JIT の `SetValue` が **6.40 ns・0 B**(CoreCLR は配列を作らない)、NativeAOT が **20.4 ns・32 B → 13.2 ns・0 B(0.65 倍)→ 3.71 ns・0 B(0.18 倍)**。どの形にも残る 24 B は生成したインスタンスそのもの(ベンチは引数を事前に箱へ入れてある)。別環境(Zen 3 機・実運用ライブラリの Native AOT)では、引数 16 個が **225.0 ns・264 B → 145.9 ns・112 B**、getter は変わらない(30.9 → 31.3 ns)。→ [測定結果](benchmarks/results/GEN-03-ReflectionInvoke.md)
 
 **注意:**
 

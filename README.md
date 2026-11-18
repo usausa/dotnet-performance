@@ -46,7 +46,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [MEM-03](#-mem-03-explicit-slicing-with-sliceoffset-length) | Explicit Slice(offset, length) | Tighter slicing codegen than the range operator | ✅ | [Verified](benchmarks/results/MEM-03-SliceStyle.md) |
 | [MEM-04](#-mem-04-passing-struct-arguments-by-in--ref) | Passing struct arguments by in / ref | Avoid value copies of large structs | ✅ | [Verified](benchmarks/results/MEM-04-StructPass.md) |
 | [MEM-05](#-mem-05-struct-layout-optimization-size-and-field-order) | Struct layout optimization | Cut footprint through size and field order | ✅ | [Verified](benchmarks/results/MEM-05-StructLayout.md) |
-| [MEM-06](#-mem-06-array-range-operator-vs-slicing) | Array range operator vs slicing | Pick the notation that does not allocate for `array[..n]` | ✅ | [Not measured](benchmarks/PerformancePatterns.Benchmarks/Lab/ArrayRangeCopyBenchmark.cs) |
+| [MEM-06](#-mem-06-array-range-operator-vs-slicing) | Array range operator vs slicing | Pick the notation that does not allocate for `array[..n]` | ✅ | [Verified](benchmarks/results/MEM-06-ArrayRangeCopy.md) |
 | [STK-01](#-stk-01-ref-struct-stack-only-type) | ref struct (stack-only type) | Ban heap escape at the type level | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [STK-02](#-stk-02-zero-copy-access-with-spant--readonlyspant) | Span\<T\> / ReadOnlySpan\<T\> | Zero-copy typed view | ✅ | [Implemented](src/PerformancePatterns/Seq/SpanTokenizer.cs) |
 | [STK-03](#-stk-03-struct-iterator-pattern) | struct iterator pattern | Remove virtual calls and heap allocation from foreach | ✅ | [Implemented](src/PerformancePatterns/Seq/BatchExtensions.cs) |
@@ -57,7 +57,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [STK-08](#-stk-08-fixed-length-buffers-inside-structs-with-inlinearray) | InlineArray | Fixed-length buffer inside a struct (.NET 8+) | ✅ | [Verified](benchmarks/results/STK-08-InlineArray.md) |
 | [STK-09](#-stk-09-params-readonlyspant) | params ReadOnlySpan\<T\> | Remove the array allocation for variadic arguments (C# 13) | ✅ | [Verified](benchmarks/results/STK-09-ParamsSpan.md) |
 | [STK-10](#-stk-10-ref-field-cursor-for-structured-reads) | ref field cursor | Sequential reads of differing field widths | ✅ | [Verified](benchmarks/results/STK-10-RefFieldStructRead.md) |
-| [STK-11](#-stk-11-the-return-type-of-a-using-scope) | Return type of a using scope | Remove the box of an `IDisposable` return by returning the struct | ✅ | [Not measured](benchmarks/PerformancePatterns.Benchmarks/Lab/ScopeBoxingBenchmark.cs) |
+| [STK-11](#-stk-11-the-return-type-of-a-using-scope) | Return type of a using scope | Remove the box of an `IDisposable` return by returning the struct | ✅ | [Verified](benchmarks/results/STK-11-ScopeBoxing.md) |
 | [BUF-01](#-buf-01-buffer-reuse-with-arraypoolt) | ArrayPool\<T\> | Reduce GC pressure from throwaway buffers | ✅ | [Implemented](src/PerformancePatterns/Buf/TemporaryBuffer.cs) |
 | [BUF-02](#-buf-02-ibufferwritert--getspan--advance-pattern) | IBufferWriter\<T\> + GetSpan / Advance | Write directly into the output buffer | ✅ | [Implemented](src/PerformancePatterns/Buf/PooledBufferWriter.cs) |
 | [BUF-03](#-buf-03-bufferwriterslimt-stack-first-writing) | BufferWriterSlim\<T\> | Stack-first buffer writing | ✅ | [Implemented](src/PerformancePatterns/Buf/BufferWriterSlim.cs) |
@@ -85,7 +85,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [TYP-05](#️-typ-05-skipping-type-checks-on-casts-with-unsafeas) | Unsafe.As cast | Speed up casts already guaranteed by type | ✅ | [Verified](benchmarks/results/TYP-05-UnsafeAsCast.md) |
 | [TYP-06](#️-typ-06-static-pre-assembly-of-per-type-artifacts) | Static pre-assembly of per-type artifacts | Fix per-type strings and SQL at initialization | ✅ | [Verified](benchmarks/results/TYP-06-StaticArtifact.md) |
 | [TYP-07](#️-typ-07-choosing-the-hash-source-for-type-keys) | Hash source for Type keys | TypeHandle.Value over virtual GetHashCode | ⚠️ | [Verified](benchmarks/results/TYP-07-TypeHashSource.md) |
-| [TYP-08](#️-typ-08-put-the-cache-lookup-first) | Put the cache lookup first | Remove reflection and closures from the hit path | ✅ | [Not measured](benchmarks/PerformancePatterns.Benchmarks/Lab/CacheLookupOrderBenchmark.cs) |
+| [TYP-08](#️-typ-08-put-the-cache-lookup-first) | Put the cache lookup first | Remove reflection and closures from the hit path | ✅ | [Verified](benchmarks/results/TYP-08-CacheLookupOrder.md) |
 | [BIT-01](#-bit-01-lightweight-hashing-that-exploits-domain-constraints) | Lightweight hash exploiting domain constraints | O(1) hash for a known key set | ✅ | [Implemented](src/PerformancePatterns/Col/SampledNameTable.cs) |
 | [BIT-02](#-bit-02-power-of-two-sizing-plus-masking-to-replace-modulo) | Power-of-two size + mask | Turn modulo (division) into a bitwise AND | ✅ | [Verified](benchmarks/results/BIT-02-PowerOfTwoMask.md) |
 | [BIT-03](#-bit-03-bit-scanning-and-counting-with-bitoperations) | BitOperations | Hardware instructions for bit scanning and counting | ✅ | [Verified](benchmarks/results/BIT-03-BitOperations.md) |
@@ -98,7 +98,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [SEQ-03](#-seq-03-lazy-sequence-processing-batch--segment--traverse) | Batch / Segment / Traverse | Low-allocation sequence processing | ✅ | [Implemented](src/PerformancePatterns/Seq/BatchExtensions.cs) |
 | [SEQ-04](#-seq-04-ring-buffer-with-incremental-delimiter-search) | Ring buffer + incremental search | Splitting a streaming receive | ✅ | [Verified](benchmarks/results/SEQ-04-RingSplit.md) |
 | [SEQ-05](#-seq-05-reading-an-unknown-length-stream-without-a-grow-copy-chain) | Unknown-length stream to ReadOnlySequence | Remove the grow-copy chain and the LOH traffic | ✅ | [Verified](benchmarks/results/SEQ-05-StreamSequence.md) |
-| [SEQ-06](#-seq-06-which-members-a-stream-subclass-must-override) | What a Stream subclass must override | Remove the one-byte array, staging buffer and thread-pool hop | ✅ | [Not measured](benchmarks/PerformancePatterns.Benchmarks/Lab/StreamOverrideBenchmark.cs) |
+| [SEQ-06](#-seq-06-which-members-a-stream-subclass-must-override) | What a Stream subclass must override | Remove the one-byte array, staging buffer and thread-pool hop | ✅ | [Verified](benchmarks/results/SEQ-06-StreamOverride.md) |
 | [COL-01](#️-col-01-direct-internal-access-with-collectionsmarshal) | CollectionsMarshal | Direct access to List/Dictionary internals | ✅ | [Verified](benchmarks/results/COL-01-CollectionsMarshal.md) |
 | [COL-02](#️-col-02-conditional-adoption-of-frozendictionary) | Conditional use of FrozenDictionary | Faster lookup for immutable dictionaries | ✅ | [Verified](benchmarks/results/COL-02-FrozenCondition.md) |
 | [COL-03](#️-col-03-span-key-lookups-with-getalternatelookup) | GetAlternateLookup | Dictionary lookup with a Span key | ✅ | [Verified](benchmarks/results/COL-04-SampledNameTable.md) |
@@ -106,7 +106,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [COL-05](#️-col-05-concrete-type-dispatch-for-ienumerable-parameters) | IEnumerable concrete-type dispatch | Route List/array inputs onto a Span path | ✅ | [Verified](benchmarks/results/COL-05-EnumerableDispatch.md) |
 | [COL-06](#️-col-06-shape-specialized-collection-conversion) | Shape-specialized collection conversion | Optimize the allocation and copy strategy for the destination | ✅ | [Verified](benchmarks/results/COL-06-CollectionConvert.md) |
 | [COL-07](#️-col-07-existence-checked-ref-lookup-with-getvaluerefornullref) | GetValueRefOrNullRef | Fuse existence check and update into one probe | ✅ | [Verified](benchmarks/results/COL-07-ValueRefLookup.md) |
-| [COL-08](#️-col-08-caching-absence-and-sharing-the-empty-result) | Caching absence and sharing the empty result | Remove the lock and the allocation on every miss | ✅ | [Not measured](benchmarks/PerformancePatterns.Benchmarks/Lab/NegativeCacheBenchmark.cs) |
+| [COL-08](#️-col-08-caching-absence-and-sharing-the-empty-result) | Caching absence and sharing the empty result | Remove the lock and the allocation on every miss | ✅ | [Verified](benchmarks/results/COL-08-NegativeCache.md) |
 | [TXT-01](#-txt-01-formatting-and-conversion-with-lookup-tables) | Lookup-table formatting | Table-driven fixed-format formatting | ✅ | [Implemented](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) |
 | [TXT-02](#-txt-02-stackalloc-first-string-building) | stackalloc-first string building | Low-allocation alternative to StringBuilder | ✅ | [Implemented](src/PerformancePatterns/Txt/ValueStringBuilder.cs) |
 | [TXT-03](#-txt-03-avoiding-exceptions-with-the-try-pattern) | Try pattern | Do not use exceptions for control flow | ✅ | [Verified](benchmarks/results/TXT-03-TryPattern.md) |
@@ -132,7 +132,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [DAT-01](#️-dat-01-optimizing-column-resolution-in-db-access) | Optimized column resolution for DB access | Ordinal caching and single-pass column resolution | ✅ | [Verified](benchmarks/results/DAT-01-OrdinalResolve.md) |
 | [GEN-01](#-gen-01-strategies-for-fast-emit-generated-code) | Speed strategies for Emit-generated code | Inlining of generated delegates and similar | ❌ | [Verified](benchmarks/results/GEN-01-EmitStrategy.md) |
 | [GEN-02](#-gen-02-designing-source-generator-output) | Designing Source Generator output | Guide to what to generate for speed | ✅ | [Guide](docs/generated-code-patterns.md) |
-| [GEN-03](#-gen-03-reflection-invocation-without-the-argument-array) | Reflection invocation without the argument array | Remove the `object?[]` of the AOT path with an invoker | ✅ | [Not measured](benchmarks/PerformancePatterns.Benchmarks/Lab/ReflectionInvokeBenchmark.cs) |
+| [GEN-03](#-gen-03-reflection-invocation-without-the-argument-array) | Reflection invocation without the argument array | Remove the `object?[]` of the AOT path with an invoker | ✅ | [Verified](benchmarks/results/GEN-03-ReflectionInvoke.md) |
 
 ## 💾 MEM: Memory access optimization
 
@@ -390,7 +390,7 @@ buffer[..index].CopyTo(grown.AsSpan());
 buffer.AsSpan(0, index).CopyTo(grown);
 ```
 
-**Measurement (not measured in this repository — `ArrayRangeCopyBenchmark` / `ArraySliceStyleBenchmark` are to be measured in P4):** reference numbers from a shipped library (the grow path of a pooled `IBufferWriter<T>`): writing 64 KB in 4 KB steps from a 4 KB buffer went **4.93 µs / 61,568 B → 1.61 µs / 32 B**, and writing 1 MB went **113.45 µs / 1,291,947 B (540 gen2 collections over 2,000 runs) → 20.65 µs / 32 B (0 gen2 collections)**. Taken on a Zen 3 machine, not on this book's reference environment.
+**Measured (net11 / x86-64-v4, growing from a 4 KB array in 4 KB steps):** writing 64 KB went **2.25 µs / 61,536 B → 1.03-1.12 µs / 0 B (0.46-0.50x)**, and writing 1 MB **74.1 µs / 1,045,414 B (176 gen2 collections per 1,000 runs) → 23.0 µs / 0 B (0 gen2 collections) (0.31x)**. A single 1 KB slice of a 4 KB array went **25.6 ns / 1,048 B → 0.81 ns / 0 B**. The range form carries an allocation helper and two `Memmove` calls, the AsSpan form one `Memmove`. → [Results](benchmarks/results/MEM-06-ArrayRangeCopy.md)
 
 **Notes:**
 
@@ -887,7 +887,7 @@ public static IDisposable Begin(this IBusyState state) => new BusyStateScope(sta
 public static BusyStateScope Begin(this IBusyState state) => new(state);
 ```
 
-**Measurement (not measured in this repository — `ScopeBoxingBenchmark` is to be measured in P4):** reference numbers from a shipped library: the synchronous `using` was already **0 B** on Tier1 (24 B → 0 B in the non-inlined form), `UsingAsync` went **21.2 ns / 24 B → 9.6 ns / 0 B**, and a delegate-carrying scope went **10.3 ns / 64 B → 1.1 ns / 0 B**. Taken on a Zen 3 machine.
+**Measured (net11 / x86-64-v4):** the inlined synchronous `using` reads **0 B and 0.80 ns for both the boxed and the struct form, with matching instruction sequences** (escape analysis removes the box). Where the box survives, the non-inlined helper went **3.86 ns / 24 B → 1.60 ns / 0 B (0.42x)**, the `async` method **9.62 ns / 96 B → 8.09 ns / 72 B (0.84x; the 24 B difference is the box, the 72 B is the `Task<int>` created per call)**, and a delegate-carrying scope **3.29 ns / 56 B → 0.80 ns / 0 B**. → [Results](benchmarks/results/STK-11-ScopeBoxing.md)
 
 **Notes:**
 
@@ -2142,7 +2142,7 @@ var index = (int)((ulong)key.TypeHandle.Value.ToInt64() >> 3) & mask;
 
 **Goal:** in a factory that caches an artifact per type or member, remove **everything that runs before the lookup** (the reflection used to build the key, the closure of the lambda handed to `GetOrAdd`) so that the hit path is the lookup alone.
 
-- The cache does not help if the reflection in front of it runs on every hit. `Nullable.GetUnderlyingType`, `Type.GetInterfaces()`, `Type.GenericTypeArguments` and `GetConstructor(Type[])` all **copy an array per call**
+- The cache does not help if the reflection in front of it runs on every hit. `Type.GetInterfaces()`, `Type.GenericTypeArguments` and `GetConstructor(Type[])` all **copy an array per call** (`Nullable.GetUnderlyingType` did the same through net10, but no longer allocates on net11, where caching it is slower)
 - A lambda that captures a local, as in `GetOrAdd(key, x => Build(key, state))`, has **its display class allocated at method entry**, so the allocation survives even on the path that looks the value up and returns immediately. Passing state to `GetOrAdd(key, static (k, s) => …, state)` removes it
 - Fix the order first — look up, then build on a miss. Making the factory lambda `static` comes second
 
@@ -2160,7 +2160,7 @@ if (cache.TryGetValue(property, out var cached))
 return cache.GetOrAdd(property, static (key, state) => Build(key, FindHolder(state)), property.PropertyType);
 ```
 
-**Measurement (not measured in this repository — `CacheLookupOrderBenchmark` / `TypeMetadataLookupBenchmark` are to be measured in P4):** reference numbers from a shipped library (a dynamic delegate factory): one hit went **129-146 ns / 376-384 B → 8-16 ns / 0 B**, and the constructor variant **53-168 ns / 0-232 B → 6.3-6.5 ns / 0 B**. The first attempt, which fixed only the order and left the lambda capturing, **still allocated 32-40 B on a hit**. Taken on a Zen 3 machine.
+**Measured (net11 / x86-64-v4):** one hit went **33.4 ns / 368 B → 4.15 ns / 0 B (0.12x)**. Fixing only the order and leaving the lambda capturing **still leaves 32 B on a hit** (5.44 ns; Tier1 does not remove it). Per-type caching took `GetInterfaces` **42.8 ns / 120 B → 3.0 ns / 0 B** and `GetConstructor` **36.2 ns / 128 B → 3.0 ns / 0 B**. Reusing the signature array alone only removes 32 B and no time (`GetConstructor` itself allocates 96 B). `Nullable.GetUnderlyingType` went **29.1 ns / 32 B → 3.5 ns / 0 B** on net10, but on net11 calling it every time is **2.7 ns / 0 B** and the cache (3.0 ns) is slower. → [Results](benchmarks/results/TYP-08-CacheLookupOrder.md)
 
 **Notes:**
 
@@ -2760,7 +2760,7 @@ public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationTo
 }
 ```
 
-**Measurement (not measured in this repository — `StreamOverrideBenchmark` is to be measured in P4):** reference numbers from a shipped library (a pooled memory stream): 1,000 `ReadByte` calls went **6,552 ns / 32,000 B → 583 ns / 0 B**, `WriteByte` **4,702 ns / 32,000 B → 1,596 ns / 0 B**, a 64-byte `WriteAsync` **1,026 ns / 112 B → 8.0 ns / 0 B**, `FlushAsync` **897 ns / 64 B → 0.5 ns / 0 B**, and a 1 MB `CopyTo` **42.0 µs → 21.6 µs** (0 B either way). Taken on a Zen 3 machine.
+**Measured (net11 / x86-64-v4, per call):** `ReadByte` went **3.12 ns / 32 B → 0.42 ns / 0 B**, `WriteByte` **1.91 ns / 32 B → 0.62 ns / 0 B**, a 64-byte `WriteAsync` **191.8 ns / 113 B → 2.7 ns / 1 B**, `FlushAsync` **156.6 ns / 65 B → 1.0 ns / 0 B**, and a 64 KB `CopyTo` **2,221 ns → 1,404 ns (0.63x)** (the only allocation is the destination, the same on both sides). → [Results](benchmarks/results/SEQ-06-StreamOverride.md)
 
 **Notes:**
 
@@ -3107,7 +3107,7 @@ lock (sync)
 }
 ```
 
-**Measurement (not measured in this repository — `NegativeCacheBenchmark` is to be measured in P4):** reference numbers from a shipped library (the `IEnumerable<T>` path of a component container): an unregistered key from the second call on went **263.7 ns / 56 B → 16.4 ns / 0 B**, and lock contention over 300 ms on 4 threads went **2,477 → 1** (throughput 1.14 M → 129.2 M calls). The price shows on the first call: asking for 20 distinct types once each went **5,726 ns / 1,984 B → 12,228 ns / 14,963 B**. Taken on a Zen 3 machine.
+**Measured (net11 / x86-64-v4):** an unregistered key from the second call on went **63.1 ns / 56 B → 4.4 ns / 0 B (0.07x)**, the same path as a registered hit (4.5 ns). The price shows on the first call: asking for 20 distinct types once each went **1,477 ns / 1,688 B → 2,762 ns / 13,168 B (1.87x)**. The extra first-call cost per key (about 64 ns) roughly equals the saving per later call (about 59 ns), so **asking for the same key twice pays it back**. Lock contention comes from another environment (Zen 3 machine, shipped library): over 300 ms on 4 threads it went **2,477 → 1** (throughput 1.14 M → 129.2 M calls). → [Results](benchmarks/results/COL-08-NegativeCache.md)
 
 **Notes:**
 
@@ -4186,7 +4186,7 @@ private static readonly ConstructorInvoker Invoker = ConstructorInvoker.Create(c
 var instance = Invoker.Invoke(boxedValue);
 ```
 
-**Measurement (not measured in this repository — `ReflectionConstructBenchmark` / `ReflectionAccessorBenchmark` are to be measured in P4 under both JIT and NativeAOT; both are registered in AotHarness):** reference numbers from a shipped library (Native AOT): a one-argument constructor went **41.1 ns / 56 B → 26.2 ns / 24 B**, a sixteen-argument one **225.0 ns / 264 B → 145.9 ns / 112 B**, a setter **54.2 ns / 32 B → 27.8 ns / 0 B**, and the getter did not move (30.9 → 31.3 ns). The remaining 24 B is the box of the value-type argument and of the result, which reflection cannot avoid. Taken on a Zen 3 machine.
+**Measured (net11 / x86-64-v4, JIT and NativeAOT):** a one-argument constructor went **9.43 ns / 56 B → invoker 5.25 ns / 24 B (0.56x) → typed delegate 3.21 ns / 24 B (0.34x)** under JIT and **18.0 ns / 56 B → 15.4 ns / 24 B (0.86x) → 3.58 ns / 24 B (0.20x)** under NativeAOT. For the setter, `SetValue` under JIT is **6.40 ns / 0 B** (CoreCLR builds no array), and under NativeAOT it went **20.4 ns / 32 B → 13.2 ns / 0 B (0.65x) → 3.71 ns / 0 B (0.18x)**. The 24 B left on every form is the constructed instance itself (the benchmark boxes the argument once up front). In another environment (Zen 3 machine, Native AOT in a shipped library) a sixteen-argument constructor went **225.0 ns / 264 B → 145.9 ns / 112 B**, and the getter did not move (30.9 → 31.3 ns). → [Results](benchmarks/results/GEN-03-ReflectionInvoke.md)
 
 **Notes:**
 

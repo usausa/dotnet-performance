@@ -61,7 +61,7 @@ cd benchmarks/PerformancePatterns.AotHarness
 dotnet run -c Release -- --filter "*TypeKeyBenchmark*" --runtimes nativeaot11.0 --job medium
 ```
 
-**結果の読み方:** BDN の `Ratio` は**最初のランタイム側**のベースラインメソッドに対して計算されるため、AOT 行もすべて JIT のベースラインに対する比になる。AOT 側を判断するには、AOT 実行自身のベースライン行に対して比を取り直すこと。
+**結果の読み方:** BenchmarkDotNet 0.16(0.16.0-preview.2 で確認)では `Ratio` がジョブごとに計算され、AOT 行は AOT 自身のベースライン行に対する比になる。0.15.8 までは**最初のランタイム側**のベースラインに対する比だったので、その版の結果を読むときは AOT 自身のベースライン行に対して比を取り直すこと。
 
 **速度ではなく前提を確認する場合:** 正しさのテストでは前提の破綻を隠してしまうことがある。TYP-07 は型ハンドルがポインタ整列であることを根拠に右 3 ビットシフトするが、仮にこれが成立しなくなってもルックアップは正しいまま(挿入時と探索時に同じシフトを掛けるため)で、潰れるのはバケット分布だけである。この種の前提は `PublishAot=true` で publish した native バイナリを直接実行して確認する。なお `PublishAot=true` のプロジェクトに対する `dotnet run` は**依然として JIT 実行**である点に注意 — このプロパティは機能スイッチを切り替えるため `RuntimeFeature.IsDynamicCodeCompiled` が既に `false` を返し、AOT 判定を自前で書くと嘘をつく。`bin/Release/<tfm>/<rid>/publish/<name>.exe` を直接実行すること。
 
@@ -240,6 +240,8 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | 7-3 `GetValueRefOrNullRef` の読み取り経路・**8 バイト値** | 0.99〜1.04 倍、両機とも信頼区間重複(6 ns だけ重なった 1.04 倍は再測定で消えた) | 命令数一致(200 vs 200)、違いは基本ブロックの配置のみ | ❌ **差なし**(1 フィールド読みでは分解できない) |
 | 7-3 同・**32 バイト値 / 2 フィールド読み** | x86-64-v4 で 0.93 倍・0.94 倍、**2 回とも信頼区間非重複**。x86-64-v3 では 1.00 倍 | 202 vs 201 命令。ref 形は各フィールド読みを `add rsi,[r13]` に畳み、`TryGetValue` 形は `mov` + `add` を出す | ✅ **実差** — 節約はフィールド読み 1 つにつき 1 命令。複数フィールドを読み、かつコアが十分広いときだけ顕在化する → COL-07 |
 | 7-9 `Vector128.Shuffle` vs `Ssse3.Shuffle` | x86-64-v3 で 121.53 vs 64.35 ns、**信頼区間非重複**。x86-64-v4 では同じ比較が 62.51 vs 61.06(run 1)、64.69 vs 62.21 ns(run 2、**信頼区間重複**) | **命令列完全一致**(59 命令 / 190 B、両機とも) | ⚠️ **配置由来と確定**。API 差ではない。別機で 1.76 倍が 1〜4% に収縮したので、異常値は 121.53 ns の方(落とし穴 10 を参照) |
+| STK-11 インライン化される同期 `using`(箱 vs 構造体) | 0.808 vs 0.803 ns、信頼区間重複、どちらも 0 B | **命令列一致**(19 B、分岐先アドレスのみ違う) | ❌ **差なし**(Tier1 のエスケープ解析が箱を消す)。箱が残る形(非インライン・async)では実差 |
+| TYP-08 `GetConstructor` の署名配列の使い回し | 36.21 vs 36.44 ns、信頼区間重複 | コードサイズ 17,797 vs 17,773 B で別物 | ➖ **誤差**(時間軸)。確保は 128 → 96 B に減る。残る 96 B は `GetConstructor` 自身の確保で、効くのは結果のキャッシュ(2.99 ns・0 B) |
 
 | 批次 | 候補 | 概要 / 検証の問い | 関連 | 状態 |
 |:---:|---|---|---|:---:|
@@ -364,13 +366,13 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 
 ### 🧹 稼働中ライブラリの見直しから収録したパターン(初回測定)
 
-[docs/waste-review-checklist.md](waste-review-checklist.md) の元になった見直し(実運用 7 ライブラリ、2026-11)から収録した 6 パターン。本文には**参考実測(Zen 3 機・.NET 10 の JIT)**を「本リポジトリ未計測」と明記して載せてあるので、基準環境で初回測定して置き換える。再検証ではなく初回測定なので、A〜G とは別に扱う。
+[docs/waste-review-checklist.md](waste-review-checklist.md) の元になった見直し(実運用 7 ライブラリ、2026-11)から収録した 6 パターン。本文の参考実測(Zen 3 機・.NET 10 の JIT)は、基準環境(HX 370・net11)での初回測定(2026-11-18)で置き換え済み。再検証ではなく初回測定なので、A〜G とは別に扱う。
 
-| パターン | ベンチマーク | 測定時の注意 |
-|---|---|---|
-| MEM-06 | `ArrayRangeCopyBenchmark`(`TotalBytes` = 64 KB / 1 MB)・`ArraySliceStyleBenchmark` | gen2 GC の回数が主眼。1 MB では**写し元と写し先の 4096 での剰余差**で 1 回の `CopyTo` が 2 倍動く(落とし穴 10 と同種)ので、`Gen2Collections` 列も記録する |
-| TYP-08 | `CacheLookupOrderBenchmark`・`TypeMetadataLookupBenchmark` | `LookupFirstCapturingLambda` が**ヒット経路でも確保する**ことが要点。確保が 0 B に見えたら Tier1 のエスケープ解析が働いているので、`[MethodImpl(NoInlining)]` 版も足して切り分ける |
-| SEQ-06 | `StreamOverrideBenchmark` | 既定の非同期はスレッドプールを通るため、**他プロセスの負荷で大きく揺れる**。負荷のない状態で測る |
-| GEN-03 | `ReflectionConstructBenchmark`・`ReflectionAccessorBenchmark` | **JIT と NativeAOT の両方**で測る(AotHarness に登録済み)。`SetValue` の差は CoreCLR では出ず、AOT でだけ出る |
-| STK-11 | `ScopeBoxingBenchmark` | 同期の `using` は Tier1 で 0 B になるのが期待値。**`BoxedScopeAsync` と `BoxedScopeNoInline` で 24 B が出ること**を確認してから、構造体版と比べる |
-| COL-08 | `NegativeCacheBenchmark` | 定常状態(`MissWith*`)と初回(`ColdMisses*`)は**別の判断軸**。初回が重くなる側の数値も本文へ残す |
+| パターン | ベンチマーク | 測定時の注意 | 結果(HX 370・net11) |
+|---|---|---|---|
+| MEM-06 | `ArrayRangeCopyBenchmark`(`TotalBytes` = 64 KB / 1 MB)・`ArraySliceStyleBenchmark` | gen2 GC の回数が主眼。1 MB では**写し元と写し先の 4096 での剰余差**で 1 回の `CopyTo` が 2 倍動く(落とし穴 10 と同種)ので、`Gen2Collections` 列も記録する | ✅ 有効 — 1 MB で 74.1 → 23.0 µs(0.31 倍)、gen2 GC は 1,000 回あたり 176 → 0 回。2 回測って 1 MB の行は 1.5 % 以内で一致し、剰余差の揺れは出なかった → [MEM-06](../benchmarks/results/MEM-06-ArrayRangeCopy.md) |
+| TYP-08 | `CacheLookupOrderBenchmark`・`TypeMetadataLookupBenchmark` | `LookupFirstCapturingLambda` が**ヒット経路でも確保する**ことが要点。確保が 0 B に見えたら Tier1 のエスケープ解析が働いているので、`[MethodImpl(NoInlining)]` 版も足して切り分ける | ✅ 有効 — ヒット 33.4 ns・368 B → 4.15 ns・0 B。捕捉ラムダはヒットでも 32 B 残り、Tier1 でも消えない(NoInline 版は不要だった)。`Nullable.GetUnderlyingType` は net11 で確保しなくなり、キャッシュが効くのは net10 だけ → [TYP-08](../benchmarks/results/TYP-08-CacheLookupOrder.md) |
+| SEQ-06 | `StreamOverrideBenchmark` | 既定の非同期はスレッドプールを通るため、**他プロセスの負荷で大きく揺れる**。負荷のない状態で測る | ✅ 有効 — 5 系統すべて信頼区間非重複(`WriteAsync` 0.014 倍、`ReadByte` 0.13 倍)。無負荷で測定。`sealed` のクラスを BDN が拒否していた(終了コードは 0)ので直してから測った → [SEQ-06](../benchmarks/results/SEQ-06-StreamOverride.md) |
+| GEN-03 | `ReflectionConstructBenchmark`・`ReflectionAccessorBenchmark` | **JIT と NativeAOT の両方**で測る(AotHarness に登録済み)。`SetValue` の差は CoreCLR では出ず、AOT でだけ出る | ✅ 有効 — 型つきデリゲートが JIT 0.32〜0.34 倍、AOT 0.18〜0.20 倍。`SetValue` の 32 B は AOT でだけ出た。Invoker の利得は AOT で小さい(0.65〜0.86 倍) → [GEN-03](../benchmarks/results/GEN-03-ReflectionInvoke.md) |
+| STK-11 | `ScopeBoxingBenchmark` | 同期の `using` は Tier1 で 0 B になるのが期待値。**`BoxedScopeAsync` と `BoxedScopeNoInline` で 24 B が出ること**を確認してから、構造体版と比べる | ✅ 有効 — 同期の `using` は 0 B で命令列も一致(差なし)。NoInline 版で 24 B → 0 B(0.42 倍)、async 版で箱の 24 B が消える → [STK-11](../benchmarks/results/STK-11-ScopeBoxing.md) |
+| COL-08 | `NegativeCacheBenchmark` | 定常状態(`MissWith*`)と初回(`ColdMisses*`)は**別の判断軸**。初回が重くなる側の数値も本文へ残す | ⚖️ 条件付き — 定常は 63.1 → 4.4 ns(0.07 倍)、初回は 1.87 倍・13,168 B。同じキーを 2 回引けば元が取れる。キーの集合が閉じていることが条件 → [COL-08](../benchmarks/results/COL-08-NegativeCache.md) |

@@ -16,7 +16,7 @@
 | W-04 | 同じものを作り直して返す | 変換結果が入力と同じでも新しい文字列・配列を返す | [下](#w-04-同じものを作り直して返す) |
 | W-05 | キャッシュの手前に仕事がある | ヒットしてもリフレクション・キー生成・クロージャが走る | TYP-08 / TYP-04 |
 | W-06 | 不在を覚えない | 外れるたびにロック・型メタデータのコピー・空インスタンスの確保 | COL-08 |
-| W-07 | 型メタデータを毎回引く | `GetUnderlyingType` / `GetInterfaces` / `GenericTypeArguments` / `GetConstructor(Type[])` が配列を写す | TYP-08 |
+| W-07 | 型メタデータを毎回引く | `GetUnderlyingType`(net10 まで)/ `GetInterfaces` / `GenericTypeArguments` / `GetConstructor(Type[])` が配列を写す | TYP-08 |
 | W-08 | 反射で呼ぶたびに配列を作る | `Invoke(object?[])` / `SetValue`。Emit が使えない AOT 経路では残り続ける | GEN-03 / GEN-01 |
 | W-09 | 例外を制御フローに使っている | 特定の入力で毎回 try/catch を通る。Try 版が無い BCL API を包んでいる | TXT-03 |
 | W-10 | 基底の既定実装に任せている | `Stream` の `ReadByte` / `CopyTo` / 非同期。既定実装は別の前提で書かれている | SEQ-06 |
