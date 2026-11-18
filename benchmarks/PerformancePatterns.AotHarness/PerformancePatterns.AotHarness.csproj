@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\PerformancePatterns.Benchmarks\Lab\EscapeGenerationBenchmark.cs" Link="Lab\EscapeGenerationBenchmark.cs" />
     <Compile Include="..\PerformancePatterns.Benchmarks\Lab\ReflectionInvokeBenchmark.cs" Link="Lab\ReflectionInvokeBenchmark.cs" />
     <Compile Include="..\PerformancePatterns.Benchmarks\Lab\StaticAbstractCallBenchmark.cs" Link="Lab\StaticAbstractCallBenchmark.cs" />
     <Compile Include="..\PerformancePatterns.Benchmarks\Lab\TypeHashSourceBenchmark.cs" Link="Lab\TypeHashSourceBenchmark.cs" />

@@ -22,6 +22,8 @@ Measurement environment: .NET 10 and later / x86-64-v4 (Ryzen AI 9 HX 370; new m
 
 🎯 **Intent:** eliminate in-loop bounds checks by walking memory manually with `MemoryMarshal.GetReference` / `MemoryMarshal.GetArrayDataReference` plus `Unsafe.Add`.
 
+🔭 **Re-verified on net11 (net11 / net10, x86-64-v4):** the basis for the second legitimate use of a manual ref (sampling access) holds on net11. Written in index form, `SampledNameTable.CalculateHash` cannot prove `value[length >> 1]` and `value[length - 1]` from `length != 0`, and one bounds check remains (76 B on both generations, 1.08x of the manual ref). The look-ahead guard extension (#124242 / #125235) does not reach this shape, so the manual ref stays. → [Results](../benchmarks/results/NET11-Revalidation.md#a2-sampledhashindexbenchmark)
+
 📉 **Measured — why it is rejected:** on net10 it is not faster in **any** shape.
 
 - Single Span: the plain `for` loop already gets full bounds-check elimination, so the manual ref form only pays the setup cost (1.07-1.13x)
@@ -51,6 +53,8 @@ Manual walking also has a high defect rate (several real bugs were found during 
 ### R-04: Choosing the loop construct (for / while / do-while / foreach / ascending vs descending)
 
 🎯 **Intent:** Make code faster by picking a particular loop construct or iteration direction.
+
+🔭 **Re-verified on net11 (net11 / net10, x86-64-v4):** two things moved. (1) A `!=` terminated `for (i = 0; i != n; i++)` keeps a bounds check inside the loop on net10 (63 / 69 B) and loses it on net11, level with `<` (33 / 54 B; not an identical instruction sequence). **On net11 either `<` or `!=` is fine.** (2) `foreach` over `ReadOnlyCollection<T>` still allocated 32 B on net11, against the article's "32 → 0 B" (#122946), in all three shapes tried (field, static readonly, wrapper created in the method; time 1.32x → 1.15x of the indexer). **Keep indexing wrappers**: the net10 non-reproduction was not a generation difference. → [Results](../benchmarks/results/LAB-ReadOnlyCollectionLoop.md)
 
 📉 **Measured — why it is rejected:** All forms converge on identical performance (an exact match at size 256 and above). **A generated code check (JitDisasm) revealed the breakdown:**
 
@@ -141,6 +145,8 @@ The `_version` comparison in `List<T>.Enumerator` is not the thing to worry abou
 ### R-06: Hand-rolled sort implementations
 
 🎯 **Intent:** Beat the BCL with a purpose-built sort (merge sort, etc.).
+
+🔭 **Re-verified on net11 (net11 / net10, x86-64-v4):** "pass the comparer as a struct through a generic constraint" **did not work for `Span.Sort<T, TComparer>` up to net10**. The struct comparer was boxed and called through the interface, 4,014 ns / 88 B, 5.5x slower than the default comparison (731 ns). net11 specializes it at **603 ns / 0 B** (0.85x of the default comparison, #116109). A multi-target that includes net10 should expect that cost on net10 when passing a struct comparer. → [Results](../benchmarks/results/NET11-Revalidation.md#e2-spansortcomparerbenchmark)
 
 📉 **Measured — why it is rejected:** The BCL's `Span.Sort` (introsort) is about 9x faster than a hand-written merge sort, at 1/5 the code size. The BCL side keeps receiving pdqsort-family optimization, leaving essentially no room to win on general-purpose comparison sorts.
 
@@ -264,6 +270,8 @@ A u8 literal does have the advantage that the table address becomes a link-time 
 
 🎯 **Intent:** Get the JIT to eliminate bounds checks in loops driven by an external length, via a pre-access such as `_ = array[length - 1];` or an unsigned guard.
 
+🔭 **Re-verified on net11 (net11 / net10, x86-64-v4):** unchanged. All four forms run at 210.2-211.6 ns on both generations, and the tail-touch form compiles to the same code on both (78 B FullOpts, one bounds check left as in the external-length loop). The net11 folding of constant-index guards (#127439 / #124705) does not reach this loop shape. The touch is neither slower nor larger, so **it stays "not needed"** rather than moving to "harmful". → [Results](../benchmarks/results/LAB-BoundsCheckHint.md)
+
 📉 **Measured — why it is rejected:** On .NET 10 there is no difference across any variant. Even on .NET 8 there is no difference for a 1024-element summation loop (the effect reported in older generations was a tiny difference limited to extremely small loops). Using `array.Length` directly in the condition also gives the smallest code (34B vs 94–140B).
 
 ✅ **Do this instead:** Rewrite the loop condition to use `array.Length` / `span.Length` directly.
@@ -309,6 +317,8 @@ The same article's "`(uint)` cast" and "touch the last element first" shapes wer
 ### R-18: Hand-written unsigned-overflow range checks
 
 🎯 **Intent:** rewrite `min <= value && value <= max` as the single comparison `(uint)(value - min) <= (uint)(max - min)` to cut a branch.
+
+🔭 **Re-verified on net11 (net11 / net10, x86-64-v4):** one condition is added. When the lower bound is not 0 (`i > 0 && i < length` in order to read `span[i - 1]`), the JIT does not fuse the two comparisons, and the hand-written `(uint)i < (uint)length && i != 0` is faster on both generations (0.86x / 0.76x, non-overlapping CIs). What helps is the branch count, not a bounds check: on net10 only the uint form keeps a check on `span[i - 1]`, and on net11 it disappears so both forms are 85 B. **For a range check whose lower bound is 0, writing it by hand is still pointless** - this entry's conclusion stands. → [Results](../benchmarks/results/NET11-Revalidation.md#a5-unsignedguardoffsetbenchmark)
 
 📉 **Measured — why it is rejected:** 548.5 vs 553.7 ns with overlapping CIs. **Comparing the Tier1 codegen shows the two forms are effectively identical** — the only difference is the encoding (`sub r8d,100` vs `add r8d,-100`), 45 bytes either way. The net10 JIT already fuses the two-comparison form into a single unsigned comparison, so rewriting it by hand buys nothing.
 

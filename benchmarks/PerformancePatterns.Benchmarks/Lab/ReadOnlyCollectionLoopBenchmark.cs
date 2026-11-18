@@ -13,18 +13,17 @@ using BenchmarkDotNet.Jobs;
 [MediumRunJob(RuntimeMoniker.Net11_0)]
 public class ReadOnlyCollectionLoopBenchmark
 {
+    private static readonly ReadOnlyCollection<int> SharedCollection = new(CreateValues());
+
     private ReadOnlyCollection<int> collection = default!;
+
+    private int[] values = default!;
 
     [GlobalSetup]
     public void Setup()
     {
-        var array = new int[1024];
-        for (var i = 0; i < array.Length; i++)
-        {
-            array[i] = i;
-        }
-
-        collection = new ReadOnlyCollection<int>(array);
+        values = CreateValues();
+        collection = new ReadOnlyCollection<int>(values);
     }
 
     [Benchmark(Baseline = true)]
@@ -50,5 +49,40 @@ public class ReadOnlyCollectionLoopBenchmark
         }
 
         return total;
+    }
+
+    [Benchmark]
+    public long ForeachStaticReadOnly()
+    {
+        var total = 0L;
+        foreach (var value in SharedCollection)
+        {
+            total += value;
+        }
+
+        return total;
+    }
+
+    [Benchmark]
+    public long ForeachLocalWrapper()
+    {
+        var total = 0L;
+        foreach (var value in new ReadOnlyCollection<int>(values))
+        {
+            total += value;
+        }
+
+        return total;
+    }
+
+    private static int[] CreateValues()
+    {
+        var array = new int[1024];
+        for (var i = 0; i < array.Length; i++)
+        {
+            array[i] = i;
+        }
+
+        return array;
     }
 }

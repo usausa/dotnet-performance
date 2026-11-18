@@ -1,5 +1,39 @@
 # R-04: foreach vs for (loop form selection)
 
+## net11 / net10 re-verification (2026-11-18, HX 370)
+
+- Verdict: on net11 a `for` terminated by `i != length` is bounds-check free and runs like the `<` form; on net10 it
+  keeps a bounds check inside the loop
+- `DOTNET_JitDisasm` (FullOpts): `ArrayLocalForNotEqual` 63 B + RNGCHKFAIL and `SpanForNotEqual` 69 B + RNGCHKFAIL on
+  net10; 33 B and 54 B without a check on net11 (`<`: 32 B and 54 B)
+- Not instruction-identical to `<` (the array form is 17 against 18 instructions, the span form differs in register
+  set-up), so the forms are equivalent rather than identical
+- Times on net11 (BDN, net11 job only): 214.6 / 214.8 ns for `!=` against 220.8 / 215.5 ns for `<`. A 3% single-process
+  gap is not attributed to the form (pitfall 10)
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.35 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+Job=MediumRun-.NET 11.0  Runtime=.NET 11.0  IterationCount=15  
+LaunchCount=2  WarmupCount=10  
+
+```
+| Method                | Mean     | Error   | StdDev  | Min      | Max      | P90      | Code Size | Allocated |
+|---------------------- |---------:|--------:|--------:|---------:|---------:|---------:|----------:|----------:|
+| ArrayLocalFor         | 220.8 ns | 1.03 ns | 1.55 ns | 219.1 ns | 225.2 ns | 223.3 ns |      32 B |         - |
+| SpanForeach           | 216.1 ns | 1.19 ns | 1.62 ns | 214.6 ns | 220.3 ns | 218.8 ns |      54 B |         - |
+| SpanFor               | 215.5 ns | 0.50 ns | 0.75 ns | 214.3 ns | 217.4 ns | 216.4 ns |      54 B |         - |
+| ArrayLocalForNotEqual | 214.6 ns | 0.65 ns | 0.91 ns | 213.1 ns | 216.6 ns | 215.9 ns |      33 B |         - |
+| SpanForNotEqual       | 214.8 ns | 0.85 ns | 1.20 ns | 213.2 ns | 217.5 ns | 216.7 ns |      54 B |         - |
+
+## Earlier record
+
 - Verdict: no difference for array / Span / ReadOnlySpan (instruction sequences identical, and the times match
   to within 0.2 ns); two real exceptions
 - **Exception 1: a `for` whose loop condition reads a field (`this.values.Length`) is 1.13x slower** and 67 B vs 32 B.

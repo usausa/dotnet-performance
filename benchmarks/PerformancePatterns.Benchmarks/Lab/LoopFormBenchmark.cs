@@ -124,6 +124,32 @@ public class LoopFormSpanBenchmark
 
         return total;
     }
+
+    [Benchmark]
+    public long ArrayLocalForNotEqual()
+    {
+        var total = 0L;
+        var local = values;
+        for (var i = 0; i != local.Length; i++)
+        {
+            total += local[i];
+        }
+
+        return total;
+    }
+
+    [Benchmark]
+    public long SpanForNotEqual()
+    {
+        var total = 0L;
+        var span = values.AsSpan();
+        for (var i = 0; i != span.Length; i++)
+        {
+            total += span[i];
+        }
+
+        return total;
+    }
 }
 
 //--------------------------------------------------------------------------------

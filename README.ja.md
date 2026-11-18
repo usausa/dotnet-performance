@@ -496,6 +496,8 @@ foreach (var line in text.SplitLines())
 
 **リポジトリ内実装:** [BatchExtensions.cs](src/PerformancePatterns/Seq/BatchExtensions.cs)(SEQ-03 のチャンク分割を struct enumerator で実装した実例) / [テスト](tests/PerformancePatterns.Tests/Seq/BatchTest.cs) / [測定結果](benchmarks/results/SEQ-03-Batch.md)
 
+**net11 での再検証(net11 / net10、x86-64-v4):** 単相の `IEnumerable<int>` フィールドは両世代とも 0 B・配列の 1.05〜1.06 倍、型が交互に入れ替わる形は両世代とも 10.3 倍・36 B で、**net11 でも変わらない**。`ReadOnlyCollection<T>` の foreach も net11 で 32 B 残る(R-04)ので、本パターンの適用範囲はそのまま。→ [測定結果](benchmarks/results/LAB-EnumerableEscape.md)
+
 **実測結果(net10 / x86-64-v4、SEQ-03 の測定より):** struct enumerator ベースの foreach は `Enumerable.Chunk`(IEnumerator 経由)に対し 0.63〜0.74 倍・割り当てゼロ・コードサイズ 1/12〜1/16。
 
 **注意:** struct enumerator を `IEnumerable<T>` として公開するとボックス化されて効果が消える。struct を直接返す `GetEnumerator()` を公開し、`IEnumerable<T>` 実装が必要な場合は明示的実装で分離する。
@@ -584,6 +586,8 @@ public static IEnumerable<IReadOnlyList<T>> Batch<T>(this IEnumerable<T> source,
 ### 🥞 STK-05: ボックス化回避と頻出値キャッシュ
 
 **目的:** object 境界を通る際のボックス化アロケーションを避ける、または固定化する。
+
+**net11 での変化(net11 / net10、x86-64-v4):** 2 種類の暗黙のボックス化を JIT が消すようになった。`Nullable<T>` をインターフェース判定や `(object?)` キャストで箱に入れる形は **5.9 ns・24 B → 0.92 ns・0 B**(箱がメソッドの外へ出ない場合)、ジェネリック文脈(`T : struct, Enum`)の `x.Equals(y)` は **5.42 ns・48 B → 0.80 ns・0 B** で、`EqualityComparer<T>.Default` や `Unsafe.As` による回避策と同じになる。`net10.0` を含む多ターゲットでは回避策が引き続き要る。→ [測定結果](benchmarks/results/NET11-Revalidation.md#b2-nullableboxingbenchmark)
 
 **効果(実測例):**
 
@@ -1361,6 +1365,8 @@ public ref struct SpanTokenizer<T> where T : IEquatable<T>
 
 **ユースケース:** コレクション、サーチ、スプリッタなどの汎用アルゴリズム実装。
 
+**net11 での再検証(net11 / net10、x86-64-v4):** sealed なクラスのキーでは、`IEquatable<T>` 制約付きの `x.Equals(y)` と `EqualityComparer<T>.Default.Equals(x, y)` は **net10 の時点で既に同じ**(0.81 vs 0.80 ns、コード 30 vs 28 B)。毎回作るインスタンスは net10 では両方とも 24 B、net11 では両方とも 0 B になる。Native AOT でも同じで(1.81 vs 1.81 ns。毎回作るインスタンスは AOT では両方とも 24 B のまま)、**sealed なクラスのキーでは JIT・AOT とも制約の利点はない**。一方、struct 比較子を渡す `Span.Sort` は net10 では箱とインターフェース呼び出しになっていた(4,014 ns・88 B)のが、net11 で **603 ns・0 B** になり、ジェネリック制約で渡す指針がここで初めて効く(R-06)。→ [測定結果](benchmarks/results/NET11-Revalidation.md#b3-comparerdevirtbenchmark)
+
 **実測結果(TYP-02 の測定より):** 16 バイト構造体キーの辞書ルックアップで、`IEquatable<T>` 実装 struct の既定比較子は **3.7 ns / 割り当てゼロ**(未実装 struct は 15.8 ns + 96 B/回のボックス化 = 4.3 倍)。制約による脱仮想化・ボックス化回避の効果そのもの → [TYP-02-BitwiseComparer.md](benchmarks/results/TYP-02-BitwiseComparer.md)
 
 ---
@@ -1551,6 +1557,8 @@ public static object? Convert<TConverter, TDb, TClr>(TClr value)
 ```csharp
 public sealed class BinaryFormatter : IFormatter { ... }
 ```
+
+**net11 での変化(net11 / net10、x86-64-v4):** インターフェース上のジェネリック仮想メソッド(`T Echo<T>(T)`)が devirt とインライン化の対象になり、**3.34 ns・コード 272 B → 0.80 ns・4 B**(メソッド内で作ったインスタンスは 24 B → 0 B)と非ジェネリックの呼び出しに並んだ。「ジェネリック仮想メソッドをホットパスで避ける」慣習は net11 の JIT では要らない。また、参照型配列への格納の共変性チェックは、**要素型が sealed の配列とメソッド内で作った配列では両世代とも出ず**、`object[]` と sealed でない要素型の配列では net11 でも残る(ヘルパー自体は 0.72〜0.80 倍に速くなった)。→ [測定結果](benchmarks/results/NET11-Revalidation.md#c1-genericvirtualdevirtbenchmark)
 
 **実測結果(net10 / x86-64-v4、単一実装のインターフェース経由呼び出し × 1024):**
 
@@ -2277,6 +2285,8 @@ var index = hash & mask;
 
 **目的:** ビットマップの走査・ビット数計測を素朴なループからハードウェア命令(`TrailingZeroCount` / `PopCount` / `Log2` 等)へ置き換える。
 
+**net11 での変化(net11 / net10、x86-64-v4):** `LeadingZeroCount` / `PopCount` の結果をそのまま添字にした表引きは、境界チェックが消える(75 → 58 B、0.91 倍)。`Log2` は net10 から既にチェックなし。ビット演算から得た添字のために unsafe へ開く必要はない。→ [測定結果](benchmarks/results/NET11-Revalidation.md#a4-bitderivedindexbenchmark)
+
 **効果(実測、net10 / x86-64-v4、7 ビット立った疎な ulong × 64 個):**
 
 - 立ちビット走査: 全 64 ビットループ 1,056ns → TZCNT 方式 **141ns(0.13、7.5 倍)**
@@ -2402,6 +2412,8 @@ else
 
 **目的:** 集計・変換・検索のデータ並列処理をハードウェア SIMD 命令で一括実行する。
 
+**net11 での変化(net11 / net10、x86-64-v4):** `data = data[16..]` のように Slice で前に進めるチャンクループは、境界チェックと例外ヘルパーが消える(ベクタ版 119 → 98 B)。index 算術の形はむしろ net11 でチェックが 1 本戻る(157 → 170 B、時間は同じ)ので、**Slice 形のままでよい**。また、2 つの `double` を持つドメイン型を `Unsafe.BitCast` で `Vector128<double>` に載せて演算する形は、net10 ではスタックへの退避が入ってフィールドごとの演算の 7.6 倍遅い(4,447 ns)が、net11 では退避が消えて **562 ns(0.96 倍)** になる。**ドメイン型を BitCast で SIMD 演算してよいのは net11 から**。→ [測定結果](benchmarks/results/NET11-Revalidation.md#a3-sliceadvanceloopbenchmark)
+
 **効果(実測、net10 / x86-64-v4(AVX-512)、int[4096] の合計):**
 
 | 実装 | 比率 |
@@ -2483,6 +2495,8 @@ public static void ReverseEndianness(ReadOnlySpan<uint> source, Span<uint> desti
 ```
 
 **ユースケース:** エンディアン変換、ニブル展開(Hex / Base 系エンコード)、バイト単位のテーブル引き、固定パターンの並べ替え。
+
+**net11 での変化(net11 / x86-64-v4):** 追加された portable なレーン操作 API のうち、`Vector128.ZipLower` / `ZipUpper` は `Sse2.UnpackLow` / `UnpackHigh` と**命令列が完全に一致**し、時間も同じ(21.7 vs 21.9 ns)。インターリーブはプラットフォーム固有 API から portable へ置き換えてよい。`Vector128.Reverse` を 2 回重ねたエンディアン反転は `Shuffle` と別のコード(101 vs 109 B)だが、時間は区別できない(➖誤差)。→ [測定結果](benchmarks/results/NET11-Revalidation.md#e4-vectorlaneapibenchmark)
 
 **実測結果(net10 / x86-64-v4、`uint` × 1,021 のエンディアン反転):**
 
@@ -2578,6 +2592,8 @@ public static void Write<T>(this Stream stream, in T value) where T : unmanaged
 ```
 
 **ユースケース:** バイナリファイルフォーマット、固定長レコード I/O、独自プロトコル。
+
+**net11 での変化(net11 / net10、x86-64-v4):** 長さを確かめた後の `BinaryPrimitives.ReadUInt32LittleEndian(span[^4..])` のような末尾の固定幅読みは、net10 の 68 B・例外ヘルパー 2 本から **23 B・チェックなし**になり、ref で読む形(21 B)と並ぶ。Slice 形のままでよく、index 算術や ref に開く必要はない。→ [測定結果](benchmarks/results/NET11-Revalidation.md#a3-slicetailreadbenchmark)
 
 **実測結果(net10 / x86-64-v4、16 バイト × 1024 レコード):**
 
@@ -2827,6 +2843,8 @@ for (var i = 0; i < span.Length; i++)
 
 - 検索は `Dictionary` 比 2〜4 倍高速(1024 件)。ただし**構築は 15〜20 倍遅く**割り当ても大きい — 起動時に一度だけ構築して読み続ける用途限定
 - キー集合によっては検索も逆転する(実測例: enum 名 64 件で Dictionary より 1.15〜1.31 倍遅い)。採用前に実データで計測する
+
+**net11 での再検証(net11 / net10、x86-64-v4):** 構築は net11 でも安くならない。`Dictionary` に対する構築比は net10 の 9.4 / 7.6 / 5.4 倍に対して net11 は 10.7 / 8.3 / 5.5 倍(16 / 256 / 1024 件)で、確保は同じバイト数。件数の分かる配列から作る形では net11 の事前サイズ確保(#128300)は効かず、採用条件は変わらない。→ [測定結果](benchmarks/results/COL-02-FrozenCondition.md)
 
 **実測結果(net10 / x86-64-v4、string キー、非インターンのプローブ):**
 
@@ -3151,6 +3169,8 @@ private static ReadOnlySpan<byte> HexTable => "0123456789ABCDEF"u8;
 
 **リポジトリ内実装:** [Utf8DateTimeFormatter.cs](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) / [テスト](tests/PerformancePatterns.Tests/Txt/Utf8DateTimeFormatterTest.cs) / [ベンチマーク](benchmarks/PerformancePatterns.Benchmarks/Txt/Utf8DateTimeFormatterBenchmark.cs) / [測定結果](benchmarks/results/TXT-01-Utf8DateTimeFormatter.md)
 
+**net11 での変化(net11 / net10、x86-64-v4):** Base64 型の `((a & 0x3) << 4) | (b >> 4)` のようにビット演算で作った添字は、表の長さ(64)未満と証明されて境界チェックが消える(97 → 80 B、0.88 倍)。表引きのために unsafe へ開く必要はない(BIT-03 と同じ)。→ [測定結果](benchmarks/results/NET11-Revalidation.md#a4-bitderivedindexbenchmark)
+
 **実測結果(net10 / x86-64-v4、yyyyMMddHHmmss):** `ToString` + `Encoding.GetBytes` 比で 0.41 倍(約 2.5 倍高速)・56B → 0B、コードサイズ約 10KB → 0.9KB。`DateTime.TryFormat` + エンコードは `ToString` 比 0.90 倍と小幅な改善で、テーブル方式はそのさらに約 2.2 倍速い。
 
 ---
@@ -3370,6 +3390,8 @@ var index = span.IndexOfAny(Delimiters);
 
 **ユースケース:** トークナイザの区切り検出、エスケープが必要な文字の検出、検証(許可文字集合の判定)。
 
+**net11 での変化(net11 / x86-64-v4):** 空白の探索は `IndexOfAnyWhiteSpace` / `IndexOfAnyExceptWhiteSpace` などの BCL API で書く。`char.IsWhiteSpace` の全文字から作った自前の `SearchValues` と同じコードになる(19.0 vs 19.0 ns、725 B)ので、自前の集合を持つ理由はない。ただし先頭のトリムのように**最初の 1 文字でほぼ決まる入力**では、`char.IsWhiteSpace` のスカラーループの方が 2.3 倍速い(20.2 vs 46.7 ns)。→ [測定結果](benchmarks/results/NET11-Revalidation.md#e1-whitespacesearchbenchmark)
+
 **実測結果(net10 / x86-64-v4、256 文字走査、`IndexOfAny(char[])` 比):**
 
 | 候補数 | 配列オーバーロード | SearchValues | 比率 |
@@ -3568,6 +3590,8 @@ public static string Convert(object value) => value switch
 
 **目的:** 内側の Task / ValueTask を加工せず返すだけのメソッドでは `async`/`await` を書かず、そのまま返す(async 消去)。
 
+**net11 での変化(net11、runtime-async):** 既定のコンパイル(runtime-async off)では変わらない。`<Features>runtime-async=on</Features>` にすると await ラッパーの確保が消え(**6.77 ns・73 B → 2.49 ns・0 B**)、async 消去の利得は時間だけになる(直接返しとの比は 0.15 倍のまま)。本パターンの確保の根拠は「フラグ off、または net10 向け」に限られる(net10 はこのフラグでビルドできない)。→ [測定結果](benchmarks/results/ASY-01-AsyncElision.md)
+
 **効果(実測、net10 / x86-64-v4、同期完了パス):**
 
 - Task 直接返し: **0.16 倍(6.4 倍高速)+ 73B → 0B** — async ラッパーはキャッシュ済みの完了 Task ですら毎回新しい Task に再ラップして確保する
@@ -3693,6 +3717,8 @@ public ValueTask<Entry> GetAsync(string key, CancellationToken cancel)
 - **`AsTask()` は確保に戻る。** 成功して完了済みの `ValueTask<T>` でも `Task.FromResult` で新しい `Task<T>` を作る(int で 72 B。`bool` と -1〜8 の `int` などランタイムがキャッシュを持つ値は 0 B)。`Forget` のような受け取り側では、先に `IsCompletedSuccessfully` を見て結果だけ取り出す(参考実測(Zen 3 機)で **6.6〜16.8 ns・72 B → 0.8〜1.3 ns・0 B**)。`IValueTaskSource` 由来の `ValueTask` は、プールへ返すために結果の取り出しが必要なので省略しない
 - 戻り値として使う型であり、フィールドに保持して使い回すものではない
 - `IValueTaskSource` の自前実装は状態管理が難しい(`ManualResetValueTaskSourceCore<T>` を土台にする)。**明確なボトルネックが実測されてから**着手する
+
+**net11 での変化(net11、runtime-async):** runtime-async を有効にすると、同期完了経路の `Task` も確保しなくなり(`async` メソッドで 73 B → 0 B)、`Task` と `ValueTask` の確保差は消える(0.815 vs 0.815 ns)。「同期完了時の確保回避」という `ValueTask` を選ぶ動機は、フラグ off の既定と net10 にだけ残る。→ [測定結果](benchmarks/results/ASY-05-ValueTask.md)
 
 **実測結果(net10 / x86-64-v4、同期完了 1 回あたり):**
 
@@ -3847,6 +3873,8 @@ public static void EnsureInitialized()
 ```
 
 **ユースケース:** Dispose ガード、グローバル初期化、フラグの CAS 制御。
+
+**net11 での変化(記事の記述に依拠。x64 では計測できない):** ロック・`Interlocked`・一度きりの初期化で既に保護されているフィールドの `volatile` は冗長で、.NET 11 では BCL 全体から外された(#125274)。x64 では命令に現れないが Arm ではフェンスになるので、`Interlocked` で読み書きするガード用のフィールドに `volatile` を足さない。
 
 **注意:**
 
@@ -4219,6 +4247,30 @@ var instance = Invoker.Invoke(boxedValue);
 | 末尾要素の事前タッチによる境界チェック誘導 | ヒントなしで同一(全バリアント差なし) | net10 / net8 実測(当時) | [R-15](docs/rejected-patterns.md) |
 
 **読み方:** ここに載っている形は「書いても壊れない」が、**書く理由がもうない**。手書きが依然必要な境界(複合条件の範囲チェック、実行時サイズのマスク、複数 Span の同時走査、エスケープするボックス等)は各パターン本文・不採用記録の「代わりにやること」を参照。
+
+---
+
+## 🤖 net11 で手書き不要になった最適化(ランタイム自動化の記録)
+
+上の net10 の表と同じ基準で、**.NET 11 の JIT・BCL が自動で行うようになったもの**の一覧(2026-11 の再検証、HX 370)。`net10.0` を含む多ターゲットでは、net10 側に回避策が引き続き要る。
+
+| 手書きしていた形 | net11 が自動でやること | 確認方法 | 記録 |
+|---|---|---|---|
+| ジェネリック文脈(`T : Enum`)の `Equals` を `EqualityComparer<T>.Default` / `Unsafe.As` で回避 | 基底整数の直接比較へ畳む | 5.42 ns・48 B → 0.80 ns・0 B | [F2](benchmarks/results/NET11-Revalidation.md#f2-genericenumequalsbenchmark) |
+| `Nullable<T>` を箱に入れないための書き換え | 箱を展開してエスケープ解析でスタック化 | 24 → 0 B | [B2](benchmarks/results/NET11-Revalidation.md#b2-nullableboxingbenchmark) |
+| ホットパスのジェネリック仮想メソッドを非ジェネリックへ書き換え | devirt + インライン化 | 3.34 → 0.80 ns、コード 272 → 4 B | [C1](benchmarks/results/NET11-Revalidation.md#c1-genericvirtualdevirtbenchmark) |
+| ドメイン型の SIMD 演算をフィールドごとに書く | `Unsafe.BitCast` した struct をベクタ表現のまま保持 | 退避が消え 4,447 → 562 ns | [E5](benchmarks/results/NET11-Revalidation.md#e5-bitcaststructvectorbenchmark) |
+| `!=` 終端の for を `<` へ書き換え | `!=` 終端でも境界チェックを除去 | チェックあり 63 B → なし 33 B | [R-04](benchmarks/results/R-04-LoopForm.md) |
+| Slice の末尾読み・Slice で前進するループを index 算術 / ref に開く | Slice 後の固定幅読みと前進を追跡 | 68 → 23 B、130 → 85 B、チェックなし | [A3](benchmarks/results/NET11-Revalidation.md#a3-slicetailreadbenchmark) |
+| `LeadingZeroCount` / `PopCount` / ビット OR 由来の添字を unsafe で引く | 結果の値域を認識してチェックを除去 | 75 → 58 B、97 → 80 B | [A4](benchmarks/results/NET11-Revalidation.md#a4-bitderivedindexbenchmark) |
+| 範囲ガードの後で `checked` を外す | ガードからオーバーフローしないことを証明 | 分岐が消え、narrowing は命令列一致 | [A6](benchmarks/results/NET11-Revalidation.md#a6-checkedafterguardbenchmark) |
+| uint ガードの後の `span[i - 1]` を ref で読む | ガードが `i >= 0` も記録 | 104 → 85 B、チェックなし | [A5](benchmarks/results/NET11-Revalidation.md#a5-unsignedguardoffsetbenchmark) |
+| 空白探索用の自前 `SearchValues` | `IndexOfAnyWhiteSpace` 系 API が同じ探索器を使う | 19.0 vs 19.0 ns、同サイズのコード | [E1](benchmarks/results/NET11-Revalidation.md#e1-whitespacesearchbenchmark) |
+| `Sse2.UnpackLow` / `UnpackHigh` によるインターリーブ | portable な `Vector128.ZipLower` / `ZipUpper` | 命令列一致 | [E4](benchmarks/results/NET11-Revalidation.md#e4-vectorlaneapibenchmark) |
+| `Span.Sort` に struct 比較子を渡すのを避ける | struct 比較子を箱に入れず特殊化 | 4,014 ns・88 B → 603 ns・0 B | [E2](benchmarks/results/NET11-Revalidation.md#e2-spansortcomparerbenchmark) |
+| 確保を避けるための async 消去 / `ValueTask`(runtime-async を有効にした場合) | JIT が async を下位変換し、途中の Task を作らない | 73 → 0 B | [D1](benchmarks/results/ASY-01-AsyncElision.md) |
+
+**読み方:** net10 の表と同じく「書いても壊れない」が、net11 では書く理由がない。回避策を外せるのはターゲットから `net10.0` が外れた時点。runtime-async はオプトインで、既定のコンパイルでは ASY-01 / ASY-05 の根拠はそのまま残る。
 
 ---
 

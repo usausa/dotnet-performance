@@ -496,6 +496,8 @@ foreach (var line in text.SplitLines())
 
 **Implementation in this repo:** [BatchExtensions.cs](src/PerformancePatterns/Seq/BatchExtensions.cs) (SEQ-03 chunking implemented with a struct enumerator) / [Tests](tests/PerformancePatterns.Tests/Seq/BatchTest.cs) / [Results](benchmarks/results/SEQ-03-Batch.md)
 
+**Re-verified on net11 (net11 / net10, x86-64-v4):** a monomorphic `IEnumerable<int>` field is 0 B and 1.05-1.06x of the array on both generations, and alternating concrete types are 10.3x and 36 B on both, so **net11 changes nothing here**. `foreach` over `ReadOnlyCollection<T>` still allocates 32 B on net11 (R-04), so the scope of this pattern stays as it is. → [Results](benchmarks/results/LAB-EnumerableEscape.md)
+
 **Measured (net10 / x86-64-v4, from the SEQ-03 measurements):** foreach over a struct enumerator runs at 0.63-0.74x of `Enumerable.Chunk` (which goes through IEnumerator), with zero allocation and 1/12 to 1/16 the code size.
 
 **Caveats:** Exposing a struct enumerator as `IEnumerable<T>` boxes it and erases the benefit. Expose a `GetEnumerator()` that returns the struct directly, and if `IEnumerable<T>` support is required, separate it out with an explicit implementation.
@@ -584,6 +586,8 @@ public static IEnumerable<IReadOnlyList<T>> Batch<T>(this IEnumerable<T> source,
 ### 🥞 STK-05: Boxing avoidance and hot-value caching
 
 **Goal:** Avoid — or pin down — the boxing allocation incurred when crossing an object boundary.
+
+**Changed on net11 (net11 / net10, x86-64-v4):** the JIT now removes two kinds of implicit boxing. Boxing a `Nullable<T>` through an interface check or an `(object?)` cast went **5.9 ns / 24 B → 0.92 ns / 0 B** (when the box does not leave the method), and `x.Equals(y)` in a generic context (`T : struct, Enum`) went **5.42 ns / 48 B → 0.80 ns / 0 B**, the same as the `EqualityComparer<T>.Default` or `Unsafe.As` workarounds. A multi-target that includes `net10.0` still needs the workarounds. → [Results](benchmarks/results/NET11-Revalidation.md#b2-nullableboxingbenchmark)
 
 **Effect (measured):**
 
@@ -1361,6 +1365,8 @@ public ref struct SpanTokenizer<T> where T : IEquatable<T>
 
 **Use cases:** General-purpose algorithms such as collections, searches, and splitters.
 
+**Re-verified on net11 (net11 / net10, x86-64-v4):** for a sealed class key, `x.Equals(y)` under an `IEquatable<T>` constraint and `EqualityComparer<T>.Default.Equals(x, y)` were **already equal on net10** (0.81 vs 0.80 ns, 30 vs 28 B of code). An instance created per call is 24 B in both forms on net10 and 0 B in both on net11. Native AOT behaves the same (1.81 vs 1.81 ns; the per-call instance stays 24 B in both forms there), so **for a sealed class key the constraint has no advantage on either the JIT or AOT**. On the other hand, `Span.Sort` with a struct comparer boxed it and called through the interface on net10 (4,014 ns / 88 B) and goes **603 ns / 0 B** on net11, so passing it through a generic constraint pays off there for the first time (R-06). → [Results](benchmarks/results/NET11-Revalidation.md#b3-comparerdevirtbenchmark)
+
 **Measured (from the TYP-02 run):** For dictionary lookups on a 16-byte struct key, the default comparer over a struct that implements `IEquatable<T>` costs **3.7 ns / zero allocation** (a struct without it costs 15.8 ns + 96 B of boxing per lookup — 4.3x). That is precisely the payoff of constraint-driven devirtualization and boxing avoidance → [TYP-02-BitwiseComparer.md](benchmarks/results/TYP-02-BitwiseComparer.md)
 
 ---
@@ -1551,6 +1557,8 @@ public static object? Convert<TConverter, TDb, TClr>(TClr value)
 ```csharp
 public sealed class BinaryFormatter : IFormatter { ... }
 ```
+
+**Changed on net11 (net11 / net10, x86-64-v4):** a generic virtual method on an interface (`T Echo<T>(T)`) is now devirtualized and inlined, going **3.34 ns / 272 B of code → 0.80 ns / 4 B** (an instance created in the method goes 24 B → 0 B), level with a non-generic call. The habit of keeping generic virtual methods off hot paths is not needed on the net11 JIT. Separately, the covariance check on a store into a reference-type array **is absent on both generations for arrays of a sealed element type and for arrays allocated in the method**, and stays on net11 for `object[]` and arrays of a non-sealed element type (the helper itself got 0.72-0.80x faster). → [Results](benchmarks/results/NET11-Revalidation.md#c1-genericvirtualdevirtbenchmark)
 
 **Measured (net10 / x86-64-v4, calls through an interface with a single implementation x 1024):**
 
@@ -2277,6 +2285,8 @@ var index = hash & mask;
 
 **Goal:** Replace naive loops for bitmap scanning and bit counting with hardware instructions (`TrailingZeroCount` / `PopCount` / `Log2` etc.).
 
+**Changed on net11 (net11 / net10, x86-64-v4):** a table lookup indexed directly by the result of `LeadingZeroCount` / `PopCount` loses its bounds check (75 → 58 B, 0.91x). `Log2` was already check-free on net10. An index derived from bit operations no longer needs unsafe code. → [Results](benchmarks/results/NET11-Revalidation.md#a4-bitderivedindexbenchmark)
+
 **Effect (measured, net10 / x86-64-v4, 64 sparse ulongs with 7 bits set):**
 
 - Scanning set bits: full 64-bit loop 1,056ns → TZCNT approach **141ns (0.13, 7.5x)**
@@ -2402,6 +2412,8 @@ else
 
 **Goal:** Run data-parallel work — aggregation, transformation, search — in bulk with hardware SIMD instructions.
 
+**Changed on net11 (net11 / net10, x86-64-v4):** a chunk loop that advances with a Slice (`data = data[16..]`) loses its bounds check and throw helper (vector form 119 → 98 B). The index-arithmetic form gains a check back on net11 (157 → 170 B, same time), so **keep the Slice form**. Separately, a domain type of two `double` values reinterpreted as `Vector128<double>` with `Unsafe.BitCast` spills to the stack on net10 and runs 7.6x slower than fieldwise arithmetic (4,447 ns); net11 keeps it in a register at **562 ns (0.96x)**. **Doing SIMD arithmetic on domain types through BitCast is fine from net11 on.** → [Results](benchmarks/results/NET11-Revalidation.md#a3-sliceadvanceloopbenchmark)
+
 **Effect (measured, net10 / x86-64-v4 (AVX-512), sum of int[4096]):**
 
 | Implementation | Ratio |
@@ -2483,6 +2495,8 @@ public static void ReverseEndianness(ReadOnlySpan<uint> source, Span<uint> desti
 ```
 
 **Use cases:** Endianness conversion, nibble expansion (hex / Base-N encoders), byte-level table lookup, fixed permutation patterns.
+
+**Changed on net11 (net11 / x86-64-v4):** among the new portable lane APIs, `Vector128.ZipLower` / `ZipUpper` produce **exactly the instruction sequence** of `Sse2.UnpackLow` / `UnpackHigh` at the same time (21.7 vs 21.9 ns), so interleaving can move from the platform-specific API to the portable one. Endianness reversal written as two `Vector128.Reverse` calls is different code from `Shuffle` (101 vs 109 B) with indistinguishable time (➖ noise). → [Results](benchmarks/results/NET11-Revalidation.md#e4-vectorlaneapibenchmark)
 
 **Measured (net10 / x86-64-v4, endianness reversal of 1,021 `uint` values):**
 
@@ -2578,6 +2592,8 @@ public static void Write<T>(this Stream stream, in T value) where T : unmanaged
 ```
 
 **Use cases:** Binary file formats, fixed-length record I/O, custom protocols.
+
+**Changed on net11 (net11 / net10, x86-64-v4):** a fixed-width read of the tail after a length check, such as `BinaryPrimitives.ReadUInt32LittleEndian(span[^4..])`, goes from 68 B with two throw helpers on net10 to **23 B with no check**, level with reading through a ref (21 B). Keep the Slice form; there is no need to open it into index arithmetic or refs. → [Results](benchmarks/results/NET11-Revalidation.md#a3-slicetailreadbenchmark)
 
 **Measured (net10 / x86-64-v4, 16 bytes x 1024 records):**
 
@@ -2827,6 +2843,8 @@ for (var i = 0; i < span.Length; i++)
 
 - Lookups are 2-4x faster than `Dictionary` (1024 entries). But **construction is 15-20x slower** and allocates far more — only for tables built once at startup and read forever
 - For some key sets the lookup advantage reverses as well (measured: 1.15-1.31x slower than Dictionary for 64 enum names). Measure with real data before adopting
+
+**Re-verified on net11 (net11 / net10, x86-64-v4):** building is not cheaper on net11. The build ratio against `Dictionary` is 9.4 / 7.6 / 5.4x on net10 and 10.7 / 8.3 / 5.5x on net11 (16 / 256 / 1024 entries), with identical allocation. The net11 pre-sizing (#128300) does not apply to a source array whose count is known, so the adoption condition stays. → [Results](benchmarks/results/COL-02-FrozenCondition.md)
 
 **Measured (net10 / x86-64-v4, string keys, non-interned probes):**
 
@@ -3151,6 +3169,8 @@ To drop the `fixed` pinning on a static array while keeping the read width, use 
 
 **Implementation in this repo:** [Utf8DateTimeFormatter.cs](src/PerformancePatterns/Txt/Utf8DateTimeFormatter.cs) / [Tests](tests/PerformancePatterns.Tests/Txt/Utf8DateTimeFormatterTest.cs) / [Benchmark](benchmarks/PerformancePatterns.Benchmarks/Txt/Utf8DateTimeFormatterBenchmark.cs) / [Results](benchmarks/results/TXT-01-Utf8DateTimeFormatter.md)
 
+**Changed on net11 (net11 / net10, x86-64-v4):** an index built from bit operations, such as the Base64-style `((a & 0x3) << 4) | (b >> 4)`, is proven to be below the table length (64) and loses its bounds check (97 → 80 B, 0.88x). The lookup no longer needs unsafe code (as in BIT-03). → [Results](benchmarks/results/NET11-Revalidation.md#a4-bitderivedindexbenchmark)
+
 **Measured (net10 / x86-64-v4, yyyyMMddHHmmss):** 0.41x versus `ToString` + `Encoding.GetBytes` (about 2.5x faster), 56B → 0B, code size about 10KB → 0.9KB. `DateTime.TryFormat` + encoding is a modest 0.90x over `ToString`, and the table approach is still ~2.2x faster than it.
 
 ---
@@ -3370,6 +3390,8 @@ var index = span.IndexOfAny(Delimiters);
 
 **Use cases:** Delimiter detection in tokenizers, detecting characters that need escaping, validation (checking against an allowed character set).
 
+**Changed on net11 (net11 / x86-64-v4):** search for whitespace with the BCL APIs such as `IndexOfAnyWhiteSpace` / `IndexOfAnyExceptWhiteSpace`. They run the same code as a `SearchValues` built from every `char.IsWhiteSpace` character (19.0 vs 19.0 ns, 725 B), so there is no reason to keep your own set. For input **decided by the first character**, such as a leading trim, a scalar `char.IsWhiteSpace` loop is 2.3x faster (20.2 vs 46.7 ns). → [Results](benchmarks/results/NET11-Revalidation.md#e1-whitespacesearchbenchmark)
+
 **Measured (net10 / x86-64-v4, scanning 256 characters, versus `IndexOfAny(char[])`):**
 
 | Candidates | Array overload | SearchValues | Ratio |
@@ -3568,6 +3590,8 @@ public static string Convert(object value) => value switch
 
 **Goal:** In methods that just return an inner Task / ValueTask without touching it, drop `async`/`await` and return it directly (async elision).
 
+**Changed on net11 (net11, runtime-async):** nothing changes with the default compilation (runtime-async off). With `<Features>runtime-async=on</Features>` the await wrapper stops allocating (**6.77 ns / 73 B → 2.49 ns / 0 B**), so eliding it saves time only (still 0.15x against the direct return). The allocation argument of this pattern holds only with the flag off or for net10 (which cannot build with the flag). → [Results](benchmarks/results/ASY-01-AsyncElision.md)
+
 **Effect (measured, net10 / x86-64-v4, synchronously completing path):**
 
 - Returning the Task directly: **0.16x (6.4x faster) + 73B → 0B** — the async wrapper re-wraps even an already cached completed Task into a freshly allocated Task every call
@@ -3693,6 +3717,8 @@ public ValueTask<Entry> GetAsync(string key, CancellationToken cancel)
 - **`AsTask()` puts the allocation back.** Even for a `ValueTask<T>` that already completed successfully it builds a new `Task<T>` through `Task.FromResult` (72 B for an int; 0 B for the values the runtime caches, such as `bool` and `int` from -1 to 8). On the consuming side, such as a `Forget` helper, check `IsCompletedSuccessfully` first and just take the result (reference numbers, Zen 3 machine: **6.6-16.8 ns / 72 B → 0.8-1.3 ns / 0 B**). Do not skip taking the result for a `ValueTask` backed by an `IValueTaskSource` — that is what returns it to the pool
 - It is a return type, not something to stash in a field and reuse
 - Hand-writing `IValueTaskSource` is hard to get right (build on `ManualResetValueTaskSourceCore<T>`). Only start **after you have measured a clear bottleneck**
+
+**Changed on net11 (net11, runtime-async):** with runtime-async enabled, a `Task` on the synchronous completion path stops allocating as well (73 B → 0 B for an `async` method), and the allocation difference between `Task` and `ValueTask` disappears (0.815 vs 0.815 ns). Avoiding the allocation on synchronous completion remains a reason to choose `ValueTask` only with the flag off (the default) and on net10. → [Results](benchmarks/results/ASY-05-ValueTask.md)
 
 **Measured (net10 / x86-64-v4, per synchronous completion):**
 
@@ -3847,6 +3873,8 @@ public static void EnsureInitialized()
 ```
 
 **Use cases:** Dispose guards, global initialization, CAS-controlled flags.
+
+**Changed on net11 (based on the article; not measurable on x64):** `volatile` on a field already protected by a lock, `Interlocked` or one-time initialization is redundant, and .NET 11 removed it across the BCL (#125274). It shows up as no instruction on x64 but becomes a fence on Arm, so do not add `volatile` to a guard field that is read and written through `Interlocked`.
 
 **Caveats:**
 
@@ -4219,6 +4247,30 @@ A list of hand-written optimizations that were once effective (or were held to b
 | Touching the last element first to coax bounds-check elimination | Identical without the hint (no difference across any variant) | Measured on net10 / net8 (at the time) | [R-15](docs/rejected-patterns.md) |
 
 **How to read this:** The forms listed here still work if you write them, but **there is no longer a reason to**. For the boundaries where hand-writing is still required (range checks with compound conditions, masks over runtime sizes, walking multiple Spans at once, boxes that escape), see the "what to do instead" notes in each pattern and in the rejection records.
+
+---
+
+## 🤖 Optimizations no longer worth hand-writing on net11 (runtime automation)
+
+By the same standard as the net10 table above, the list of **what the .NET 11 JIT and BCL now do on their own** (re-verified 2026-11 on HX 370). A multi-target that includes `net10.0` still needs the workarounds for net10.
+
+| Hand-written form | What net11 does on its own | How confirmed | Record |
+|---|---|---|---|
+| Working around `Equals` in a generic context (`T : Enum`) with `EqualityComparer<T>.Default` / `Unsafe.As` | Folds it into a direct comparison of the underlying integer | 5.42 ns / 48 B → 0.80 ns / 0 B | [F2](benchmarks/results/NET11-Revalidation.md#f2-genericenumequalsbenchmark) |
+| Rewrites that keep a `Nullable<T>` out of a box | Expands the box and stack-allocates it by escape analysis | 24 → 0 B | [B2](benchmarks/results/NET11-Revalidation.md#b2-nullableboxingbenchmark) |
+| Rewriting a hot generic virtual method as a non-generic one | Devirtualization + inlining | 3.34 → 0.80 ns, code 272 → 4 B | [C1](benchmarks/results/NET11-Revalidation.md#c1-genericvirtualdevirtbenchmark) |
+| Writing SIMD arithmetic on a domain type field by field | Keeps a struct `Unsafe.BitCast` to a vector in vector form | Spills gone, 4,447 → 562 ns | [E5](benchmarks/results/NET11-Revalidation.md#e5-bitcaststructvectorbenchmark) |
+| Rewriting a `!=` terminated for into `<` | Removes the bounds check for `!=` termination too | 63 B with a check → 33 B without | [R-04](benchmarks/results/R-04-LoopForm.md) |
+| Opening a Slice tail read or a Slice-advance loop into index arithmetic / refs | Tracks fixed-width reads after a Slice and the advance | 68 → 23 B, 130 → 85 B, no checks | [A3](benchmarks/results/NET11-Revalidation.md#a3-slicetailreadbenchmark) |
+| Indexing with unsafe code by a `LeadingZeroCount` / `PopCount` / bit-OR result | Knows the value range and removes the check | 75 → 58 B, 97 → 80 B | [A4](benchmarks/results/NET11-Revalidation.md#a4-bitderivedindexbenchmark) |
+| Dropping `checked` after a range guard | Proves from the guard that it cannot overflow | Branch gone; the narrowing form is instruction-identical | [A6](benchmarks/results/NET11-Revalidation.md#a6-checkedafterguardbenchmark) |
+| Reading `span[i - 1]` through a ref after a uint guard | The guard also records `i >= 0` | 104 → 85 B, no check | [A5](benchmarks/results/NET11-Revalidation.md#a5-unsignedguardoffsetbenchmark) |
+| A hand-built `SearchValues` for whitespace | The `IndexOfAnyWhiteSpace` family uses the same searcher | 19.0 vs 19.0 ns, same code size | [E1](benchmarks/results/NET11-Revalidation.md#e1-whitespacesearchbenchmark) |
+| Interleaving with `Sse2.UnpackLow` / `UnpackHigh` | Portable `Vector128.ZipLower` / `ZipUpper` | Identical instructions | [E4](benchmarks/results/NET11-Revalidation.md#e4-vectorlaneapibenchmark) |
+| Avoiding a struct comparer with `Span.Sort` | Specializes on the struct comparer without boxing it | 4,014 ns / 88 B → 603 ns / 0 B | [E2](benchmarks/results/NET11-Revalidation.md#e2-spansortcomparerbenchmark) |
+| Eliding async / choosing `ValueTask` to avoid allocation (with runtime-async enabled) | The JIT lowers async and does not create the intermediate Task | 73 → 0 B | [D1](benchmarks/results/ASY-01-AsyncElision.md) |
+
+**How to read this:** as with the net10 table, writing these forms breaks nothing, but on net11 there is no reason to write them. The workarounds can go once `net10.0` leaves the target list. runtime-async is opt-in; with the default compilation the case for ASY-01 / ASY-05 stands.
 
 ---
 

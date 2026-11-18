@@ -90,6 +90,25 @@ public static class Program
         ReflectionAccessorBenchmark.Verify();
         ScopeBoxingBenchmark.Verify();
         NegativeCacheBenchmark.Verify();
+        SampledHashIndexBenchmark.Verify();
+        SliceTailReadBenchmark.Verify();
+        SliceAdvanceLoopBenchmark.Verify();
+        BitDerivedIndexBenchmark.Verify();
+        UnsignedGuardOffsetBenchmark.Verify();
+        CheckedAfterGuardBenchmark.Verify();
+        FixedLengthParseBenchmark.Verify();
+        NullableBoxingBenchmark.Verify();
+        GenericEnumEqualsBenchmark.Verify();
+        ComparerDevirtBenchmark.Verify();
+        GenericVirtualDevirtBenchmark.Verify();
+        ArrayCovarianceBenchmark.Verify();
+        BitCastStructVectorBenchmark.Verify();
+        SpanSortComparerBenchmark.Verify();
+#if NET11_0_OR_GREATER
+        WhiteSpaceSearchBenchmark.Verify();
+        GZipEncoderBenchmark.Verify();
+        VectorLaneApiBenchmark.Verify();
+#endif
 
         // Example: dotnet run -c Release --framework net11.0 -- --filter "*"
         BenchmarkSwitcher
@@ -230,6 +249,25 @@ public static class Program
                 typeof(ReflectionAccessorBenchmark),
                 typeof(ScopeBoxingBenchmark),
                 typeof(NegativeCacheBenchmark),
+                typeof(SampledHashIndexBenchmark),
+                typeof(SliceTailReadBenchmark),
+                typeof(SliceAdvanceLoopBenchmark),
+                typeof(BitDerivedIndexBenchmark),
+                typeof(UnsignedGuardOffsetBenchmark),
+                typeof(CheckedAfterGuardBenchmark),
+                typeof(FixedLengthParseBenchmark),
+                typeof(NullableBoxingBenchmark),
+                typeof(GenericEnumEqualsBenchmark),
+                typeof(ComparerDevirtBenchmark),
+                typeof(GenericVirtualDevirtBenchmark),
+                typeof(ArrayCovarianceBenchmark),
+                typeof(BitCastStructVectorBenchmark),
+                typeof(SpanSortComparerBenchmark),
+#if NET11_0_OR_GREATER
+                typeof(WhiteSpaceSearchBenchmark),
+                typeof(GZipEncoderBenchmark),
+                typeof(VectorLaneApiBenchmark),
+#endif
             ])
             .Run(args);
     }
@@ -634,7 +672,9 @@ public static class Program
             (loopSpan.SpanForeach() != expectedSpanTotal) ||
             (loopSpan.SpanFor() != expectedSpanTotal) ||
             (loopSpan.ReadOnlySpanForeach() != expectedSpanTotal) ||
-            (loopSpan.ReadOnlySpanFor() != expectedSpanTotal))
+            (loopSpan.ReadOnlySpanFor() != expectedSpanTotal) ||
+            (loopSpan.ArrayLocalForNotEqual() != expectedSpanTotal) ||
+            (loopSpan.SpanForNotEqual() != expectedSpanTotal))
         {
             throw new InvalidOperationException("Verify failed. LoopFormSpan");
         }
@@ -732,7 +772,9 @@ public static class Program
         var readOnlyCollection = new ReadOnlyCollectionLoopBenchmark();
         readOnlyCollection.Setup();
         if ((readOnlyCollection.Indexer() != sum1024) ||
-            (readOnlyCollection.Foreach() != sum1024))
+            (readOnlyCollection.Foreach() != sum1024) ||
+            (readOnlyCollection.ForeachStaticReadOnly() != sum1024) ||
+            (readOnlyCollection.ForeachLocalWrapper() != sum1024))
         {
             throw new InvalidOperationException("Verify failed. ReadOnlyCollectionLoop");
         }

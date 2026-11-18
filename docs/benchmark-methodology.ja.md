@@ -39,7 +39,7 @@ public class BenchmarkConfig : ManualConfig
 1. **`DisassemblyDiagnoser` は NativeAOT 非対応。** BDN が検証段階でジョブを拒否し、AOT 行はすべて `NA` になる。しかも終了コードは 0 なので成功したように見える。上記の基本構成は常に診断器を含むため、AOT 比較には診断器を外した別 config が必要(その結果 Code Size 列は使えない)
 2. **`vswhere.exe` を `PATH` に通す必要がある**(ILCompiler のリンク段階で使用。実体は `C:\Program Files (x86)\Microsoft Visual Studio\Installer`)。通っていないと `Microsoft.NETCore.Native.targets` 内でリンクが失敗し、やはり AOT 行が全部 `NA` になる
 
-そのため AOT 比較は独立ハーネス `benchmarks/PerformancePatterns.AotHarness` で行う。ハーネスはベンチマーク本体をコピーせず、AOT 比較の対象クラス(`Lab/ReflectionInvokeBenchmark.cs` / `StaticAbstractCallBenchmark.cs` / `TypeHashSourceBenchmark.cs` / `TypeKeyBenchmark.cs` / `TypeKeyDispatchBenchmark.cs` / `TypeKeyDispatchSweepBenchmark.cs`)を `<Compile Include>` でリンクし、`[Config(typeof(BenchmarkConfig))]` が束縛する `PerformancePatterns.Benchmarks.BenchmarkConfig` を診断器なしの版で差し替える(`RootNamespace` を本体側に合わせてあるのはそのため)。対象を増やすには csproj にリンクを 1 行足し、`Program.cs` に `Verify()` を足す。
+そのため AOT 比較は独立ハーネス `benchmarks/PerformancePatterns.AotHarness` で行う。ハーネスはベンチマーク本体をコピーせず、AOT 比較の対象クラス(`Lab/EscapeGenerationBenchmark.cs` / `ReflectionInvokeBenchmark.cs` / `StaticAbstractCallBenchmark.cs` / `TypeHashSourceBenchmark.cs` / `TypeKeyBenchmark.cs` / `TypeKeyDispatchBenchmark.cs` / `TypeKeyDispatchSweepBenchmark.cs`)を `<Compile Include>` でリンクし、`[Config(typeof(BenchmarkConfig))]` が束縛する `PerformancePatterns.Benchmarks.BenchmarkConfig` を診断器なしの版で差し替える(`RootNamespace` を本体側に合わせてあるのはそのため)。対象を増やすには csproj にリンクを 1 行足し、`Program.cs` に `Verify()` を足す。
 
 ```csharp
 // ハーネス側の BenchmarkConfig: 本体と同名・同名前空間で DisassemblyDiagnoser だけを外す。
@@ -242,6 +242,10 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | 7-9 `Vector128.Shuffle` vs `Ssse3.Shuffle` | x86-64-v3 で 121.53 vs 64.35 ns、**信頼区間非重複**。x86-64-v4 では同じ比較が 62.51 vs 61.06(run 1)、64.69 vs 62.21 ns(run 2、**信頼区間重複**) | **命令列完全一致**(59 命令 / 190 B、両機とも) | ⚠️ **配置由来と確定**。API 差ではない。別機で 1.76 倍が 1〜4% に収縮したので、異常値は 121.53 ns の方(落とし穴 10 を参照) |
 | STK-11 インライン化される同期 `using`(箱 vs 構造体) | 0.808 vs 0.803 ns、信頼区間重複、どちらも 0 B | **命令列一致**(19 B、分岐先アドレスのみ違う) | ❌ **差なし**(Tier1 のエスケープ解析が箱を消す)。箱が残る形(非インライン・async)では実差 |
 | TYP-08 `GetConstructor` の署名配列の使い回し | 36.21 vs 36.44 ns、信頼区間重複 | コードサイズ 17,797 vs 17,773 B で別物 | ➖ **誤差**(時間軸)。確保は 128 → 96 B に減る。残る 96 B は `GetConstructor` 自身の確保で、効くのは結果のキャッシュ(2.99 ns・0 B) |
+| A6 範囲ガード後の `checked((byte)value)` vs `unchecked` | 296.6 vs 303.6 ns、信頼区間重複(net11) | net11 で**命令列一致**(23 命令・59 B)。net10 は `checked` 側にオーバーフロー分岐(67 vs 60 B) | ❌ **差なし**(net11)。ガード後の `checked` は負担ゼロ |
+| B3 `IEquatable<T>` 制約 vs `EqualityComparer<T>.Default`(sealed クラスのキー) | 0.81 vs 0.80 ns、信頼区間重複(両世代) | コードサイズ 30 vs 28 B で別物 | ➖ **誤差**。制約の利点は JIT でも NativeAOT でも見えない(AOT は 1.81 vs 1.81 ns) |
+| E4 `Vector128.Reverse` 2 回 vs `Vector128.Shuffle` のエンディアン反転 | 59.04 vs 58.60 ns、信頼区間重複 | コードサイズ 101 vs 109 B で別物 | ➖ **誤差**。`ZipLower` / `ZipUpper` は `Sse2.UnpackLow` / `UnpackHigh` と命令列一致(差なし) |
+| G2 固定長解析の `span = span[..8]` の有無 | 128.2 vs 128.9 ns、信頼区間重複(両世代) | **命令列一致**(43 命令、両世代) | ❌ **差なし**。長さガードだけで定数添字のチェックは全て消える |
 
 | 批次 | 候補 | 概要 / 検証の問い | 関連 | 状態 |
 |:---:|---|---|---|:---:|
@@ -290,64 +294,64 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 
 出典: [Performance Improvements in .NET 11](https://devblogs.microsoft.com/dotnet/performance-improvements-in-net-11/)(.NET Blog、2026-09)。**「機能が速くなった」だけの項目は載せない。** 載せるのは「手書きの回避策が不要になる」「カタログの指針が変わりうる」ものだけで、LINQ の改善は対象外。各行は「net11 で何が変わったか → カタログのどこが影響を受けるか → 何で測るか → どの結果ならカタログを書き換えるか」。
 
-**共通の判定方針:** 時間ではなく**生成コード(RNGCHKFAIL の有無・コードサイズ)と確保バイト数**で判定する(R-04 で倍率がコア依存だった経緯のとおり)。既存ベンチマークは `RuntimeMoniker.Net11_0` の Job を足すだけで再実行できる。
+**共通の判定方針:** 時間ではなく**生成コード(RNGCHKFAIL の有無・コードサイズ)と確保バイト数**で判定する(R-04 で倍率がコア依存だった経緯のとおり)。既存ベンチマークは `RuntimeMoniker.Net11_0` の Job を足すだけで再実行できる。結果列は基準環境(HX 370)での net11 / net10 の再検証(2026-11-18)で、境界チェック・オーバーフロー・共変性チェックの有無は `DOTNET_JitDisasm` で確定させた。
 
 #### A. 境界チェック除去の拡張 — 手動 ref / unsafe の「例外」が縮む
 
-| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
-|---|---|---|---|---|
-| A1 | 定数添字の連続アクセスを 1 本のガードに畳む(#127439 / #124705)。`values[0]..values[15]` は最大添字の 1 回チェックに。Sum16 0.62 倍 | R-15(末尾の事前タッチ)、外部記事「消えるパターン集」#5 | `LAB-BoundsCheckHint` を net11 で再実行 | 手書きの事前タッチが**逆に遅い / コードが増える**なら R-15 を「不要」から「有害」へ格上げ |
-| A2 | 先読みガード `(uint)(i + n) < (uint)span.Length` が `span[i]..span[i+n]` を証明(#124242 / #125235) | R-02 の例外(2)「構成的に範囲保証されたサンプリングアクセス」= `SampledNameTable.CalculateHash` の手動 ref | `SampledNameTable` の索引形 vs 手動 ref を net11 で再測 | 索引形で RNGCHKFAIL が消えるなら**手動 ref を索引形へ戻し、R-02 の例外(2)を削除** |
-| A3 | `Slice(Length - n)` 後の固定幅読み(#127488、73 → 28 B)と、Slice 前進ループの追跡(#122040 / #127117) | SEQ-02(`BinaryPrimitives` の末尾読み)、VEC-01 のチャンクループ(`data = data.Slice(16)`) | 両形のコードサイズと RNGCHKFAIL | チェックが消えるなら「Slice 形でよい、index 算術に開く必要なし」を SEQ-02 / VEC-01 に追記 |
-| A4 | `BitOperations.LeadingZeroCount / TrailingZeroCount / PopCount` の結果範囲を認識(#128620、0.85 倍)、ビット OR の範囲合成(#122263) | BIT-03、TXT-01(テーブル索引)、R-09 | `table[BitOperations.Log2(v)]` と Base64 型 `(a << 4) \| (b >> 4)` 索引のコードサイズ | 消えるなら「ビット演算由来の添字は unsafe 不要」を BIT-03 / TXT-01 に追記 |
-| A5 | `(uint)i < (uint)span.Length` ガードが `i >= 0` も記録(#125056) | R-18(uint キャストの手書き) | `span[i - 1]` を含む形で uint ガードの有無を比較 | uint ガードが**時間で**効く形が見つかれば、R-18 の「意味がない」に条件を付ける |
-| A6 | ガード後の `checked(...)` のオーバーフロー分岐を除去(#124147 / #124184、64 → 44 B・52 → 24 B) | (未収載)ホットパスで `checked` を避ける慣習 | ガード付き `checked(length * 10)` / `checked((byte)value)` のコードサイズ | 消えるなら「範囲ガード後は `checked` を書いてよい」を新規注記(安全性側の改善) |
-| A7 | `!=` 終端ループのクローン(#129268 / #129303) | R-04(昇順 `<` を推奨) | `for (i = 0; i != n; i++)` を `LoopFormBenchmark` に追加 | `<` と同一命令列なら R-04 の推奨を「`<` または `!=`」へ緩和 |
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 | 結果(HX 370・2026-11-18) |
+|---|---|---|---|---|---|
+| A1 | 定数添字の連続アクセスを 1 本のガードに畳む(#127439 / #124705)。`values[0]..values[15]` は最大添字の 1 回チェックに。Sum16 0.62 倍 | R-15(末尾の事前タッチ)、外部記事「消えるパターン集」#5 | `LAB-BoundsCheckHint` を net11 で再実行 | 手書きの事前タッチが**逆に遅い / コードが増える**なら R-15 を「不要」から「有害」へ格上げ | ➖ 不変 — 事前タッチの形は両世代とも同じコード(78 B、チェック 1 本)で時間も同じ。R-15 は「不要」のまま → [LAB-BoundsCheckHint](../benchmarks/results/LAB-BoundsCheckHint.md) |
+| A2 | 先読みガード `(uint)(i + n) < (uint)span.Length` が `span[i]..span[i+n]` を証明(#124242 / #125235) | R-02 の例外(2)「構成的に範囲保証されたサンプリングアクセス」= `SampledNameTable.CalculateHash` の手動 ref | `SampledNameTable` の索引形 vs 手動 ref を net11 で再測 | 索引形で RNGCHKFAIL が消えるなら**手動 ref を索引形へ戻し、R-02 の例外(2)を削除** | ➖ 不変 — 索引形に境界チェックが 1 本残る(両世代 76 B、1.08 倍)。手動 ref と R-02 の記述はそのまま → [A2](../benchmarks/results/NET11-Revalidation.md#a2-sampledhashindexbenchmark) |
+| A3 | `Slice(Length - n)` 後の固定幅読み(#127488、73 → 28 B)と、Slice 前進ループの追跡(#122040 / #127117) | SEQ-02(`BinaryPrimitives` の末尾読み)、VEC-01 のチャンクループ(`data = data.Slice(16)`) | 両形のコードサイズと RNGCHKFAIL | チェックが消えるなら「Slice 形でよい、index 算術に開く必要なし」を SEQ-02 / VEC-01 に追記 | ✅ 変化 — 末尾読み 68 B・throw 2 本 → 23 B・なし、Slice 前進 130 → 85 B・なし。index 算術の形は net11 でチェックが 1 本戻る。SEQ-02 / VEC-01 に追記 → [A3](../benchmarks/results/NET11-Revalidation.md#a3-slicetailreadbenchmark) |
+| A4 | `BitOperations.LeadingZeroCount / TrailingZeroCount / PopCount` の結果範囲を認識(#128620、0.85 倍)、ビット OR の範囲合成(#122263) | BIT-03、TXT-01(テーブル索引)、R-09 | `table[BitOperations.Log2(v)]` と Base64 型 `(a << 4) \| (b >> 4)` 索引のコードサイズ | 消えるなら「ビット演算由来の添字は unsafe 不要」を BIT-03 / TXT-01 に追記 | ✅ 変化 — `LeadingZeroCount` / `PopCount` / OR 合成の添字のチェックが消える(75 → 58 B、97 → 80 B)。`Log2` は net10 から既になし。BIT-03 / TXT-01 に追記 → [A4](../benchmarks/results/NET11-Revalidation.md#a4-bitderivedindexbenchmark) |
+| A5 | `(uint)i < (uint)span.Length` ガードが `i >= 0` も記録(#125056) | R-18(uint キャストの手書き) | `span[i - 1]` を含む形で uint ガードの有無を比較 | uint ガードが**時間で**効く形が見つかれば、R-18 の「意味がない」に条件を付ける | ⚠️ 条件付き — チェックは消える(104 → 85 B)。uint ガードは両世代で時間も速い(0.86 / 0.76 倍)が、効いているのは下限 `> 0` が融合されないこと。R-18 に条件を追記 → [A5](../benchmarks/results/NET11-Revalidation.md#a5-unsignedguardoffsetbenchmark) |
+| A6 | ガード後の `checked(...)` のオーバーフロー分岐を除去(#124147 / #124184、64 → 44 B・52 → 24 B) | (未収載)ホットパスで `checked` を避ける慣習 | ガード付き `checked(length * 10)` / `checked((byte)value)` のコードサイズ | 消えるなら「範囲ガード後は `checked` を書いてよい」を新規注記(安全性側の改善) | ✅ 変化 — オーバーフロー分岐が消え、narrowing は命令列一致。掛け算に残る 1.15 倍は `movsxd` 1 命令と配置。README の net11 自動化の表へ記録 → [A6](../benchmarks/results/NET11-Revalidation.md#a6-checkedafterguardbenchmark) |
+| A7 | `!=` 終端ループのクローン(#129268 / #129303) | R-04(昇順 `<` を推奨) | `for (i = 0; i != n; i++)` を `LoopFormBenchmark` に追加 | `<` と同一命令列なら R-04 の推奨を「`<` または `!=`」へ緩和 | ✅ 変化 — net10 はループ内にチェック(63 / 69 B)、net11 は消えて `<` と同等(33 / 54 B、命令列は完全一致ではない)。R-04 を「`<` または `!=`(net11)」へ緩和 → [R-04](../benchmarks/results/R-04-LoopForm.md) |
 
 #### B. エスケープ解析の拡張 — 確保回避の手書きが不要になる
 
-| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
-|---|---|---|---|---|
-| B1 | 委譲する `GetEnumerator()` 連鎖を条件付きエスケープ解析が認識(#122946)。`ReadOnlyInstance` 13.874 → 2.674 ns、32 → 0 B | **STK-03、R-04 のラッパー節(⏳❗ 本検証待ち)** | `ReadOnlyCollectionLoopBenchmark` / `EnumerableEscapeBenchmark` を net11 で再実行 | ラッパーの foreach が 0 B になれば R-04 の「ラッパーは添字」を net10 限定に格下げし、STK-03 の適用範囲をさらに狭める。net10 で「再現せず」だった原因が世代差だったと確定する |
-| B2 | `Nullable<T>` のボックス化を JIT が展開しエスケープ解析の対象に(#122167、0.21 倍・24 → 0 B) | STK-05(暗黙ボックス化リスト)、上表 ⑥ の ① | STK-05 の暗黙ボックス化ケースに `T?` 経由を追加して再測 | 消えるケースをリストから外し「net11 以降は不要」と世代注記 |
-| B3 | `EqualityComparer<T>.Default.Equals` の受け手を間接参照でなく直接ロード(#121918、0.46 倍・24 → 0 B) | JIT-02(`IEquatable<T>` 制約) | JIT-02 の比較を「制約あり」vs「`EqualityComparer<T>.Default` 直呼び」で再測 | 差が消えれば JIT-02 を「制約は AOT / 旧世代向け」に条件付け |
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 | 結果(HX 370・2026-11-18) |
+|---|---|---|---|---|---|
+| B1 | 委譲する `GetEnumerator()` 連鎖を条件付きエスケープ解析が認識(#122946)。`ReadOnlyInstance` 13.874 → 2.674 ns、32 → 0 B | **STK-03、R-04 のラッパー節** | `ReadOnlyCollectionLoopBenchmark` / `EnumerableEscapeBenchmark` を net11 で再実行 | ラッパーの foreach が 0 B になれば R-04 の「ラッパーは添字」を net10 限定に格下げし、STK-03 の適用範囲をさらに狭める。net10 で「再現せず」だった原因が世代差だったと確定する | ❌ 再現せず — `ReadOnlyCollection<T>` の foreach は net11 でも 32 B(フィールド・static readonly・メソッド内で作るラッパーの 3 形)。時間 1.32 → 1.15 倍。R-04 の「ラッパーは添字」は維持。`IEnumerable<T>` 側も両世代で同値 → [LAB-ReadOnlyCollectionLoop](../benchmarks/results/LAB-ReadOnlyCollectionLoop.md) |
+| B2 | `Nullable<T>` のボックス化を JIT が展開しエスケープ解析の対象に(#122167、0.21 倍・24 → 0 B) | STK-05(暗黙ボックス化リスト)、上表 ⑥ の ① | STK-05 の暗黙ボックス化ケースに `T?` 経由を追加して再測 | 消えるケースをリストから外し「net11 以降は不要」と世代注記 | ✅ 変化 — インターフェース判定・明示キャストとも 5.9 ns・24 B → 0.92 ns・0 B。外部実測(RC3)の「明示キャストは 24 B のまま」は、箱をメソッドの外へ出さないこの形では再現せず。STK-05 に世代注記 → [B2](../benchmarks/results/NET11-Revalidation.md#b2-nullableboxingbenchmark) |
+| B3 | `EqualityComparer<T>.Default.Equals` の受け手を間接参照でなく直接ロード(#121918、0.46 倍・24 → 0 B) | JIT-02(`IEquatable<T>` 制約) | JIT-02 の比較を「制約あり」vs「`EqualityComparer<T>.Default` 直呼び」で再測 | 差が消えれば JIT-02 を「制約は AOT / 旧世代向け」に条件付け | ⚠️ 条件付き — 制約付きと `Default` は net10 で既に同値(0.81 / 0.80 ns)。毎回作るインスタンスは両方とも 24 → 0 B。NativeAOT でも同値(1.81 / 1.81 ns、インスタンスは両方とも 24 B のまま)。JIT-02 を「sealed クラスのキーでは JIT・AOT とも制約の利点なし」に条件付け → [B3](../benchmarks/results/NET11-Revalidation.md#b3-comparerdevirtbenchmark) |
 
 #### C. devirt の拡張
 
-| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
-|---|---|---|---|---|
-| C1 | ジェネリック仮想メソッド(GVM)の devirt + インライン化(#122023 / #128702、0.25 倍・24 → 0 B) | (未収載)DSP-01 / JIT-02 の周辺 | インターフェース上の `T Get<T>()` 形を sealed 実装で呼ぶベンチを新設 | net11 で直接呼び出しになるなら「GVM をホットパスで避ける」という慣習は不要、と DSP-01 に注記 |
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 | 結果(HX 370・2026-11-18) |
+|---|---|---|---|---|---|
+| C1 | ジェネリック仮想メソッド(GVM)の devirt + インライン化(#122023 / #128702、0.25 倍・24 → 0 B) | (未収載)DSP-01 / JIT-02 の周辺 | インターフェース上の `T Get<T>()` 形を sealed 実装で呼ぶベンチを新設 | net11 で直接呼び出しになるなら「GVM をホットパスで避ける」という慣習は不要、と DSP-01 に注記 | ✅ 変化 — 3.34 ns・272 B → 0.80 ns・4 B、メソッド内のインスタンスは 24 → 0 B。DSP-01 に注記 → [C1](../benchmarks/results/NET11-Revalidation.md#c1-genericvirtualdevirtbenchmark) |
 
 #### D. runtime-async(オプトイン)
 
-| # | .NET 11 の変更 | 影響する記述 | 測るもの | 書き換え条件 |
-|---|---|---|---|---|
-| D1 | `<Features>runtime-async=on</Features>` で async の下位変換を C# コンパイラでなく JIT が担当。2 層チェーン 21.2 → 6.2 ns・144 → 0 B、10 層の例外伝播 0.30 倍、バイナリ 0.52 倍 | ASY-01(async 消去)、ASY-05(ValueTask)、ASY-04 | 既存の ASY-01 / ASY-05 ベンチをフラグ on / off の 2 Job で再測 | on で `return await` の確保が消えるなら ASY-01 を「フラグ off または net10 以前向け」に条件付け。`ValueTask` を選ぶ動機(同期完了時の確保回避)も再判定 |
+| # | .NET 11 の変更 | 影響する記述 | 測るもの | 書き換え条件 | 結果(HX 370・2026-11-18) |
+|---|---|---|---|---|---|
+| D1 | `<Features>runtime-async=on</Features>` で async の下位変換を C# コンパイラでなく JIT が担当。2 層チェーン 21.2 → 6.2 ns・144 → 0 B、10 層の例外伝播 0.30 倍、バイナリ 0.52 倍 | ASY-01(async 消去)、ASY-05(ValueTask)、ASY-04 | 既存の ASY-01 / ASY-05 ベンチをフラグ on / off の 2 Job で再測 | on で `return await` の確保が消えるなら ASY-01 を「フラグ off または net10 以前向け」に条件付け。`ValueTask` を選ぶ動機(同期完了時の確保回避)も再判定 | ✅ 変化(オプトイン) — on で `return await` が 6.77 ns・73 B → 2.49 ns・0 B、Task / ValueTask の確保差も消える。off(既定)は不変。net10 は SYSLIB5007 でビルド不可。ハーネスも runtime-async になるため Code Size は取れない → [ASY-01](../benchmarks/results/ASY-01-AsyncElision.md) / [ASY-05](../benchmarks/results/ASY-05-ValueTask.md) |
 
 #### E. コアライブラリ API の追加 — 自前実装を BCL へ置き換える
 
-| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
-|---|---|---|---|---|
-| E1 | `MemoryExtensions` に `ContainsAnyWhiteSpace` / `IndexOfAnyWhiteSpace` / `IndexOfAnyExceptWhiteSpace` / `LastIndexOfAny(Except)WhiteSpace` を追加(#111439)。内部は共有の `SearchValues<char>` | TXT-08(自前の空白 `SearchValues`)、トリム・パーサ実装 | 自前 `SearchValues.Create(" \t\r\n…")` と新 API の時間・コードサイズ。**トリムのように「ほぼ何も無い」入力**では記事自身が「スカラーの方が速い場合がある」と注記しているので、その形も測る | 同等以上なら「空白探索は自前 SearchValues を持たず BCL API」を TXT-08 に追記。短い入力でスカラーが勝つ条件が出れば併記 |
-| E2 | `Span<T>.Sort<T, TComparer>` が struct 比較子を**ボックス化せず**ジェネリック特殊化(#116109)。0.30 倍・88 → 0 B | **R-06 / JIT-02**(「比較子は struct + ジェネリック制約で渡す」)。**net10 まではこの指針が `Span.Sort` では効いていなかった**(ボックス化 + インターフェース呼び出し) | net10 と net11 で struct 比較子渡しの `Span.Sort` の確保バイト数 | net10 で 88 B が出れば R-06 に「`Span.Sort` での struct 比較子は net11 から有効」と世代注記。JIT-02 の適用範囲の記述も見直す |
-| E3 | `DeflateEncoder/Decoder`、`ZLibEncoder/Decoder`、`GZipEncoder/Decoder` を公開(#123145、既存の `BrotliEncoder` と同形)。呼び出し側が入出力バッファを所有・プールできる | BUF-05 / ASY-07、Rester の `CompressedContent`(GZipStream / DeflateStream) | `GZipStream` 経由と `GZipEncoder` + プール済みバッファでの確保・時間 | 確保が消えるなら「Stream ラッパーを介さない Span 圧縮」を BUF 系に新設し、Rester を適用候補に |
-| E4 | portable なレーン操作 API を追加(#129627): 系列生成(`[1, 2, 4, 8]`)、半分連結、interleave / de-interleave、reverse。JIT が命令選択 | **VEC-02**(`Ssse3` vs `Vector128.Shuffle`)、VEC-01 | VEC-02 のシャッフルを新 API で書いた版のコード生成と時間 | 同一命令列なら VEC-02 に「プラットフォーム固有 API を portable へ置換可」を追記 |
-| E5 | SIMD 型へ `Unsafe.BitCast` されるユーザ定義 struct を struct promotion の対象外にし、ベクタ表現を維持(#129563) | LAB-BitCast、VEC-01(`Vector2Double` 型の値型) | 2 つの `double` を持つ struct ↔ `Vector128<double>` の往復で spill が消えるか | 消えるなら「ドメイン型は BitCast で SIMD 演算してよい」を VEC-01 に追記 |
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 | 結果(HX 370・2026-11-18) |
+|---|---|---|---|---|---|
+| E1 | `MemoryExtensions` に `ContainsAnyWhiteSpace` / `IndexOfAnyWhiteSpace` / `IndexOfAnyExceptWhiteSpace` / `LastIndexOfAny(Except)WhiteSpace` を追加(#111439)。内部は共有の `SearchValues<char>` | TXT-08(自前の空白 `SearchValues`)、トリム・パーサ実装 | 自前 `SearchValues.Create(" \t\r\n…")` と新 API の時間・コードサイズ。**トリムのように「ほぼ何も無い」入力**では記事自身が「スカラーの方が速い場合がある」と注記しているので、その形も測る | 同等以上なら「空白探索は自前 SearchValues を持たず BCL API」を TXT-08 に追記。短い入力でスカラーが勝つ条件が出れば併記 | ✅ 追記 — `IndexOfAnyWhiteSpace` は自前 `SearchValues` と同じ(19.0 ns・725 B)。先頭トリム形はスカラーが 2.3 倍速い。TXT-08 に両方を併記 → [E1](../benchmarks/results/NET11-Revalidation.md#e1-whitespacesearchbenchmark) |
+| E2 | `Span<T>.Sort<T, TComparer>` が struct 比較子を**ボックス化せず**ジェネリック特殊化(#116109)。0.30 倍・88 → 0 B | **R-06 / JIT-02**(「比較子は struct + ジェネリック制約で渡す」)。**net10 まではこの指針が `Span.Sort` では効いていなかった**(ボックス化 + インターフェース呼び出し) | net10 と net11 で struct 比較子渡しの `Span.Sort` の確保バイト数 | net10 で 88 B が出れば R-06 に「`Span.Sort` での struct 比較子は net11 から有効」と世代注記。JIT-02 の適用範囲の記述も見直す | ✅ 変化 — net10 は 4,014 ns・88 B(既定比較の 5.5 倍)、net11 は 603 ns・0 B。R-06 に世代注記、JIT-02 にも反映 → [E2](../benchmarks/results/NET11-Revalidation.md#e2-spansortcomparerbenchmark) |
+| E3 | `DeflateEncoder/Decoder`、`ZLibEncoder/Decoder`、`GZipEncoder/Decoder` を公開(#123145、既存の `BrotliEncoder` と同形)。呼び出し側が入出力バッファを所有・プールできる | BUF-05 / ASY-07、Rester の `CompressedContent`(GZipStream / DeflateStream) | `GZipStream` 経由と `GZipEncoder` + プール済みバッファでの確保・時間 | 確保が消えるなら「Stream ラッパーを介さない Span 圧縮」を BUF 系に新設し、Rester を適用候補に | ❌ 新設せず — 時間は同じ。確保は `GZipEncoder` 144 B、使い回しの `MemoryStream` 232 B、新しい `MemoryStream` 58,072 B。0 B にはならず、差は出力バッファの使い回しで決まる → [E3](../benchmarks/results/NET11-Revalidation.md#e3-gzipencoderbenchmark) |
+| E4 | portable なレーン操作 API を追加(#129627): 系列生成(`[1, 2, 4, 8]`)、半分連結、interleave / de-interleave、reverse。JIT が命令選択 | **VEC-02**(`Ssse3` vs `Vector128.Shuffle`)、VEC-01 | VEC-02 のシャッフルを新 API で書いた版のコード生成と時間 | 同一命令列なら VEC-02 に「プラットフォーム固有 API を portable へ置換可」を追記 | ✅ 追記 — `ZipLower` / `ZipUpper` は `Sse2.UnpackLow` / `UnpackHigh` と命令列一致。`Reverse` 2 回の反転は 101 vs 109 B で時間は区別できない(➖)。VEC-02 に追記 → [E4](../benchmarks/results/NET11-Revalidation.md#e4-vectorlaneapibenchmark) |
+| E5 | SIMD 型へ `Unsafe.BitCast` されるユーザ定義 struct を struct promotion の対象外にし、ベクタ表現を維持(#129563) | LAB-BitCast、VEC-01(`Vector2Double` 型の値型) | 2 つの `double` を持つ struct ↔ `Vector128<double>` の往復で spill が消えるか | 消えるなら「ドメイン型は BitCast で SIMD 演算してよい」を VEC-01 に追記 | ✅ 変化 — net10 はスタック退避で 4,447 ns(フィールドごとの 7.6 倍)、net11 は退避なしで 562 ns(0.96 倍)。VEC-01 に追記 → [E5](../benchmarks/results/NET11-Revalidation.md#e5-bitcaststructvectorbenchmark) |
 
 #### F. 既存判定の数値が動くもの
 
-| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 |
-|---|---|---|---|---|
-| F1 | `FrozenDictionary` 構築時の一時 `Dictionary` を元の件数で事前サイズ確保(#128300) | **COL-02 / R-08**(不採用の主因は「構築が `Dictionary` の 5〜20 倍」) | COL-02 の構築ベンチを net11 で再測 | 構築比が縮めば COL-02 の採用条件を緩和。検索側は変わらないので「1024 件で検索 1.19 倍遅い」は残る |
-| F2 | ジェネリック `T : Enum` 文脈の `Enum.Equals` を基底整数の直接比較へ畳む(#122779)。従来はボックス 2 回 + 仮想呼び出し | 上表 ⑥ の ①、STK-05(暗黙ボックス化リスト) | STK-05 の enum 比較ケースを net11 で再測 | 0 B になれば STK-05 のリストから外し「net11 以降は不要」と世代注記。`EqualityComparer<T>.Default` や `Unsafe.As` による回避策も不要になる |
-| F3 | 参照型配列への格納で、JIT が配列の正確な型を知る場合は共変性チェックを除去(#126547) | MEM-02、DSP-01(sealed) | `object[]` への格納 vs sealed 要素型の配列への格納 vs ローカル生成配列への格納 | チェックが消える条件が確認できれば DSP-01 の効果に「配列格納の共変性チェック回避」を追加 |
+| # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 | 結果(HX 370・2026-11-18) |
+|---|---|---|---|---|---|
+| F1 | `FrozenDictionary` 構築時の一時 `Dictionary` を元の件数で事前サイズ確保(#128300) | **COL-02 / R-08**(不採用の主因は「構築が `Dictionary` の 5〜20 倍」) | COL-02 の構築ベンチを net11 で再測 | 構築比が縮めば COL-02 の採用条件を緩和。検索側は変わらないので「1024 件で検索 1.19 倍遅い」は残る | ➖ 不変 — 構築比は net10 9.4 / 7.6 / 5.4 倍、net11 10.7 / 8.3 / 5.5 倍で、確保も同じ。件数の分かる配列から作る形には効かない。外部実測(4,096 件)とは入力の形が違う → [COL-02](../benchmarks/results/COL-02-FrozenCondition.md) |
+| F2 | ジェネリック `T : Enum` 文脈の `Enum.Equals` を基底整数の直接比較へ畳む(#122779)。従来はボックス 2 回 + 仮想呼び出し | 上表 ⑥ の ①、STK-05(暗黙ボックス化リスト) | STK-05 の enum 比較ケースを net11 で再測 | 0 B になれば STK-05 のリストから外し「net11 以降は不要」と世代注記。`EqualityComparer<T>.Default` や `Unsafe.As` による回避策も不要になる | ✅ 変化 — 5.42 ns・48 B → 0.80 ns・0 B で、`EqualityComparer<T>.Default` の回避策と同じ。STK-05 に世代注記 → [F2](../benchmarks/results/NET11-Revalidation.md#f2-genericenumequalsbenchmark) |
+| F3 | 参照型配列への格納で、JIT が配列の正確な型を知る場合は共変性チェックを除去(#126547) | MEM-02、DSP-01(sealed) | `object[]` への格納 vs sealed 要素型の配列への格納 vs ローカル生成配列への格納 | チェックが消える条件が確認できれば DSP-01 の効果に「配列格納の共変性チェック回避」を追加 | ➖ net11 では不変 — `object[]` と sealed でない要素型の配列は両世代ともチェックあり(ヘルパーは 0.72〜0.80 倍に高速化)。sealed 要素型とメソッド内で作った配列は両世代ともなし。DSP-01 に追記 → [F3](../benchmarks/results/NET11-Revalidation.md#f3-arraycovariancebenchmark) |
 
 #### G. 注記のみ(この環境では計測不能、または net11 を待たず適用可)
 
-| # | 内容 | 扱い |
-|---|---|---|
-| G1 | ロック / `Interlocked` / 一度きり初期化で既に保護されているフィールドの `volatile` は冗長(#125274 で BCL 全体から除去)。x64 では命令に出ないが **Arm ではフェンスになる** | CON 系の指針として注記する。x64 環境では計測できないため、判定は記事の記述に依拠すると明記 |
-| G2 | 固定書式の解析・整形で**先頭に `span = span[..N]` を置いて厳密な長さを確定**させると、後続の定数添字の境界チェックが全て消える(#119254 が `Decimal` / `Guid` / `IPAddress` に適用) | **net11 を待たず net10 で検証可能。** TXT-09(固定長整形の応用イディオム)の候補として先に測る |
+| # | 内容 | 扱い | 結果(HX 370・2026-11-18) |
+|---|---|---|---|
+| G1 | ロック / `Interlocked` / 一度きり初期化で既に保護されているフィールドの `volatile` は冗長(#125274 で BCL 全体から除去)。x64 では命令に出ないが **Arm ではフェンスになる** | CON 系の指針として注記する。x64 環境では計測できないため、判定は記事の記述に依拠すると明記 | 📝 注記のみ — 計測していない。CON-01 に記事の記述に依拠して注記 |
+| G2 | 固定書式の解析・整形で**先頭に `span = span[..N]` を置いて厳密な長さを確定**させると、後続の定数添字の境界チェックが全て消える(#119254 が `Decimal` / `Guid` / `IPAddress` に適用) | **net11 を待たず net10 で検証可能。** TXT-09(固定長整形の応用イディオム)の候補として先に測る | ❌ 差なし — 長さガードだけの形と `span[..8]` の形は両世代とも命令列一致(43 命令)。TXT-09 の候補にしない → [G2](../benchmarks/results/NET11-Revalidation.md#g2-fixedlengthparsebenchmark) |
 
 **外部の実測(参考、当方の測定ではない):** [davepcallan/Dotnet11Benchmarks](https://github.com/davepcallan/Dotnet11Benchmarks)(上記記事のベンチを net10 と net11 で比べたもの)。**.NET 11 RC3・EPYC 7763・x86-64-v3・`SimpleJob`** で、当方の基準環境(HX 370・x86-64-v4・`MediumRunJob`)とも GA 版とも異なるため、P4 の判定には使わず**期待値の目安**として扱う。対応する行は 4 つ。
 
