@@ -14,7 +14,6 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net11.0</TargetFramework>
     <RootNamespace>PerformancePatterns.Benchmarks</RootNamespace>
-    <CodeAnalysisRuleSet>..\..\Benchmark.ruleset</CodeAnalysisRuleSet>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
