@@ -3,7 +3,7 @@
 ## net11 / net10 re-verification (2026-11-19, HX 370)
 
 - Verdict: unchanged. A class T that is inlined with its exact type stays at the direct-call cost (0.387 ns) on both generations
-- The shared class body is slower on net11: 1.11x in the first run (1.82 → 2.02 ns, 5.20x of direct) and 1.05x in the 2026-11-19 re-run (1.81 → 1.91 ns), with 12 B more code in both
+- The shared class body does not move: 1.81 ns on both generations (4.68x of direct)
 - The instance interface calls do not move (mono 2.71x, poly 4.28x)
 
 ### StaticAbstractCallBenchmark

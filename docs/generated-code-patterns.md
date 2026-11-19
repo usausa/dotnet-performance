@@ -14,7 +14,7 @@ Corresponding main pattern: **GEN-02** in [README](../README.md). For where this
 
 1. **Move runtime resolution to build time** — of the dictionary lookups, reflection, hash computation, and string assembly involved, bake whatever can be settled at generation time into code (constants, switch, direct `new`)
 2. **Branch on count and shape** — the generator knows the target's count, types, and layout. Do at generation time the "switch implementations based on N" that a runtime library cannot do
-3. **Emit combinations of measured patterns** — build the body of the generated code out of this catalog's adopted patterns, and never include rejected patterns (R-01–R-17)
+3. **Emit combinations of measured patterns** — build the body of the generated code out of this catalog's adopted patterns, and never include rejected patterns (R-01–R-24)
 
 ---
 
@@ -317,4 +317,5 @@ For details, see [rejected-patterns.md](rejected-patterns.md).
 
 - Apply this catalog's verification process to generated code as well: always provide an **equivalence test** (the generated form matches the results of the straightforward implementation) — the same caveat as GEN-01
 - Measure before recording any performance claim. If the measurement falls within measurement noise, go down to the generated code (JitDisasm) to distinguish "➖ measurement noise" from "no difference" (the decision criteria in [benchmark-methodology.md](benchmark-methodology.md))
+- Compare across runtimes (net10 / net11) with at least two processes per runtime, and diff the disassembly with addresses, label numbers and the call form normalized. The same generated source can move by up to about 30% between processes through code placement, the Dynamic PGO block layout and the far call form (`mov rax,imm64` + `call [rax]` on net11); do not reshape the generated code for such a difference (pitfall 11 in [benchmark-methodology.md](benchmark-methodology.md), R-24 in [rejected-patterns.md](rejected-patterns.md))
 - If you also ship an Emit fast path for JIT environments, branch on `RuntimeFeature.IsDynamicCodeCompiled` (AOTS-08). But as the GEN-01 measurements show, **directly generated code is on par with Emit's best form**, so a dual path is only needed for dynamic scenarios that cannot be generated

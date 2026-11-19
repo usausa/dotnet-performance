@@ -403,4 +403,26 @@ u8 リテラルはテーブルのアドレスがリンク時定数になりル�
 
 ---
 
+### R-24: 単一プロセスで見えた net11 の遅れに合わせたコードの組み替え
+
+🎯 **狙い:** net11 で net10 より遅く測れたベンチマークについて、コードを組み替えて(ループの分割・統合、呼び出しの切り出し、呼び出し形の変更)時間を取り戻す。
+
+📉 **実測・不採用の理由:** 2026-11-19 の再検証では、単一プロセスの測定で net11 が遅く見えた 10 クラスのうち 5 件が別プロセスで差を失い、どれも逆アセンブリ上は生成コードの退行ではなかった。原因はソースの変更では制御できない、プロセスごとの効果だった:
+
+| 事例 | 再測定(net11 / net10) | 原因 |
+|---|---:|---|
+| VEC-02 のシャッフル | 0.76〜0.88 倍 | コード配置(命令列は完全一致、193 B) |
+| BUF-08 の要素ごとの `.Span` | 1.00 倍 | Dynamic PGO のブロック配置(`DOTNET_TieredPGO=0` では両世代とも 1 通り) |
+| MEM-04 の 128 B 値渡し | 0.41 倍 | コードは同一。両世代とも速いプロセスと遅いプロセスに分かれる |
+| ASY-03 の Pipe | 1.03 倍 | プロセスごとの PGO。PGO 無効では 1.00 倍 |
+| JIT-06 の共有クラス本体 | 1.00 倍(5 プロセス中 3) | 遠い呼び出し形 `mov rax,imm64` + `call [rax]`。遅い 2 プロセスにだけ出た |
+
+1 プロセスの配置やプロファイルに合わせた書き換えには安定した狙い所がなく、呼び出し形もランタイムがプロセスごとに選ぶ。プロセスをまたいで再現した差(ArrayPool、TickCount64、容量制限ありのチャネル、`await foreach`、PipeReader)はライブラリ側の変化で、こちらも判定は変わらない。
+
+✅ **代わりにやること:** 世代差を事実として扱う前に、別プロセスで再測定し、正規化した逆アセンブリを比較する([benchmark-methodology.md](benchmark-methodology.md) の落とし穴 11)。
+
+🔗 **測定記録:** [BUF-08](../benchmarks/results/BUF-08-MemoryAccess.md), [VEC-02](../benchmarks/results/VEC-02-VectorShuffle.md), [MEM-04](../benchmarks/results/MEM-04-StructPass.md), [ASY-03](../benchmarks/results/ASY-03-Pipelines.md), [JIT-06](../benchmarks/results/JIT-06-StaticAbstractCall.md)
+
+---
+
 📝 なお「マイクロベンチ結果の直接外挿」(単体で 30 倍差でも実処理では 1.1 倍に希釈される)は手法ではなく測定方法論のため、[benchmark-methodology.md](benchmark-methodology.md) の落とし穴として記載している。

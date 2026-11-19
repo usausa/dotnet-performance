@@ -403,4 +403,26 @@ Once it spills, copying the inline elements out plus two resizes costs more than
 
 ---
 
+### R-24: Reshaping code around a net11 slowdown seen in a single process
+
+🎯 **Intent:** When a benchmark reads slower on net11 than on net10, restructure the code (split or merge loops, move a call out of line, change the call form) to win the time back.
+
+📉 **Measured — why it is rejected:** In the 2026-11-19 re-verification, 5 of the 10 classes that looked slower on net11 in a single process lost the difference in a second process, and the disassembly showed no code-generation regression in any of them. The cause was a per-process effect that a source change does not control:
+
+| Case | Re-measurement (net11 / net10) | Cause |
+|---|---:|---|
+| VEC-02 shuffle | 0.76-0.88x | Code placement (instruction streams identical, 193 B) |
+| BUF-08 per-element `.Span` | 1.00x | Dynamic PGO block layout (one layout on both generations with `DOTNET_TieredPGO=0`) |
+| MEM-04 128 B by value | 0.41x | Identical code; fast and slow processes on both generations |
+| ASY-03 Pipe | 1.03x | Per-process PGO; 1.00x with PGO off |
+| JIT-06 shared class body | 1.00x (3 of 5 processes) | The far call form `mov rax,imm64` + `call [rax]`, present only in the two slow processes |
+
+A rewrite tuned to one process's placement or profile has nothing stable to aim at, and the runtime picks the call form per process. The differences that did reproduce across processes (ArrayPool, TickCount64, the bounded channel, `await foreach`, PipeReader) are library-side changes and do not change any verdict either.
+
+✅ **Do this instead:** Re-run in a second process and compare the normalized disassembly before treating a generation difference as real (pitfall 11 in [benchmark-methodology.md](benchmark-methodology.md)).
+
+🔗 **Measurement:** [BUF-08](../benchmarks/results/BUF-08-MemoryAccess.md), [VEC-02](../benchmarks/results/VEC-02-VectorShuffle.md), [MEM-04](../benchmarks/results/MEM-04-StructPass.md), [ASY-03](../benchmarks/results/ASY-03-Pipelines.md), [JIT-06](../benchmarks/results/JIT-06-StaticAbstractCall.md)
+
+---
+
 📝 Note that "extrapolating microbenchmark results directly" (a 30x difference in isolation dilutes to 1.1x in real processing) is measurement methodology rather than a technique, so it is documented as a pitfall in [benchmark-methodology.md](benchmark-methodology.md).

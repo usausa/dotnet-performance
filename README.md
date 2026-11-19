@@ -4171,7 +4171,7 @@ The `Call` vs `Callvirt` substitution, on the other hand, measured 6.36 vs 6.46 
 
 1. **Move runtime resolution to build time** — bake dictionary lookups, reflection, hash computation, and string building into constants, switches, and literal `new` expressions
 2. **Branch on count and shape** — the generator knows how many items and which types are involved. Do the N-dependent implementation switching that a runtime library cannot
-3. **Compose only measured patterns** — the body of the generated code uses only the adopted patterns in this catalog. Never include a rejected one (R-01 through R-23)
+3. **Compose only measured patterns** — the body of the generated code uses only the adopted patterns in this catalog. Never include a rejected one (R-01 through R-24)
 
 **AOT:** ✅ No issues (this is the fundamental means of AOT support)
 
@@ -4272,6 +4272,8 @@ By the same standard as the net10 table above, the list of **what the .NET 11 JI
 
 **How to read this:** as with the net10 table, writing these forms breaks nothing, but on net11 there is no reason to write them. The workarounds can go once `net10.0` leaves the target list. runtime-async is opt-in; with the default compilation the case for ASY-01 / ASY-05 stands.
 
+**Slower on net11 (reproduced in two processes, verdicts unchanged):** `ArrayPool<byte>.Shared` Rent/Return 1.26-1.31x ([BUF-05](#-buf-05-tiered-temporary-buffer-strategy-stackalloc--arraypool-unified)), `Environment.TickCount64` 1.39-1.41x ([SYS-01](#️-sys-01-low-cost-time-and-elapsed-time-reads)), the bounded channel 1.24-1.27x ([ASY-02](#-asy-02-producerconsumer-with-systemthreadingchannels)), `await foreach` 1.17-1.18x ([ASY-04](#-asy-04-knowing-the-cost-of-iasyncenumerable-and-when-to-use-it)) and PipeReader 1.06x ([SEQ-05](#-seq-05-reading-an-unknown-length-stream-without-a-grow-copy-chain)). The other net11 slowdowns seen in a single process did not survive a second process and a disassembly comparison (code placement, Dynamic PGO, the far call form; pitfall 11 in [docs/benchmark-methodology.md](docs/benchmark-methodology.md), rejected as R-24).
+
 ---
 
 ## ⚠️ Assumptions that change under AOT
@@ -4323,6 +4325,7 @@ Techniques measured and judged to have no effect or to be counterproductive. **D
 | R-21 | Recovering an index from a ref with `Unsafe.ByteOffset` | 1.45-1.52x against carrying the index, and larger code (same conclusion as R-02) |
 | R-22 | Hand-written general-purpose hash table (ankerl::unordered_dense layout) | Contrary to the source's 3.8x, 1.48x slower than `Dictionary` even with the same hash (1.40x on x86-64-v3 as well) |
 | R-23 | Small list backed by InlineArray with heap spill (SmallVec) | Loses 1.76x to a capacity-sized `List<T>` once it spills and allocates more; with a known bound STK-08 already covers it |
+| R-24 | Reshaping code around a net11 slowdown seen in a single process | 5 of the 10 net11 slowdowns vanished in a second process; the cause was placement, the PGO layout or the far call form, not code generation |
 
 ---
 
@@ -4381,6 +4384,7 @@ For the shape to emit per scenario and its evidence see the [generated code patt
 | Removing allocation from a cache hit path | TYP-08 |
 | Encouraging inlining on hot paths | JIT-04 |
 | Cost of static abstract member calls (reference-type T) | JIT-06 |
+| Responding to a slowdown seen on net11 | Re-measure in a second process and compare the normalized disassembly first; do not reshape the code for a single-process difference (R-24) |
 | Index computation for hash tables | BIT-02 |
 | Choosing how to hold callbacks and factories | DSP-01 / DSP-02 |
 | Fast raising of multi-subscriber events | DSP-03 |

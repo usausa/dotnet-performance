@@ -129,6 +129,20 @@ The decision rule "overlapping confidence intervals plus identical generated cod
 
 **Swapping the declaration order does not separate them.** The JIT's code heap placement does not depend on declaration order, so reordering leaves the addresses unchanged (confirmed in VEC-02). Loop start addresses are readable from the DisassemblyDiagnoser output (`printInstructionAddresses`).
 
+### 11. Calling a generation regression from one process per runtime
+
+In the net11 re-verification (2026-11-19), 10 classes that looked slower on net11 in a single process were re-run. Five of them (BUF-08, VEC-02, MEM-04, ASY-03, JIT-06) did not hold up, and none was a code-generation regression. Three causes vary per process regardless of the runtime:
+
+| Cause | How it shows up | Example |
+|---|---|---|
+| Code placement | Identical instruction streams; only the offset from a 64-byte boundary differs | VEC-02 shuffle: 58.95 / 59.58 ns at offset 32, 64.3-78.5 ns at offset 0 |
+| Dynamic PGO | The block layout differs between processes of the same runtime | BUF-08 per-element `.Span`: two layouts under PGO; with `DOTNET_TieredPGO=0`, one layout on both generations and 1.00x |
+| Far indirect call | net11 sometimes emits `mov rax,imm64` + `call [rax]` instead of `call [rel32]` (12 sites across all classes on net10, 1,894 on net11) | JIT-06 shared body: 1.11x / 1.05x in the two processes with the form, 1.00x in the three without it |
+
+The far call form costs nothing measurable inside heavy library paths (ArrayPool and Channels kept the same ratio with 0 and 125 / 693 sites), but 5-11% in a tight ~1.8 ns call loop.
+
+**How to separate them:** before reporting a generation difference, re-run it in a second process and diff the disassembly with addresses, label numbers and the call form normalized. If the code matches and the sign does not reproduce, drop the difference. If the code differs between processes of the same runtime, re-run with `DOTNET_TieredPGO=0` set in the host environment (`--envVars` applies only to jobs created from the command line, not to the `[MediumRunJob]` attribute job). The rejected technique is recorded as R-24 in [rejected-patterns.md](rejected-patterns.md).
+
 ## ⚖️ Decision criteria
 
 - Evaluate on **three axes: speed, allocation, and code size**. An improvement on one axis alone is weak justification for adoption
@@ -246,6 +260,7 @@ Differences that measurement could not resolve, listed together with the result 
 | B3 `IEquatable<T>` constraint vs `EqualityComparer<T>.Default` (sealed class key) | 0.81 vs 0.80 ns, overlapping CIs (both generations) | Code size 30 vs 28 B, different | ➖ **Noise**. The constraint shows no advantage on the JIT or on NativeAOT (AOT 1.81 vs 1.81 ns) |
 | E4 endianness reversal with two `Vector128.Reverse` vs `Vector128.Shuffle` | 59.04 vs 58.60 ns, overlapping CIs | Code size 101 vs 109 B, different | ➖ **Noise**. `ZipLower` / `ZipUpper` are instruction-identical to `Sse2.UnpackLow` / `UnpackHigh` (no difference) |
 | G2 `span = span[..8]` before a fixed-length parse | 128.2 vs 128.9 ns, overlapping CIs (both generations) | **Identical instruction sequences** (43 instructions, both generations) | ❌ **No difference**. The length guard alone removes every constant-index check |
+| R-24 net11 slowdowns seen in a single process (VEC-02 / BUF-08 / MEM-04 / ASY-03 / JIT-06) | 0.41-1.03x of net10 when re-measured in a second process (JIT-06: 1.00x in 3 of 5 processes). BUF-08 and ASY-03 1.00x with `DOTNET_TieredPGO=0` | VEC-02 / MEM-04: **identical instruction streams** apart from the call form. BUF-08 / ASY-03: code varies between processes of the same runtime under PGO and settles with PGO off. JIT-06: slow only with the far call form `mov rax,imm64` + `call [rax]` | ❌ **Not a generation difference** (placement, PGO layout or call form). See pitfall 11 |
 
 | Batch | Candidate | Summary / question under test | Related | Status |
 |:---:|---|---|---|:---:|
