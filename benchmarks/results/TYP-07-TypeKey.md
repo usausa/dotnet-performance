@@ -1,5 +1,181 @@
 # TYP-07 follow-up: key type for a Type-keyed Dictionary (Type vs RuntimeTypeHandle)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict (lookup only): unchanged. `Dictionary<RuntimeTypeHandle,_>` 0.73x hit / 0.75x miss of `<Type,_>` on net11; ConcurrentDictionary by handle 0.59x hit; the hand-written table 0.25x
+- **Lookup + dispatch: the handle key no longer pays on net11.** `<Type,_>` with five rotating targets got 0.86x faster (4.77 → 4.09 ns), so the handle key is 0.98x of it (0.81x on net10); a Type key with a custom comparer is 0.78x
+- The sweep agrees: the handle key is 0.93-0.96x of the Type key at 1-5 targets on net11 (0.82-0.91x on net10); the TypeHandle pointer table stays the fastest (0.73-0.81x)
+
+### TypeKeyBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| DictionaryTypeHit | 2.7851 ns | 2.7948 ns | 1.00 | - → - | 1,038 B → 1,051 B |
+| DictionaryHandleHit | 2.0982 ns | 2.0420 ns | 0.97 | - → - | 774 B → 807 B |
+| DictionaryTypeComparerHit | 1.9562 ns | 1.9728 ns | 1.01 | - → - | 615 B → 610 B |
+| CustomHandleValueHit | 0.7434 ns | 0.7059 ns | 0.95 | - → - | 195 B → 177 B |
+| ConcurrentDictionaryTypeHit | 1.9892 ns | 2.0270 ns | 1.02 | - → - | 580 B → 746 B |
+| ConcurrentDictionaryHandleHit | 1.6937 ns | 1.6406 ns | 0.97 | - → - | 629 B → 652 B |
+| DictionaryTypeMiss | 2.9916 ns | 3.0009 ns | 1.00 | - → - | 714 B → 776 B |
+| DictionaryHandleMiss | 2.2870 ns | 2.2578 ns | 0.99 | - → - | 771 B → 808 B |
+| DictionaryTypeComparerMiss | 1.9160 ns | 2.0205 ns | 1.05 | - → - | 479 B → 474 B |
+| CustomHandleValueMiss | 0.7613 ns | 0.7570 ns | 0.99 | - → - | 205 B → 184 B |
+| ConcurrentDictionaryTypeMiss | 1.5790 ns | 1.5820 ns | 1.00 | - → - | 518 B → 544 B |
+| ConcurrentDictionaryHandleMiss | 1.6715 ns | 1.6823 ns | 1.01 | - → - | 655 B → 661 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.37 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method                         | Job                 | Runtime   | Mean      | Error     | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|------------------------------- |-------------------- |---------- |----------:|----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| DictionaryTypeHit              | .NET 10.0           | .NET 10.0 | 2.7851 ns | 0.0066 ns | 0.0092 ns | 2.7836 ns | 2.7684 ns | 2.8068 ns | 2.7962 ns |  1.00 |    0.00 |   1,038 B |         - |          NA |
+| DictionaryHandleHit            | .NET 10.0           | .NET 10.0 | 2.0982 ns | 0.0042 ns | 0.0062 ns | 2.0980 ns | 2.0852 ns | 2.1105 ns | 2.1064 ns |  0.75 |    0.00 |     774 B |         - |          NA |
+| DictionaryTypeComparerHit      | .NET 10.0           | .NET 10.0 | 1.9562 ns | 0.0063 ns | 0.0092 ns | 1.9555 ns | 1.9382 ns | 1.9732 ns | 1.9680 ns |  0.70 |    0.00 |     615 B |         - |          NA |
+| CustomHandleValueHit           | .NET 10.0           | .NET 10.0 | 0.7434 ns | 0.0045 ns | 0.0064 ns | 0.7430 ns | 0.7341 ns | 0.7533 ns | 0.7513 ns |  0.27 |    0.00 |     195 B |         - |          NA |
+| ConcurrentDictionaryTypeHit    | .NET 10.0           | .NET 10.0 | 1.9892 ns | 0.0098 ns | 0.0140 ns | 1.9888 ns | 1.9697 ns | 2.0319 ns | 2.0050 ns |  0.71 |    0.01 |     580 B |         - |          NA |
+| ConcurrentDictionaryHandleHit  | .NET 10.0           | .NET 10.0 | 1.6937 ns | 0.0030 ns | 0.0044 ns | 1.6935 ns | 1.6844 ns | 1.7034 ns | 1.6995 ns |  0.61 |    0.00 |     629 B |         - |          NA |
+| DictionaryTypeMiss             | .NET 10.0           | .NET 10.0 | 2.9916 ns | 0.0123 ns | 0.0181 ns | 2.9971 ns | 2.9622 ns | 3.0255 ns | 3.0146 ns |  1.07 |    0.01 |     714 B |         - |          NA |
+| DictionaryHandleMiss           | .NET 10.0           | .NET 10.0 | 2.2870 ns | 0.0132 ns | 0.0176 ns | 2.2912 ns | 2.2605 ns | 2.3224 ns | 2.3050 ns |  0.82 |    0.01 |     771 B |         - |          NA |
+| DictionaryTypeComparerMiss     | .NET 10.0           | .NET 10.0 | 1.9160 ns | 0.1669 ns | 0.2446 ns | 2.1070 ns | 1.6605 ns | 2.1953 ns | 2.1721 ns |  0.69 |    0.09 |     479 B |         - |          NA |
+| CustomHandleValueMiss          | .NET 10.0           | .NET 10.0 | 0.7613 ns | 0.0629 ns | 0.0902 ns | 0.8336 ns | 0.6615 ns | 0.8607 ns | 0.8556 ns |  0.27 |    0.03 |     205 B |         - |          NA |
+| ConcurrentDictionaryTypeMiss   | .NET 10.0           | .NET 10.0 | 1.5790 ns | 0.0081 ns | 0.0117 ns | 1.5768 ns | 1.5650 ns | 1.6155 ns | 1.5972 ns |  0.57 |    0.00 |     518 B |         - |          NA |
+| ConcurrentDictionaryHandleMiss | .NET 10.0           | .NET 10.0 | 1.6715 ns | 0.0026 ns | 0.0039 ns | 1.6718 ns | 1.6649 ns | 1.6812 ns | 1.6759 ns |  0.60 |    0.00 |     655 B |         - |          NA |
+|                                |                     |           |           |           |           |           |           |           |           |       |         |           |           |             |
+| DictionaryTypeHit              | MediumRun-.NET 11.0 | .NET 11.0 | 2.7948 ns | 0.0070 ns | 0.0102 ns | 2.7953 ns | 2.7792 ns | 2.8168 ns | 2.8101 ns |  1.00 |    0.00 |   1,051 B |         - |          NA |
+| DictionaryHandleHit            | MediumRun-.NET 11.0 | .NET 11.0 | 2.0420 ns | 0.0070 ns | 0.0101 ns | 2.0415 ns | 2.0239 ns | 2.0619 ns | 2.0539 ns |  0.73 |    0.00 |     807 B |         - |          NA |
+| DictionaryTypeComparerHit      | MediumRun-.NET 11.0 | .NET 11.0 | 1.9728 ns | 0.0115 ns | 0.0154 ns | 1.9735 ns | 1.9472 ns | 2.0079 ns | 1.9931 ns |  0.71 |    0.01 |     610 B |         - |          NA |
+| CustomHandleValueHit           | MediumRun-.NET 11.0 | .NET 11.0 | 0.7059 ns | 0.0046 ns | 0.0067 ns | 0.7040 ns | 0.6988 ns | 0.7272 ns | 0.7149 ns |  0.25 |    0.00 |     177 B |         - |          NA |
+| ConcurrentDictionaryTypeHit    | MediumRun-.NET 11.0 | .NET 11.0 | 2.0270 ns | 0.0059 ns | 0.0084 ns | 2.0282 ns | 2.0129 ns | 2.0436 ns | 2.0369 ns |  0.73 |    0.00 |     746 B |         - |          NA |
+| ConcurrentDictionaryHandleHit  | MediumRun-.NET 11.0 | .NET 11.0 | 1.6406 ns | 0.0119 ns | 0.0163 ns | 1.6325 ns | 1.6201 ns | 1.6622 ns | 1.6594 ns |  0.59 |    0.01 |     652 B |         - |          NA |
+| DictionaryTypeMiss             | MediumRun-.NET 11.0 | .NET 11.0 | 3.0009 ns | 0.0173 ns | 0.0248 ns | 3.0120 ns | 2.9602 ns | 3.0328 ns | 3.0262 ns |  1.07 |    0.01 |     776 B |         - |          NA |
+| DictionaryHandleMiss           | MediumRun-.NET 11.0 | .NET 11.0 | 2.2578 ns | 0.0097 ns | 0.0136 ns | 2.2598 ns | 2.2292 ns | 2.2854 ns | 2.2714 ns |  0.81 |    0.01 |     808 B |         - |          NA |
+| DictionaryTypeComparerMiss     | MediumRun-.NET 11.0 | .NET 11.0 | 2.0205 ns | 0.0873 ns | 0.1307 ns | 2.0220 ns | 1.8831 ns | 2.1745 ns | 2.1577 ns |  0.72 |    0.05 |     474 B |         - |          NA |
+| CustomHandleValueMiss          | MediumRun-.NET 11.0 | .NET 11.0 | 0.7570 ns | 0.0303 ns | 0.0415 ns | 0.7545 ns | 0.7132 ns | 0.8108 ns | 0.8012 ns |  0.27 |    0.01 |     184 B |         - |          NA |
+| ConcurrentDictionaryTypeMiss   | MediumRun-.NET 11.0 | .NET 11.0 | 1.5820 ns | 0.0061 ns | 0.0091 ns | 1.5817 ns | 1.5699 ns | 1.6080 ns | 1.5908 ns |  0.57 |    0.00 |     544 B |         - |          NA |
+| ConcurrentDictionaryHandleMiss | MediumRun-.NET 11.0 | .NET 11.0 | 1.6823 ns | 0.0052 ns | 0.0075 ns | 1.6833 ns | 1.6678 ns | 1.7018 ns | 1.6875 ns |  0.60 |    0.00 |     661 B |         - |          NA |
+
+### TypeKeyDispatchBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| TypeRotating | 4.767 ns | 4.094 ns | 0.86 | 24 B → 24 B | 548 B → 878 B |
+| HandleRotating | 3.879 ns | 3.989 ns | 1.03 | 24 B → 24 B | 657 B → 662 B |
+| PtrRotating | 3.084 ns | 3.094 ns | 1.00 | 24 B → 24 B | 480 B → 395 B |
+| TypeComparerRotating | 4.155 ns | 3.204 ns | 0.77 | 24 B → 24 B | 470 B → 490 B |
+| TypeSingle | 3.357 ns | 2.995 ns | 0.89 | 24 B → 24 B | 589 B → 1,284 B |
+| HandleSingle | 2.695 ns | 2.788 ns | 1.03 | 24 B → 24 B | 1,156 B → 1,173 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.33 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method               | Job                 | Runtime   | Mean     | Error     | StdDev    | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
+|--------------------- |-------------------- |---------- |---------:|----------:|----------:|---------:|---------:|---------:|------:|--------:|----------:|-------:|----------:|------------:|
+| TypeRotating         | .NET 10.0           | .NET 10.0 | 4.767 ns | 0.0742 ns | 0.1111 ns | 4.605 ns | 4.906 ns | 4.885 ns |  1.00 |    0.00 |     548 B | 0.0029 |      24 B |        1.00 |
+| HandleRotating       | .NET 10.0           | .NET 10.0 | 3.879 ns | 0.0259 ns | 0.0371 ns | 3.825 ns | 3.966 ns | 3.929 ns |  0.81 |    0.02 |     657 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating          | .NET 10.0           | .NET 10.0 | 3.084 ns | 0.0627 ns | 0.0919 ns | 2.950 ns | 3.228 ns | 3.192 ns |  0.65 |    0.02 |     480 B | 0.0029 |      24 B |        1.00 |
+| TypeComparerRotating | .NET 10.0           | .NET 10.0 | 4.155 ns | 0.0839 ns | 0.1203 ns | 4.003 ns | 4.310 ns | 4.293 ns |  0.87 |    0.03 |     470 B | 0.0029 |      24 B |        1.00 |
+| TypeSingle           | .NET 10.0           | .NET 10.0 | 3.357 ns | 0.0261 ns | 0.0374 ns | 3.293 ns | 3.459 ns | 3.402 ns |  0.70 |    0.02 |     589 B | 0.0029 |      24 B |        1.00 |
+| HandleSingle         | .NET 10.0           | .NET 10.0 | 2.695 ns | 0.0698 ns | 0.1045 ns | 2.575 ns | 2.973 ns | 2.827 ns |  0.57 |    0.03 |   1,156 B | 0.0029 |      24 B |        1.00 |
+|                      |                     |           |          |           |           |          |          |          |       |         |           |        |           |             |
+| TypeRotating         | MediumRun-.NET 11.0 | .NET 11.0 | 4.094 ns | 0.1086 ns | 0.1523 ns | 3.905 ns | 4.518 ns | 4.286 ns |  1.00 |    0.00 |     878 B | 0.0029 |      24 B |        1.00 |
+| HandleRotating       | MediumRun-.NET 11.0 | .NET 11.0 | 3.989 ns | 0.0304 ns | 0.0446 ns | 3.904 ns | 4.064 ns | 4.056 ns |  0.98 |    0.04 |     662 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating          | MediumRun-.NET 11.0 | .NET 11.0 | 3.094 ns | 0.0743 ns | 0.1112 ns | 2.903 ns | 3.323 ns | 3.243 ns |  0.76 |    0.04 |     395 B | 0.0029 |      24 B |        1.00 |
+| TypeComparerRotating | MediumRun-.NET 11.0 | .NET 11.0 | 3.204 ns | 0.0659 ns | 0.0986 ns | 3.102 ns | 3.479 ns | 3.366 ns |  0.78 |    0.04 |     490 B | 0.0029 |      24 B |        1.00 |
+| TypeSingle           | MediumRun-.NET 11.0 | .NET 11.0 | 2.995 ns | 0.0262 ns | 0.0393 ns | 2.922 ns | 3.079 ns | 3.040 ns |  0.73 |    0.03 |   1,284 B | 0.0029 |      24 B |        1.00 |
+| HandleSingle         | MediumRun-.NET 11.0 | .NET 11.0 | 2.788 ns | 0.0327 ns | 0.0489 ns | 2.706 ns | 2.868 ns | 2.859 ns |  0.68 |    0.03 |   1,173 B | 0.0029 |      24 B |        1.00 |
+
+### TypeKeyDispatchSweepBenchmark
+
+net10 → net11 per row:
+
+| Method | TargetCount | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| TypeRotating | 1 | 3.718 ns | 3.154 ns | 0.85 | 24 B → 24 B | 608 B → 873 B |
+| HandleRotating | 1 | 3.391 ns | 2.934 ns | 0.87 | 24 B → 24 B | 708 B → 735 B |
+| PtrRotating | 1 | 2.585 ns | 2.385 ns | 0.92 | 24 B → 24 B | 455 B → 460 B |
+| TypeRotating | 2 | 4.146 ns | 3.511 ns | 0.85 | 24 B → 24 B | 594 B → 869 B |
+| HandleRotating | 2 | 3.383 ns | 3.336 ns | 0.99 | 24 B → 24 B | 697 B → 728 B |
+| PtrRotating | 2 | 2.704 ns | 2.630 ns | 0.97 | 24 B → 24 B | 459 B → 457 B |
+| TypeRotating | 3 | 4.455 ns | 3.928 ns | 0.88 | 24 B → 24 B | 594 B → 873 B |
+| HandleRotating | 3 | 3.674 ns | 3.734 ns | 1.02 | 24 B → 24 B | 701 B → 731 B |
+| PtrRotating | 3 | 2.896 ns | 2.877 ns | 0.99 | 24 B → 24 B | 459 B → 457 B |
+| TypeRotating | 5 | 4.736 ns | 3.944 ns | 0.83 | 24 B → 24 B | 522 B → 873 B |
+| HandleRotating | 5 | 4.042 ns | 3.804 ns | 0.94 | 24 B → 24 B | 712 B → 731 B |
+| PtrRotating | 5 | 3.313 ns | 3.211 ns | 0.97 | 24 B → 24 B | 459 B → 457 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.45 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method         | Job                 | Runtime   | TargetCount | Mean     | Error     | StdDev    | Median   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
+|--------------- |-------------------- |---------- |------------ |---------:|----------:|----------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|-------:|----------:|------------:|
+| **TypeRotating**   | **.NET 10.0**           | **.NET 10.0** | **1**           | **3.718 ns** | **0.0678 ns** | **0.1015 ns** | **3.718 ns** | **3.583 ns** | **3.923 ns** | **3.845 ns** |  **1.00** |    **0.00** |     **608 B** | **0.0029** |      **24 B** |        **1.00** |
+| HandleRotating | .NET 10.0           | .NET 10.0 | 1           | 3.391 ns | 0.1864 ns | 0.2789 ns | 3.441 ns | 2.930 ns | 3.678 ns | 3.668 ns |  0.91 |    0.08 |     708 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating    | .NET 10.0           | .NET 10.0 | 1           | 2.585 ns | 0.1238 ns | 0.1854 ns | 2.582 ns | 2.387 ns | 2.786 ns | 2.773 ns |  0.70 |    0.05 |     455 B | 0.0029 |      24 B |        1.00 |
+|                |                     |           |             |          |           |           |          |          |          |          |       |         |           |        |           |             |
+| TypeRotating   | MediumRun-.NET 11.0 | .NET 11.0 | 1           | 3.154 ns | 0.0103 ns | 0.0144 ns | 3.154 ns | 3.129 ns | 3.181 ns | 3.171 ns |  1.00 |    0.00 |     873 B | 0.0029 |      24 B |        1.00 |
+| HandleRotating | MediumRun-.NET 11.0 | .NET 11.0 | 1           | 2.934 ns | 0.0459 ns | 0.0687 ns | 2.942 ns | 2.780 ns | 3.058 ns | 3.005 ns |  0.93 |    0.02 |     735 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating    | MediumRun-.NET 11.0 | .NET 11.0 | 1           | 2.385 ns | 0.0107 ns | 0.0161 ns | 2.384 ns | 2.356 ns | 2.418 ns | 2.406 ns |  0.76 |    0.01 |     460 B | 0.0029 |      24 B |        1.00 |
+|                |                     |           |             |          |           |           |          |          |          |          |       |         |           |        |           |             |
+| **TypeRotating**   | **.NET 10.0**           | **.NET 10.0** | **2**           | **4.146 ns** | **0.0536 ns** | **0.0802 ns** | **4.151 ns** | **4.027 ns** | **4.326 ns** | **4.247 ns** |  **1.00** |    **0.00** |     **594 B** | **0.0029** |      **24 B** |        **1.00** |
+| HandleRotating | .NET 10.0           | .NET 10.0 | 2           | 3.383 ns | 0.0870 ns | 0.1247 ns | 3.343 ns | 3.204 ns | 3.624 ns | 3.553 ns |  0.82 |    0.03 |     697 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating    | .NET 10.0           | .NET 10.0 | 2           | 2.704 ns | 0.0499 ns | 0.0731 ns | 2.689 ns | 2.604 ns | 2.843 ns | 2.806 ns |  0.65 |    0.02 |     459 B | 0.0029 |      24 B |        1.00 |
+|                |                     |           |             |          |           |           |          |          |          |          |       |         |           |        |           |             |
+| TypeRotating   | MediumRun-.NET 11.0 | .NET 11.0 | 2           | 3.511 ns | 0.0869 ns | 0.1246 ns | 3.450 ns | 3.378 ns | 3.800 ns | 3.691 ns |  1.00 |    0.00 |     869 B | 0.0029 |      24 B |        1.00 |
+| HandleRotating | MediumRun-.NET 11.0 | .NET 11.0 | 2           | 3.336 ns | 0.1112 ns | 0.1595 ns | 3.303 ns | 3.134 ns | 3.680 ns | 3.524 ns |  0.95 |    0.06 |     728 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating    | MediumRun-.NET 11.0 | .NET 11.0 | 2           | 2.630 ns | 0.0110 ns | 0.0157 ns | 2.629 ns | 2.602 ns | 2.660 ns | 2.648 ns |  0.75 |    0.03 |     457 B | 0.0029 |      24 B |        1.00 |
+|                |                     |           |             |          |           |           |          |          |          |          |       |         |           |        |           |             |
+| **TypeRotating**   | **.NET 10.0**           | **.NET 10.0** | **3**           | **4.455 ns** | **0.0283 ns** | **0.0415 ns** | **4.455 ns** | **4.376 ns** | **4.551 ns** | **4.506 ns** |  **1.00** |    **0.00** |     **594 B** | **0.0029** |      **24 B** |        **1.00** |
+| HandleRotating | .NET 10.0           | .NET 10.0 | 3           | 3.674 ns | 0.0621 ns | 0.0930 ns | 3.654 ns | 3.530 ns | 3.877 ns | 3.836 ns |  0.82 |    0.02 |     701 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating    | .NET 10.0           | .NET 10.0 | 3           | 2.896 ns | 0.0695 ns | 0.1041 ns | 2.865 ns | 2.763 ns | 3.128 ns | 3.038 ns |  0.65 |    0.02 |     459 B | 0.0029 |      24 B |        1.00 |
+|                |                     |           |             |          |           |           |          |          |          |          |       |         |           |        |           |             |
+| TypeRotating   | MediumRun-.NET 11.0 | .NET 11.0 | 3           | 3.928 ns | 0.0725 ns | 0.1017 ns | 3.922 ns | 3.809 ns | 4.142 ns | 4.079 ns |  1.00 |    0.00 |     873 B | 0.0029 |      24 B |        1.00 |
+| HandleRotating | MediumRun-.NET 11.0 | .NET 11.0 | 3           | 3.734 ns | 0.1166 ns | 0.1672 ns | 3.712 ns | 3.501 ns | 4.020 ns | 3.956 ns |  0.95 |    0.05 |     731 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating    | MediumRun-.NET 11.0 | .NET 11.0 | 3           | 2.877 ns | 0.0495 ns | 0.0725 ns | 2.878 ns | 2.768 ns | 2.969 ns | 2.953 ns |  0.73 |    0.03 |     457 B | 0.0029 |      24 B |        1.00 |
+|                |                     |           |             |          |           |           |          |          |          |          |       |         |           |        |           |             |
+| **TypeRotating**   | **.NET 10.0**           | **.NET 10.0** | **5**           | **4.736 ns** | **0.0729 ns** | **0.1068 ns** | **4.726 ns** | **4.578 ns** | **4.904 ns** | **4.860 ns** |  **1.00** |    **0.00** |     **522 B** | **0.0029** |      **24 B** |        **1.00** |
+| HandleRotating | .NET 10.0           | .NET 10.0 | 5           | 4.042 ns | 0.0192 ns | 0.0282 ns | 4.033 ns | 3.994 ns | 4.104 ns | 4.081 ns |  0.85 |    0.02 |     712 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating    | .NET 10.0           | .NET 10.0 | 5           | 3.313 ns | 0.0850 ns | 0.1218 ns | 3.389 ns | 3.160 ns | 3.467 ns | 3.445 ns |  0.70 |    0.03 |     459 B | 0.0029 |      24 B |        1.00 |
+|                |                     |           |             |          |           |           |          |          |          |          |       |         |           |        |           |             |
+| TypeRotating   | MediumRun-.NET 11.0 | .NET 11.0 | 5           | 3.944 ns | 0.0300 ns | 0.0430 ns | 3.949 ns | 3.839 ns | 4.009 ns | 3.990 ns |  1.00 |    0.00 |     873 B | 0.0029 |      24 B |        1.00 |
+| HandleRotating | MediumRun-.NET 11.0 | .NET 11.0 | 5           | 3.804 ns | 0.0409 ns | 0.0587 ns | 3.819 ns | 3.721 ns | 3.895 ns | 3.868 ns |  0.96 |    0.02 |     731 B | 0.0029 |      24 B |        1.00 |
+| PtrRotating    | MediumRun-.NET 11.0 | .NET 11.0 | 5           | 3.211 ns | 0.0433 ns | 0.0634 ns | 3.212 ns | 3.119 ns | 3.306 ns | 3.289 ns |  0.81 |    0.02 |     457 B | 0.0029 |      24 B |        1.00 |
+
+## Earlier record
+
 - Verdict (Dictionary, JIT): keying the BCL Dictionary by `RuntimeTypeHandle` instead of `Type` is 0.72x on hit / 0.81x on miss (2.905 -> 2.101 ns, 2.292 -> 1.861 ns; CIs disjoint) with 1,037 -> 797 B of code, at no change in hash quality (all three of `Type.GetHashCode`, `RuntimeHelpers.GetHashCode` and `RuntimeTypeHandle.GetHashCode` return the same identity hash). A class comparer over `TypeHandle.Value` lands on the same numbers (2.098 / 1.867 ns, 593 B): the interface dispatch it adds costs what the cheaper hash saves. The B550H (x86-64-v3) provisional run agreed (0.70x / 0.77x)
 - Verdict (ConcurrentDictionary, JIT): `ConcurrentDictionary<RuntimeTypeHandle,_>` is **0.85x on hit** (2.221 -> 1.884 ns; medians 2.071 -> 1.715) and **1.07x on miss** (1.465 -> 1.569 ns). The gain sits in the per-node compare, which only runs on hit. Both ConcurrentDictionary hit rows are bimodal between launches on this machine (2.03-2.89 / 1.68-2.11 ns), hence the medians; the `Dictionary` rows that moved 30% between launches on B550H are stable here (StdDev 0.03 ns)
 - Confirmed on both machines (was flagged unexpected on B550H): `ConcurrentDictionary<Type,_>` **beats** `Dictionary<Type,_>` on hit (2.22 vs 2.91 ns) and on miss (1.47 vs 2.29 ns). ConcurrentDictionary's `_comparerIsDefaultForClasses` flag lets it hash with `key.GetHashCode()` directly (one GDV guard to `RuntimeType`) instead of the `comparer.GetHashCode` interface call, so only its `Equals` still goes through the comparer

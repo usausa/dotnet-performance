@@ -1,5 +1,258 @@
 # TXT-10: Aggregating known-string matching into a switch
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged for string input - adopted with a size window. 16 keys on net11: switch 0.58x hit / 0.34x miss of the Equals chain; 128 keys still collapses (span switch 1.47x hit / 4.40x miss of the sampling switch)
+- **Span input changed on net11:** the span Equals chain got 0.54x / 0.43x faster at 16 keys (2.73 → 1.49 ns hit, 4.94 → 2.12 ns miss), so it now beats the span switch on hit (1.49 vs 1.91 ns) and trails it on miss (2.12 vs 1.94 ns)
+- At <=4 keys on span input the chain and the switch now compile to the same size (165 B hit / 157 B miss, from 249-259 B) and run within 4-12% of each other; the net10 advantage of the chain is gone
+- 64 keys: the hand-written sampling switch is 1.17-1.19x slower on net11, so the plain span switch is 0.80x hit / 0.75x miss of it (1.05x / 0.98x on net10). The 64-key upper bound of the window holds with more margin
+
+### StringSwitchSmallBenchmark
+
+net10 → net11 per row:
+
+| Method | Probe | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| EqualsChain | Hit | 1.2742 ns | 1.1742 ns | 0.92 | - → - | 263 B → 262 B |
+| SpanEqualsChain | Hit | 1.1384 ns | 1.0713 ns | 0.94 | - → - | 249 B → 165 B |
+| StringSwitch | Hit | 1.2727 ns | 1.1277 ns | 0.89 | - → - | 256 B → 258 B |
+| SpanSwitch | Hit | 1.2505 ns | 1.0303 ns | 0.82 | - → - | 256 B → 165 B |
+| EqualsChain | Miss | 1.7248 ns | 1.6359 ns | 0.95 | - → - | 256 B → 258 B |
+| SpanEqualsChain | Miss | 1.6306 ns | 0.8863 ns | 0.54 | - → - | 259 B → 157 B |
+| StringSwitch | Miss | 1.7514 ns | 1.6314 ns | 0.93 | - → - | 256 B → 258 B |
+| SpanSwitch | Miss | 1.7498 ns | 0.7849 ns | 0.45 | - → - | 256 B → 157 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.29 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method          | Job                 | Runtime   | Probe | Mean      | Error     | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|---------------- |-------------------- |---------- |------ |----------:|----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| **EqualsChain**     | **.NET 10.0**           | **.NET 10.0** | **Hit**   | **1.2742 ns** | **0.0148 ns** | **0.0217 ns** | **1.2766 ns** | **1.2389 ns** | **1.3186 ns** | **1.2962 ns** |  **1.00** |    **0.00** |     **263 B** |         **-** |          **NA** |
+| SpanEqualsChain | .NET 10.0           | .NET 10.0 | Hit   | 1.1384 ns | 0.0080 ns | 0.0117 ns | 1.1354 ns | 1.1165 ns | 1.1569 ns | 1.1519 ns |  0.89 |    0.02 |     249 B |         - |          NA |
+| StringSwitch    | .NET 10.0           | .NET 10.0 | Hit   | 1.2727 ns | 0.0161 ns | 0.0241 ns | 1.2715 ns | 1.2303 ns | 1.3235 ns | 1.3083 ns |  1.00 |    0.03 |     256 B |         - |          NA |
+| SpanSwitch      | .NET 10.0           | .NET 10.0 | Hit   | 1.2505 ns | 0.0355 ns | 0.0509 ns | 1.2547 ns | 1.1652 ns | 1.3362 ns | 1.3123 ns |  0.98 |    0.04 |     256 B |         - |          NA |
+|                 |                     |           |       |           |           |           |           |           |           |           |       |         |           |           |             |
+| EqualsChain     | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 1.1742 ns | 0.0138 ns | 0.0198 ns | 1.1747 ns | 1.1349 ns | 1.2161 ns | 1.1949 ns |  1.00 |    0.00 |     262 B |         - |          NA |
+| SpanEqualsChain | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 1.0713 ns | 0.0156 ns | 0.0234 ns | 1.0715 ns | 1.0226 ns | 1.1310 ns | 1.1042 ns |  0.91 |    0.02 |     165 B |         - |          NA |
+| StringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 1.1277 ns | 0.0132 ns | 0.0198 ns | 1.1282 ns | 1.0908 ns | 1.1674 ns | 1.1528 ns |  0.96 |    0.02 |     258 B |         - |          NA |
+| SpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 1.0303 ns | 0.0588 ns | 0.0880 ns | 1.0281 ns | 0.9046 ns | 1.1434 ns | 1.1252 ns |  0.88 |    0.08 |     165 B |         - |          NA |
+|                 |                     |           |       |           |           |           |           |           |           |           |       |         |           |           |             |
+| **EqualsChain**     | **.NET 10.0**           | **.NET 10.0** | **Miss**  | **1.7248 ns** | **0.0046 ns** | **0.0066 ns** | **1.7247 ns** | **1.7136 ns** | **1.7383 ns** | **1.7337 ns** |  **1.00** |    **0.00** |     **256 B** |         **-** |          **NA** |
+| SpanEqualsChain | .NET 10.0           | .NET 10.0 | Miss  | 1.6306 ns | 0.1343 ns | 0.1926 ns | 1.4761 ns | 1.4404 ns | 1.8503 ns | 1.8382 ns |  0.95 |    0.11 |     259 B |         - |          NA |
+| StringSwitch    | .NET 10.0           | .NET 10.0 | Miss  | 1.7514 ns | 0.0203 ns | 0.0285 ns | 1.7545 ns | 1.7184 ns | 1.8145 ns | 1.7951 ns |  1.02 |    0.02 |     256 B |         - |          NA |
+| SpanSwitch      | .NET 10.0           | .NET 10.0 | Miss  | 1.7498 ns | 0.1412 ns | 0.2114 ns | 1.7109 ns | 1.5174 ns | 2.0249 ns | 2.0115 ns |  1.01 |    0.12 |     256 B |         - |          NA |
+|                 |                     |           |       |           |           |           |           |           |           |           |       |         |           |           |             |
+| EqualsChain     | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 1.6359 ns | 0.0043 ns | 0.0063 ns | 1.6358 ns | 1.6253 ns | 1.6504 ns | 1.6432 ns |  1.00 |    0.00 |     258 B |         - |          NA |
+| SpanEqualsChain | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 0.8863 ns | 0.0651 ns | 0.0913 ns | 0.9550 ns | 0.7776 ns | 0.9847 ns | 0.9722 ns |  0.54 |    0.05 |     157 B |         - |          NA |
+| StringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 1.6314 ns | 0.0054 ns | 0.0081 ns | 1.6303 ns | 1.6170 ns | 1.6563 ns | 1.6415 ns |  1.00 |    0.01 |     258 B |         - |          NA |
+| SpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 0.7849 ns | 0.0044 ns | 0.0064 ns | 0.7851 ns | 0.7728 ns | 0.7958 ns | 0.7934 ns |  0.48 |    0.00 |     157 B |         - |          NA |
+
+### StringSwitchBenchmark
+
+net10 → net11 per row:
+
+| Method | Probe | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| EqualsChain | Hit | 3.069 ns | 3.123 ns | 1.02 | - → - | 1,146 B → 1,152 B |
+| SpanEqualsChain | Hit | 2.734 ns | 1.488 ns | 0.54 | - → - | 1,154 B → 885 B |
+| StringSwitch | Hit | 1.824 ns | 1.806 ns | 0.99 | - → - | 1,158 B → 1,164 B |
+| SpanSwitch | Hit | 1.925 ns | 1.906 ns | 0.99 | - → - | 1,171 B → 918 B |
+| DictionaryLookup | Hit | 4.628 ns | 4.748 ns | 1.03 | - → - | 1,223 B → 1,185 B |
+| SampledTable | Hit | 3.716 ns | 3.639 ns | 0.98 | - → - | 797 B → 748 B |
+| EqualsChain | Miss | 5.525 ns | 5.455 ns | 0.99 | - → - | 1,146 B → 1,152 B |
+| SpanEqualsChain | Miss | 4.942 ns | 2.123 ns | 0.43 | - → - | 1,178 B → 865 B |
+| StringSwitch | Miss | 1.926 ns | 1.844 ns | 0.96 | - → - | 1,164 B → 1,170 B |
+| SpanSwitch | Miss | 1.953 ns | 1.943 ns | 0.99 | - → - | 1,177 B → 949 B |
+| DictionaryLookup | Miss | 3.058 ns | 2.936 ns | 0.96 | - → - | 519 B → 476 B |
+| SampledTable | Miss | 4.440 ns | 4.366 ns | 0.98 | - → - | 807 B → 761 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.08 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method           | Job                 | Runtime   | Probe | Mean     | Error     | StdDev    | Median   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|----------------- |-------------------- |---------- |------ |---------:|----------:|----------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
+| **EqualsChain**      | **.NET 10.0**           | **.NET 10.0** | **Hit**   | **3.069 ns** | **0.0134 ns** | **0.0193 ns** | **3.065 ns** | **3.032 ns** | **3.117 ns** | **3.092 ns** |  **1.00** |    **0.00** |   **1,146 B** |         **-** |          **NA** |
+| SpanEqualsChain  | .NET 10.0           | .NET 10.0 | Hit   | 2.734 ns | 0.0075 ns | 0.0107 ns | 2.734 ns | 2.719 ns | 2.762 ns | 2.746 ns |  0.89 |    0.01 |   1,154 B |         - |          NA |
+| StringSwitch     | .NET 10.0           | .NET 10.0 | Hit   | 1.824 ns | 0.0501 ns | 0.0719 ns | 1.828 ns | 1.734 ns | 1.900 ns | 1.899 ns |  0.59 |    0.02 |   1,158 B |         - |          NA |
+| SpanSwitch       | .NET 10.0           | .NET 10.0 | Hit   | 1.925 ns | 0.0100 ns | 0.0147 ns | 1.922 ns | 1.899 ns | 1.959 ns | 1.945 ns |  0.63 |    0.01 |   1,171 B |         - |          NA |
+| DictionaryLookup | .NET 10.0           | .NET 10.0 | Hit   | 4.628 ns | 0.0402 ns | 0.0602 ns | 4.611 ns | 4.559 ns | 4.828 ns | 4.713 ns |  1.51 |    0.02 |   1,223 B |         - |          NA |
+| SampledTable     | .NET 10.0           | .NET 10.0 | Hit   | 3.716 ns | 0.0102 ns | 0.0144 ns | 3.714 ns | 3.697 ns | 3.753 ns | 3.732 ns |  1.21 |    0.01 |     797 B |         - |          NA |
+|                  |                     |           |       |          |           |           |          |          |          |          |       |         |           |           |             |
+| EqualsChain      | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 3.123 ns | 0.0116 ns | 0.0173 ns | 3.119 ns | 3.096 ns | 3.164 ns | 3.153 ns |  1.00 |    0.00 |   1,152 B |         - |          NA |
+| SpanEqualsChain  | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 1.488 ns | 0.0316 ns | 0.0453 ns | 1.486 ns | 1.423 ns | 1.558 ns | 1.542 ns |  0.48 |    0.01 |     885 B |         - |          NA |
+| StringSwitch     | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 1.806 ns | 0.0542 ns | 0.0777 ns | 1.756 ns | 1.717 ns | 1.939 ns | 1.902 ns |  0.58 |    0.02 |   1,164 B |         - |          NA |
+| SpanSwitch       | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 1.906 ns | 0.0060 ns | 0.0086 ns | 1.906 ns | 1.891 ns | 1.923 ns | 1.916 ns |  0.61 |    0.00 |     918 B |         - |          NA |
+| DictionaryLookup | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 4.748 ns | 0.1024 ns | 0.1469 ns | 4.695 ns | 4.549 ns | 5.131 ns | 4.934 ns |  1.52 |    0.05 |   1,185 B |         - |          NA |
+| SampledTable     | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 3.639 ns | 0.1054 ns | 0.1478 ns | 3.596 ns | 3.497 ns | 4.004 ns | 3.831 ns |  1.16 |    0.05 |     748 B |         - |          NA |
+|                  |                     |           |       |          |           |           |          |          |          |          |       |         |           |           |             |
+| **EqualsChain**      | **.NET 10.0**           | **.NET 10.0** | **Miss**  | **5.525 ns** | **0.0639 ns** | **0.0917 ns** | **5.546 ns** | **5.359 ns** | **5.674 ns** | **5.624 ns** |  **1.00** |    **0.00** |   **1,146 B** |         **-** |          **NA** |
+| SpanEqualsChain  | .NET 10.0           | .NET 10.0 | Miss  | 4.942 ns | 0.1593 ns | 0.2385 ns | 4.865 ns | 4.738 ns | 5.496 ns | 5.415 ns |  0.89 |    0.04 |   1,178 B |         - |          NA |
+| StringSwitch     | .NET 10.0           | .NET 10.0 | Miss  | 1.926 ns | 0.0087 ns | 0.0130 ns | 1.924 ns | 1.905 ns | 1.957 ns | 1.941 ns |  0.35 |    0.01 |   1,164 B |         - |          NA |
+| SpanSwitch       | .NET 10.0           | .NET 10.0 | Miss  | 1.953 ns | 0.0073 ns | 0.0110 ns | 1.954 ns | 1.932 ns | 1.977 ns | 1.967 ns |  0.35 |    0.01 |   1,177 B |         - |          NA |
+| DictionaryLookup | .NET 10.0           | .NET 10.0 | Miss  | 3.058 ns | 0.0123 ns | 0.0176 ns | 3.059 ns | 3.030 ns | 3.092 ns | 3.079 ns |  0.55 |    0.01 |     519 B |         - |          NA |
+| SampledTable     | .NET 10.0           | .NET 10.0 | Miss  | 4.440 ns | 0.0128 ns | 0.0187 ns | 4.438 ns | 4.412 ns | 4.482 ns | 4.467 ns |  0.80 |    0.01 |     807 B |         - |          NA |
+|                  |                     |           |       |          |           |           |          |          |          |          |       |         |           |           |             |
+| EqualsChain      | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 5.455 ns | 0.0513 ns | 0.0752 ns | 5.466 ns | 5.358 ns | 5.601 ns | 5.555 ns |  1.00 |    0.00 |   1,152 B |         - |          NA |
+| SpanEqualsChain  | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 2.123 ns | 0.0625 ns | 0.0896 ns | 2.188 ns | 2.007 ns | 2.221 ns | 2.217 ns |  0.39 |    0.02 |     865 B |         - |          NA |
+| StringSwitch     | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 1.844 ns | 0.0470 ns | 0.0659 ns | 1.868 ns | 1.739 ns | 1.976 ns | 1.899 ns |  0.34 |    0.01 |   1,170 B |         - |          NA |
+| SpanSwitch       | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 1.943 ns | 0.0158 ns | 0.0227 ns | 1.941 ns | 1.911 ns | 2.000 ns | 1.979 ns |  0.36 |    0.01 |     949 B |         - |          NA |
+| DictionaryLookup | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 2.936 ns | 0.0716 ns | 0.1027 ns | 2.900 ns | 2.848 ns | 3.253 ns | 3.032 ns |  0.54 |    0.02 |     476 B |         - |          NA |
+| SampledTable     | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 4.366 ns | 0.0324 ns | 0.0486 ns | 4.366 ns | 4.278 ns | 4.450 ns | 4.424 ns |  0.80 |    0.01 |     761 B |         - |          NA |
+
+### StringSwitchLongKeyBenchmark
+
+net10 → net11 per row:
+
+| Method | Probe | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| SampledSwitch | Hit | 1.920 ns | 1.894 ns | 0.99 | - → - | 2,022 B → 1,757 B |
+| SpanSwitch | Hit | 2.147 ns | 2.073 ns | 0.97 | - → - | 1,651 B → 1,417 B |
+| SampledTable | Hit | 3.508 ns | 3.443 ns | 0.98 | - → - | 793 B → 751 B |
+| SampledSwitch | Miss | 1.918 ns | 1.749 ns | 0.91 | - → - | 2,032 B → 1,842 B |
+| SpanSwitch | Miss | 2.067 ns | 1.980 ns | 0.96 | - → - | 1,640 B → 1,484 B |
+| SampledTable | Miss | 3.161 ns | 2.850 ns | 0.90 | - → - | 779 B → 752 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.86 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method        | Job                 | Runtime   | Probe | Mean     | Error     | StdDev    | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|-------------- |-------------------- |---------- |------ |---------:|----------:|----------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
+| **SampledSwitch** | **.NET 10.0**           | **.NET 10.0** | **Hit**   | **1.920 ns** | **0.0481 ns** | **0.0705 ns** | **1.855 ns** | **2.120 ns** | **2.019 ns** |  **1.00** |    **0.00** |   **2,022 B** |         **-** |          **NA** |
+| SpanSwitch    | .NET 10.0           | .NET 10.0 | Hit   | 2.147 ns | 0.0965 ns | 0.1444 ns | 2.034 ns | 2.617 ns | 2.353 ns |  1.12 |    0.08 |   1,651 B |         - |          NA |
+| SampledTable  | .NET 10.0           | .NET 10.0 | Hit   | 3.508 ns | 0.0405 ns | 0.0568 ns | 3.404 ns | 3.585 ns | 3.573 ns |  1.83 |    0.07 |     793 B |         - |          NA |
+|               |                     |           |       |          |           |           |          |          |          |       |         |           |           |             |
+| SampledSwitch | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 1.894 ns | 0.0715 ns | 0.1047 ns | 1.781 ns | 2.191 ns | 2.042 ns |  1.00 |    0.00 |   1,757 B |         - |          NA |
+| SpanSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 2.073 ns | 0.0362 ns | 0.0542 ns | 1.996 ns | 2.191 ns | 2.145 ns |  1.10 |    0.06 |   1,417 B |         - |          NA |
+| SampledTable  | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 3.443 ns | 0.0573 ns | 0.0840 ns | 3.324 ns | 3.683 ns | 3.549 ns |  1.82 |    0.10 |     751 B |         - |          NA |
+|               |                     |           |       |          |           |           |          |          |          |       |         |           |           |             |
+| **SampledSwitch** | **.NET 10.0**           | **.NET 10.0** | **Miss**  | **1.918 ns** | **0.0177 ns** | **0.0260 ns** | **1.881 ns** | **1.979 ns** | **1.952 ns** |  **1.00** |    **0.00** |   **2,032 B** |         **-** |          **NA** |
+| SpanSwitch    | .NET 10.0           | .NET 10.0 | Miss  | 2.067 ns | 0.0118 ns | 0.0169 ns | 2.035 ns | 2.101 ns | 2.087 ns |  1.08 |    0.02 |   1,640 B |         - |          NA |
+| SampledTable  | .NET 10.0           | .NET 10.0 | Miss  | 3.161 ns | 0.0271 ns | 0.0397 ns | 3.100 ns | 3.227 ns | 3.204 ns |  1.65 |    0.03 |     779 B |         - |          NA |
+|               |                     |           |       |          |           |           |          |          |          |       |         |           |           |             |
+| SampledSwitch | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 1.749 ns | 0.0212 ns | 0.0311 ns | 1.694 ns | 1.826 ns | 1.779 ns |  1.00 |    0.00 |   1,842 B |         - |          NA |
+| SpanSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 1.980 ns | 0.0093 ns | 0.0139 ns | 1.954 ns | 2.006 ns | 1.995 ns |  1.13 |    0.02 |   1,484 B |         - |          NA |
+| SampledTable  | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 2.850 ns | 0.0099 ns | 0.0135 ns | 2.825 ns | 2.875 ns | 2.865 ns |  1.63 |    0.03 |     752 B |         - |          NA |
+
+### StringSwitch64Benchmark
+
+net10 → net11 per row:
+
+| Method | Probe | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| SampledSwitch | Hit | 2.539 ns | 2.981 ns | 1.17 | - → - | 5,821 B → 4,770 B |
+| SpanSwitch | Hit | 2.657 ns | 2.376 ns | 0.89 | - → - | 4,903 B → 3,263 B |
+| SampledTable | Hit | 3.482 ns | 3.285 ns | 0.94 | - → - | 797 B → 755 B |
+| SampledSwitch | Miss | 2.328 ns | 2.766 ns | 1.19 | - → - | 5,963 B → 4,801 B |
+| SpanSwitch | Miss | 2.277 ns | 2.085 ns | 0.92 | - → - | 5,024 B → 3,596 B |
+| SampledTable | Miss | 4.020 ns | 3.877 ns | 0.96 | - → - | 778 B → 742 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.75 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method        | Job                 | Runtime   | Probe | Mean     | Error     | StdDev    | Median   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|-------------- |-------------------- |---------- |------ |---------:|----------:|----------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
+| **SampledSwitch** | **.NET 10.0**           | **.NET 10.0** | **Hit**   | **2.539 ns** | **0.0803 ns** | **0.1177 ns** | **2.601 ns** | **2.408 ns** | **2.719 ns** | **2.670 ns** |  **1.00** |    **0.00** |   **5,821 B** |         **-** |          **NA** |
+| SpanSwitch    | .NET 10.0           | .NET 10.0 | Hit   | 2.657 ns | 0.0102 ns | 0.0149 ns | 2.655 ns | 2.623 ns | 2.696 ns | 2.672 ns |  1.05 |    0.05 |   4,903 B |         - |          NA |
+| SampledTable  | .NET 10.0           | .NET 10.0 | Hit   | 3.482 ns | 0.0151 ns | 0.0221 ns | 3.479 ns | 3.443 ns | 3.545 ns | 3.508 ns |  1.37 |    0.06 |     797 B |         - |          NA |
+|               |                     |           |       |          |           |           |          |          |          |          |       |         |           |           |             |
+| SampledSwitch | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 2.981 ns | 0.0825 ns | 0.1184 ns | 2.998 ns | 2.757 ns | 3.163 ns | 3.131 ns |  1.00 |    0.00 |   4,770 B |         - |          NA |
+| SpanSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 2.376 ns | 0.0099 ns | 0.0149 ns | 2.377 ns | 2.345 ns | 2.407 ns | 2.396 ns |  0.80 |    0.03 |   3,263 B |         - |          NA |
+| SampledTable  | MediumRun-.NET 11.0 | .NET 11.0 | Hit   | 3.285 ns | 0.0153 ns | 0.0220 ns | 3.279 ns | 3.260 ns | 3.339 ns | 3.314 ns |  1.10 |    0.04 |     755 B |         - |          NA |
+|               |                     |           |       |          |           |           |          |          |          |          |       |         |           |           |             |
+| **SampledSwitch** | **.NET 10.0**           | **.NET 10.0** | **Miss**  | **2.328 ns** | **0.0220 ns** | **0.0329 ns** | **2.327 ns** | **2.271 ns** | **2.398 ns** | **2.369 ns** |  **1.00** |    **0.00** |   **5,963 B** |         **-** |          **NA** |
+| SpanSwitch    | .NET 10.0           | .NET 10.0 | Miss  | 2.277 ns | 0.0207 ns | 0.0303 ns | 2.274 ns | 2.234 ns | 2.337 ns | 2.316 ns |  0.98 |    0.02 |   5,024 B |         - |          NA |
+| SampledTable  | .NET 10.0           | .NET 10.0 | Miss  | 4.020 ns | 0.0108 ns | 0.0151 ns | 4.020 ns | 3.988 ns | 4.051 ns | 4.036 ns |  1.73 |    0.02 |     778 B |         - |          NA |
+|               |                     |           |       |          |           |           |          |          |          |          |       |         |           |           |             |
+| SampledSwitch | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 2.766 ns | 0.0413 ns | 0.0618 ns | 2.770 ns | 2.654 ns | 2.913 ns | 2.839 ns |  1.00 |    0.00 |   4,801 B |         - |          NA |
+| SpanSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 2.085 ns | 0.0111 ns | 0.0167 ns | 2.082 ns | 2.057 ns | 2.114 ns | 2.110 ns |  0.75 |    0.02 |   3,596 B |         - |          NA |
+| SampledTable  | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 3.877 ns | 0.0178 ns | 0.0250 ns | 3.871 ns | 3.838 ns | 3.937 ns | 3.913 ns |  1.40 |    0.03 |     742 B |         - |          NA |
+
+### StringSwitch128Benchmark
+
+net10 → net11 per row:
+
+| Method | Probe | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| SampledSwitch | Hit | 2.954 ns | 2.650 ns | 0.90 | - → - | 11,506 B → 9,421 B |
+| SpanSwitch | Hit | 3.913 ns | 3.881 ns | 0.99 | - → - | 11,591 B → 9,517 B |
+| SampledTable | Hit | 3.614 ns | 3.434 ns | 0.95 | - → - | 800 B → 754 B |
+| SampledSwitch | Miss | 2.782 ns | 2.330 ns | 0.84 | - → - | 11,517 B → 9,484 B |
+| SpanSwitch | Miss | 10.074 ns | 10.244 ns | 1.02 | - → - | 12,043 B → 12,947 B |
+| SampledTable | Miss | 4.277 ns | 4.038 ns | 0.94 | - → - | 793 B → 738 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.51 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method        | Job                 | Runtime   | Probe | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|-------------- |-------------------- |---------- |------ |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| **SampledSwitch** | **.NET 10.0**           | **.NET 10.0** | **Hit**   |  **2.954 ns** | **0.1982 ns** | **0.2967 ns** |  **2.615 ns** |  **3.315 ns** |  **3.273 ns** |  **1.00** |    **0.00** |  **11,506 B** |         **-** |          **NA** |
+| SpanSwitch    | .NET 10.0           | .NET 10.0 | Hit   |  3.913 ns | 0.1136 ns | 0.1701 ns |  3.683 ns |  4.251 ns |  4.136 ns |  1.34 |    0.14 |  11,591 B |         - |          NA |
+| SampledTable  | .NET 10.0           | .NET 10.0 | Hit   |  3.614 ns | 0.0097 ns | 0.0145 ns |  3.589 ns |  3.641 ns |  3.632 ns |  1.24 |    0.12 |     800 B |         - |          NA |
+|               |                     |           |       |           |           |           |           |           |           |       |         |           |           |             |
+| SampledSwitch | MediumRun-.NET 11.0 | .NET 11.0 | Hit   |  2.650 ns | 0.1343 ns | 0.2010 ns |  2.422 ns |  2.938 ns |  2.884 ns |  1.00 |    0.00 |   9,421 B |         - |          NA |
+| SpanSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | Hit   |  3.881 ns | 0.1355 ns | 0.1943 ns |  3.686 ns |  4.316 ns |  4.143 ns |  1.47 |    0.13 |   9,517 B |         - |          NA |
+| SampledTable  | MediumRun-.NET 11.0 | .NET 11.0 | Hit   |  3.434 ns | 0.0222 ns | 0.0326 ns |  3.380 ns |  3.491 ns |  3.466 ns |  1.30 |    0.10 |     754 B |         - |          NA |
+|               |                     |           |       |           |           |           |           |           |           |       |         |           |           |             |
+| **SampledSwitch** | **.NET 10.0**           | **.NET 10.0** | **Miss**  |  **2.782 ns** | **0.0331 ns** | **0.0496 ns** |  **2.691 ns** |  **2.878 ns** |  **2.840 ns** |  **1.00** |    **0.00** |  **11,517 B** |         **-** |          **NA** |
+| SpanSwitch    | .NET 10.0           | .NET 10.0 | Miss  | 10.074 ns | 0.0668 ns | 0.0979 ns |  9.899 ns | 10.272 ns | 10.212 ns |  3.62 |    0.07 |  12,043 B |         - |          NA |
+| SampledTable  | .NET 10.0           | .NET 10.0 | Miss  |  4.277 ns | 0.0138 ns | 0.0197 ns |  4.251 ns |  4.324 ns |  4.306 ns |  1.54 |    0.03 |     793 B |         - |          NA |
+|               |                     |           |       |           |           |           |           |           |           |       |         |           |           |             |
+| SampledSwitch | MediumRun-.NET 11.0 | .NET 11.0 | Miss  |  2.330 ns | 0.0112 ns | 0.0164 ns |  2.289 ns |  2.357 ns |  2.350 ns |  1.00 |    0.00 |   9,484 B |         - |          NA |
+| SpanSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | Miss  | 10.244 ns | 0.0508 ns | 0.0744 ns | 10.101 ns | 10.396 ns | 10.347 ns |  4.40 |    0.04 |  12,947 B |         - |          NA |
+| SampledTable  | MediumRun-.NET 11.0 | .NET 11.0 | Miss  |  4.038 ns | 0.0293 ns | 0.0421 ns |  3.969 ns |  4.106 ns |  4.093 ns |  1.73 |    0.02 |     738 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: **adopted with a size window** - the default for 5-64 keys, useless at <=4, and not usable above 64
 - 16 keys: **0.51x hit / 0.33x miss** vs an Equals chain; also beats Dictionary(Ordinal) (1.38x) and SampledNameTable (1.09x) on hit
 - 64 keys: level with a hand-written sampling-hash switch (1.06x hit, 1.00x miss - CIs overlap)

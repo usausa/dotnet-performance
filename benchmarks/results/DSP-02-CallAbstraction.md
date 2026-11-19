@@ -1,5 +1,51 @@
 # DSP-02: Call abstraction overhead (1024 calls, net10)
 
+## net11 / net10 re-verification (2026-11-18, HX 370)
+
+- Verdict: unchanged - hold the concrete sealed type; the function pointer stays the slowest option (4.65x on net10, 5.58x on net11)
+- ViaInterface reads 1.11x on net11 (221.3 → 245.8 ns) with the same 84 B of code; attributed to placement (pitfall 10). The abstract call is unchanged at 1.00x
+
+### CallAbstractionBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| DirectSealed | 221.6 ns | 221.1 ns | 1.00 | - → - | 27 B → 27 B |
+| ViaInterface | 221.3 ns | 245.8 ns | 1.11 | - → - | 84 B → 84 B |
+| ViaAbstract | 219.9 ns | 220.2 ns | 1.00 | - → - | 81 B → 81 B |
+| ViaDelegate | 254.9 ns | 264.8 ns | 1.04 | - → - | 85 B → 85 B |
+| ViaFunctionPointer | 1,030.6 ns | 1,233.4 ns | 1.20 | - → - | 42 B → 42 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.56 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method             | Job                 | Runtime   | Mean       | Error   | StdDev  | Median     | Min        | Max        | P90        | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|------------------- |-------------------- |---------- |-----------:|--------:|--------:|-----------:|-----------:|-----------:|-----------:|------:|--------:|----------:|----------:|------------:|
+| DirectSealed       | .NET 10.0           | .NET 10.0 |   221.6 ns | 0.52 ns | 0.76 ns |   221.5 ns |   220.2 ns |   223.9 ns |   222.7 ns |  1.00 |    0.00 |      27 B |         - |          NA |
+| ViaInterface       | .NET 10.0           | .NET 10.0 |   221.3 ns | 1.81 ns | 2.47 ns |   220.7 ns |   218.1 ns |   227.9 ns |   224.5 ns |  1.00 |    0.01 |      84 B |         - |          NA |
+| ViaAbstract        | .NET 10.0           | .NET 10.0 |   219.9 ns | 0.80 ns | 1.12 ns |   220.0 ns |   217.1 ns |   222.2 ns |   221.2 ns |  0.99 |    0.01 |      81 B |         - |          NA |
+| ViaDelegate        | .NET 10.0           | .NET 10.0 |   254.9 ns | 1.18 ns | 1.66 ns |   254.6 ns |   252.6 ns |   259.7 ns |   256.7 ns |  1.15 |    0.01 |      85 B |         - |          NA |
+| ViaFunctionPointer | .NET 10.0           | .NET 10.0 | 1,030.6 ns | 2.71 ns | 3.80 ns | 1,030.9 ns | 1,024.7 ns | 1,039.9 ns | 1,035.5 ns |  4.65 |    0.02 |      42 B |         - |          NA |
+|                    |                     |           |            |         |         |            |            |            |            |       |         |           |           |             |
+| DirectSealed       | MediumRun-.NET 11.0 | .NET 11.0 |   221.1 ns | 0.43 ns | 0.59 ns |   221.0 ns |   220.0 ns |   222.3 ns |   221.7 ns |  1.00 |    0.00 |      27 B |         - |          NA |
+| ViaInterface       | MediumRun-.NET 11.0 | .NET 11.0 |   245.8 ns | 6.56 ns | 9.41 ns |   240.4 ns |   234.0 ns |   258.6 ns |   257.2 ns |  1.11 |    0.04 |      84 B |         - |          NA |
+| ViaAbstract        | MediumRun-.NET 11.0 | .NET 11.0 |   220.2 ns | 1.44 ns | 2.02 ns |   219.7 ns |   217.7 ns |   225.2 ns |   223.0 ns |  1.00 |    0.01 |      81 B |         - |          NA |
+| ViaDelegate        | MediumRun-.NET 11.0 | .NET 11.0 |   264.8 ns | 6.76 ns | 9.91 ns |   270.4 ns |   252.5 ns |   276.8 ns |   276.3 ns |  1.20 |    0.04 |      85 B |         - |          NA |
+| ViaFunctionPointer | MediumRun-.NET 11.0 | .NET 11.0 | 1,233.4 ns | 4.93 ns | 6.91 ns | 1,231.4 ns | 1,223.6 ns | 1,254.6 ns | 1,241.2 ns |  5.58 |    0.03 |      42 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: hold the concrete sealed type where possible; function pointers are NOT the fast option on net10
 - DirectSealed 215.8 ns (1.00, 27 B - inlined) | ViaAbstract 223.6 ns (1.04) | ViaInterface 224.3 ns (1.04) | ViaDelegate 254.6 ns (1.18) | ViaFunctionPointer 1,250.7 ns (5.80x SLOWEST)
 - Interface and abstract dispatch cost only ~4% here - a monomorphic virtual call predicts and speculates well; the delegate's 1.18x is the largest of the ordinary options

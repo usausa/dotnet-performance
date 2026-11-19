@@ -259,7 +259,7 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 | ② | COL-01 の実装例・自環境再測定 | AsSpan / GetValueRefOrAddDefault(収録済みパターンの実装例化) | COL-01 | ✅ 検証済(AsSpan 0.52 / ref 化 0.66) |
 | ③ | byte 列の int 化定数比較 | 短い ASCII トークン(HTTP メソッド等)を uint/ulong 定数 1 比較で判定 vs `SequenceEqual("..."u8)` | BIT-01 / TXT-01 | ✅ 収録([TXT-04](../README.ja.md#-txt-04-バイト列トークンの直接判定)。string 化回避が本質、uint と SequenceEqual は同速) |
 | ③ | Utf8.TryWrite(.NET 8+) | UTF-8 補間ハンドラによる Span\<byte\> 直接整形。TXT-01 テーブル方式との比較 | TXT-01 / BUF-02 | ✅ 収録([TXT-05](../README.ja.md#-txt-05-utf8trywrite-による-utf-8-直接整形)、0.54 倍・0B) |
-| ③ | ASCII 特化処理 | Ascii クラス(.NET 8)/ char.IsAsciiXxx / `& 0x5F` 大文字化による ASCII 前提の高速パス | BIT-01 / TXT-01 | ✅ 収録([TXT-06](../README.ja.md#-txt-06-ascii-特化比較)、0.62 倍。手書き正規化は記号衝突の注意付き) |
+| ③ | ASCII 特化処理 | Ascii クラス(.NET 8)/ char.IsAsciiXxx / `& 0x5F` 大文字化による ASCII 前提の高速パス | BIT-01 / TXT-01 | ✅ 収録([TXT-06](../README.ja.md#-txt-06-ascii-特化比較)、net10 は Ascii 0.77 倍、net11 は `string.Equals` が逆転して Ascii 2.16 倍。手書き正規化は記号衝突の注意付き) |
 | ③ | BUF-02 の実装例(I/O 直結) | MemoryStream 蓄積 vs ArrayBufferWriter vs 自前 PooledBufferWriter(収録済みパターンの実証) | BUF-02 | ✅ 実装済(PooledBufferWriter。アロケーション 2,976B→32B) |
 | ④ | async ステートマシンの省略 | 単純フォワードの Task 直接返し vs async/await。例外発生位置・using スコープが変わる注意付き | TXT-03 / 拡充候補 ValueTask | ✅ 収録([ASY-01](../README.ja.md#-asy-01-async-ステートマシンの省略)、0.16 倍・73B→0B) |
 | ④ | Environment.TickCount64 / Stopwatch.GetTimestamp | DateTime.UtcNow(十数 ns)を回避する時刻・経過時間取得。キャッシュ TTL・タイムアウト用途 | — | ✅ 収録([SYS-01](../README.ja.md#️-sys-01-低コストの時刻経過時間取得)、TickCount64 は 22 倍) |
@@ -342,7 +342,7 @@ DOTNET_TieredCompilation=0 DOTNET_JitDisasm="*MethodName*" ./app.exe
 
 | # | .NET 11 の変更(PR) | 影響する記述 | 測るもの | 書き換え条件 | 結果(HX 370・2026-11-18) |
 |---|---|---|---|---|---|
-| F1 | `FrozenDictionary` 構築時の一時 `Dictionary` を元の件数で事前サイズ確保(#128300) | **COL-02 / R-08**(不採用の主因は「構築が `Dictionary` の 5〜20 倍」) | COL-02 の構築ベンチを net11 で再測 | 構築比が縮めば COL-02 の採用条件を緩和。検索側は変わらないので「1024 件で検索 1.19 倍遅い」は残る | ➖ 不変 — 構築比は net10 9.4 / 7.6 / 5.4 倍、net11 10.7 / 8.3 / 5.5 倍で、確保も同じ。件数の分かる配列から作る形には効かない。外部実測(4,096 件)とは入力の形が違う → [COL-02](../benchmarks/results/COL-02-FrozenCondition.md) |
+| F1 | `FrozenDictionary` 構築時の一時 `Dictionary` を元の件数で事前サイズ確保(#128300) | **COL-02 / R-08**(不採用の主因は「構築が `Dictionary` の 5〜20 倍」) | COL-02 の構築ベンチを net11 で再測 | 構築比が縮めば COL-02 の採用条件を緩和。検索側は変わらないので「1024 件で検索 1.19 倍遅い」は残る | ➖ 不変 — 構築比は net10 9.4 / 7.6 / 5.4 倍、net11 10.7 / 8.3 / 5.5 倍で、確保も同じ。事前サイズ確保が効くのは件数の分かる `KeyValuePair` の列をセレクタなしで渡す形だけ(4,096 件で 803 → 495 KB、0.88 倍)。セレクタ付きは net10 から同じ確保量、件数の分からない列挙は不変 → [COL-02](../benchmarks/results/COL-02-FrozenCondition.md) |
 | F2 | ジェネリック `T : Enum` 文脈の `Enum.Equals` を基底整数の直接比較へ畳む(#122779)。従来はボックス 2 回 + 仮想呼び出し | 上表 ⑥ の ①、STK-05(暗黙ボックス化リスト) | STK-05 の enum 比較ケースを net11 で再測 | 0 B になれば STK-05 のリストから外し「net11 以降は不要」と世代注記。`EqualityComparer<T>.Default` や `Unsafe.As` による回避策も不要になる | ✅ 変化 — 5.42 ns・48 B → 0.80 ns・0 B で、`EqualityComparer<T>.Default` の回避策と同じ。STK-05 に世代注記 → [F2](../benchmarks/results/NET11-Revalidation.md#f2-genericenumequalsbenchmark) |
 | F3 | 参照型配列への格納で、JIT が配列の正確な型を知る場合は共変性チェックを除去(#126547) | MEM-02、DSP-01(sealed) | `object[]` への格納 vs sealed 要素型の配列への格納 vs ローカル生成配列への格納 | チェックが消える条件が確認できれば DSP-01 の効果に「配列格納の共変性チェック回避」を追加 | ➖ net11 では不変 — `object[]` と sealed でない要素型の配列は両世代ともチェックあり(ヘルパーは 0.72〜0.80 倍に高速化)。sealed 要素型とメソッド内で作った配列は両世代ともなし。DSP-01 に追記 → [F3](../benchmarks/results/NET11-Revalidation.md#f3-arraycovariancebenchmark) |
 

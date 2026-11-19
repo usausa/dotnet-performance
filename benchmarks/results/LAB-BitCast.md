@@ -1,5 +1,50 @@
 # LAB-BitCast: Unsafe.BitCast vs Unsafe.As (study queue 7-7)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged - the five variants run within 210-216 ns on both generations with identical code sizes
+
+### BitCastBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| UnsafeAsReinterpret | 216.1 ns | 215.2 ns | 1.00 | - → - | 57 B → 57 B |
+| UnsafeBitCastReinterpret | 215.7 ns | 215.0 ns | 1.00 | - → - | 57 B → 57 B |
+| BitConverterReinterpret | 215.7 ns | 215.0 ns | 1.00 | - → - | 57 B → 57 B |
+| GenericUnsafeAs | 209.9 ns | 210.5 ns | 1.00 | - → - | 21 B → 21 B |
+| GenericBitCast | 210.0 ns | 210.8 ns | 1.00 | - → - | 21 B → 21 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.77 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method                   | Job                 | Runtime   | Mean     | Error   | StdDev  | Min      | Max      | P90      | Ratio | Code Size | Allocated | Alloc Ratio |
+|------------------------- |-------------------- |---------- |---------:|--------:|--------:|---------:|---------:|---------:|------:|----------:|----------:|------------:|
+| UnsafeAsReinterpret      | .NET 10.0           | .NET 10.0 | 216.1 ns | 0.35 ns | 0.49 ns | 214.7 ns | 216.8 ns | 216.5 ns |  1.00 |      57 B |         - |          NA |
+| UnsafeBitCastReinterpret | .NET 10.0           | .NET 10.0 | 215.7 ns | 0.40 ns | 0.57 ns | 214.5 ns | 216.8 ns | 216.3 ns |  1.00 |      57 B |         - |          NA |
+| BitConverterReinterpret  | .NET 10.0           | .NET 10.0 | 215.7 ns | 0.31 ns | 0.44 ns | 215.1 ns | 217.0 ns | 216.2 ns |  1.00 |      57 B |         - |          NA |
+| GenericUnsafeAs          | .NET 10.0           | .NET 10.0 | 209.9 ns | 0.48 ns | 0.69 ns | 208.6 ns | 211.6 ns | 210.9 ns |  0.97 |      21 B |         - |          NA |
+| GenericBitCast           | .NET 10.0           | .NET 10.0 | 210.0 ns | 0.50 ns | 0.74 ns | 209.1 ns | 211.8 ns | 211.1 ns |  0.97 |      21 B |         - |          NA |
+|                          |                     |           |          |         |         |          |          |          |       |           |           |             |
+| UnsafeAsReinterpret      | MediumRun-.NET 11.0 | .NET 11.0 | 215.2 ns | 0.32 ns | 0.45 ns | 214.5 ns | 216.1 ns | 215.8 ns |  1.00 |      57 B |         - |          NA |
+| UnsafeBitCastReinterpret | MediumRun-.NET 11.0 | .NET 11.0 | 215.0 ns | 0.38 ns | 0.56 ns | 214.1 ns | 216.6 ns | 215.7 ns |  1.00 |      57 B |         - |          NA |
+| BitConverterReinterpret  | MediumRun-.NET 11.0 | .NET 11.0 | 215.0 ns | 0.36 ns | 0.51 ns | 214.3 ns | 216.1 ns | 215.8 ns |  1.00 |      57 B |         - |          NA |
+| GenericUnsafeAs          | MediumRun-.NET 11.0 | .NET 11.0 | 210.5 ns | 0.47 ns | 0.71 ns | 209.2 ns | 211.9 ns | 211.4 ns |  0.98 |      21 B |         - |          NA |
+| GenericBitCast           | MediumRun-.NET 11.0 | .NET 11.0 | 210.8 ns | 0.50 ns | 0.75 ns | 209.1 ns | 212.3 ns | 211.6 ns |  0.98 |      21 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: identical codegen -> adopt `Unsafe.BitCast` as the default on the safety axis. Re-measured twice on
   x86-64-v4 (Zen 5); the x86-64-v3 (Zen 3) run agreed
 - **All five variants produce an identical instruction stream**: 20 instructions / 57 B for the three

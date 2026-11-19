@@ -112,7 +112,7 @@ This README is the single source of the core knowledge (pattern taxonomy, index,
 | [TXT-03](#-txt-03-avoiding-exceptions-with-the-try-pattern) | Try pattern | Do not use exceptions for control flow | ✅ | [Verified](benchmarks/results/TXT-03-TryPattern.md) |
 | [TXT-04](#-txt-04-matching-byte-sequence-tokens-directly) | Direct byte-token matching | Match with u8/uint instead of materializing a string | ✅ | [Verified](benchmarks/results/TXT-04-TokenMatch.md) |
 | [TXT-05](#-txt-05-direct-utf-8-formatting-with-utf8trywrite) | Utf8.TryWrite | Direct Span writes for UTF-8 interpolation | ✅ | [Verified](benchmarks/results/TXT-05-Utf8TryWrite.md) |
-| [TXT-06](#-txt-06-ascii-specialized-comparison) | ASCII-specialized comparison | Case-insensitive handling via the Ascii class | ✅ | [Verified](benchmarks/results/TXT-06-Ascii.md) |
+| [TXT-06](#-txt-06-ascii-specialized-comparison) | ASCII-specialized comparison | Case-insensitive comparison (string.Equals for strings, Ascii for bytes) | ✅ | [Verified](benchmarks/results/TXT-06-Ascii.md) |
 | [TXT-07](#-txt-07-stringcreate--tryformat--ispanformattable) | string.Create / TryFormat | Zero-allocation string creation | ✅ | [Verified](benchmarks/results/TXT-07-StringCreate.md) |
 | [TXT-08](#-txt-08-searchvaluest) | SearchValues\<T\> | SIMD-optimized search over many candidates | ✅ | [Verified](benchmarks/results/TXT-08-SearchValues.md) |
 | [TXT-09](#-txt-09-applied-idioms-for-fixed-length-formatting) | Advanced fixed-width formatting | TryFormat + Fill and vectorized trimming | ✅ | [Verified](benchmarks/results/TXT-09-FixedFieldFormat.md) |
@@ -2844,7 +2844,7 @@ for (var i = 0; i < span.Length; i++)
 - Lookups are 2-4x faster than `Dictionary` (1024 entries). But **construction is 15-20x slower** and allocates far more — only for tables built once at startup and read forever
 - For some key sets the lookup advantage reverses as well (measured: 1.15-1.31x slower than Dictionary for 64 enum names). Measure with real data before adopting
 
-**Re-verified on net11 (net11 / net10, x86-64-v4):** building is not cheaper on net11. The build ratio against `Dictionary` is 9.4 / 7.6 / 5.4x on net10 and 10.7 / 8.3 / 5.5x on net11 (16 / 256 / 1024 entries), with identical allocation. The net11 pre-sizing (#128300) does not apply to a source array whose count is known, so the adoption condition stays. → [Results](benchmarks/results/COL-02-FrozenCondition.md)
+**Re-verified on net11 (net11 / net10, x86-64-v4):** building is not cheaper on net11. The build ratio against `Dictionary` is 9.4 / 7.6 / 5.4x on net10 and 10.7 / 8.3 / 5.5x on net11 (16 / 256 / 1024 entries), with identical allocation. The net11 pre-sizing (#128300) applies only when a count-known sequence of `KeyValuePair` is passed without selectors (803 → 495 KB, 0.88x at 4,096 entries); the selector form already allocated that little on net10, and a sequence of unknown count is not helped. The adoption condition stays. → [Results](benchmarks/results/COL-02-FrozenCondition.md)
 
 **Measured (net10 / x86-64-v4, string keys, non-interned probes):**
 
@@ -3290,22 +3290,22 @@ if (Utf8.TryWrite(destination, $"id={id}&name={name}&ts={timestamp}", out var wr
 
 ### 🔤 TXT-06: ASCII-specialized comparison
 
-**Goal:** Replace the general Unicode-aware implementation with the ASCII-specialized one (.NET 8's `Ascii` class) for case-insensitive handling of tokens guaranteed to be ASCII (HTTP header names and the like).
+**Goal:** For case-insensitive comparison of tokens guaranteed to be ASCII (HTTP header names and the like), pick the ordinal comparison API that fits the input shape (string or byte sequence).
 
-**Effect (measured, net10 / x86-64-v4, case-insensitive comparison of 8 header name pairs):**
+**Effect (measured, net11 / net10, x86-64-v4, case-insensitive comparison of 8 header name pairs):**
 
-- `Ascii.EqualsIgnoreCase` (byte sequence against byte sequence) is **0.76x** versus `string.Equals(OrdinalIgnoreCase)`. It compares bytes as they are, so the string conversion itself becomes unnecessary too (the effective gap is larger still)
-- A hand-written `| 0x20` normalized comparison is the fastest at 0.59x, but it carries the trap of falsely equating symbol pairs such as `@` and `` ` ``
+- **Reversed on net11:** `string.Equals(OrdinalIgnoreCase)` dropped from 57.0 to 22.1 ns, so `Ascii.EqualsIgnoreCase` (byte sequence against byte sequence) is **2.16x** of it and the hand-written `| 0x20` normalized comparison 1.47x; neither is faster any more. On net10 the old order holds (Ascii 0.77x, hand-written 0.57x)
+- For string input use the plain `string.Equals(OrdinalIgnoreCase)`. Use `Ascii` when the input is already a byte sequence (received UTF-8 headers and the like) and the string conversion can be skipped. The hand-written `| 0x20` carries the trap of falsely equating symbol pairs such as `@` and `` ` ``
 
 **AOT:** ✅ No issues
 
 **Example:**
 
 ```csharp
-// Default: the Ascii class (.NET 8+; mixed byte/char overloads exist too)
-if (Ascii.EqualsIgnoreCase(headerName, "content-type"u8)) { ... }
-
-// | 0x20 normalization is acceptable only for a closed token set that differs solely in letter case
+// String input: the plain string.Equals (fastest on net11)
+if (string.Equals(headerName, "content-type", StringComparison.OrdinalIgnoreCase)) { ... }
+// Byte input: compare with Ascii without converting to string (.NET 8+; mixed byte/char overloads exist too)
+if (Ascii.EqualsIgnoreCase(headerBytes, "content-type"u8)) { ... }
 ```
 
 **Use cases:** Matching HTTP headers and protocol fields, normalization with `Ascii.ToLowerInPlace` and friends, classification with the `char.IsAsciiDigit` family.

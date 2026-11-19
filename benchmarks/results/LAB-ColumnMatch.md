@@ -1,5 +1,249 @@
 # LAB-ColumnMatch: normalizing the probe vs matching case-insensitively (TXT-10 counter-case)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged - converting the probe still loses in all 12 conditions on net11; the generated chain / hash is the fastest at 8 columns and the plain span switch at 24
+- `ToUpperInvariant` + string switch got 0.78-0.80x faster on net11 when the probe is already upper case (34.4 → 26.9 ns at 8, 107.5 → 84.0 ns at 24). At 24 columns that leaves it 1.06-1.08x of the generated hash instead of 1.36x, still a loss
+- The string-switch forms carry 1.3-2.5x more code on net11 (up to 9.9 KB) with no time change where the probe is not already upper case
+
+### ColumnMatchPascal8Benchmark
+
+net10 → net11 per row:
+
+| Method | Casing | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| GeneratedChain | AsDeclared | 8.740 ns | 9.195 ns | 1.05 | - → - | 1,012 B → 986 B |
+| UpperStringSwitch | AsDeclared | 69.107 ns | 64.982 ns | 0.94 | 304 B → 304 B | 2,765 B → 4,942 B |
+| UpperSpanSwitch | AsDeclared | 48.710 ns | 48.504 ns | 1.00 | - → - | 1,865 B → 1,743 B |
+| AsciiUpperSpanSwitch | AsDeclared | 45.668 ns | 45.250 ns | 0.99 | - → - | 1,648 B → 1,559 B |
+| PlainSpanSwitch | AsDeclared | 18.023 ns | 18.566 ns | 1.03 | - → - | 1,134 B → 1,030 B |
+| ChainViaMatcher | AsDeclared | 18.469 ns | 19.202 ns | 1.04 | - → - | 1,804 B → 1,786 B |
+| GeneratedChain | AllUpper | 8.569 ns | 9.230 ns | 1.08 | - → - | 1,012 B → 986 B |
+| UpperStringSwitch | AllUpper | 34.402 ns | 26.870 ns | 0.78 | - → - | 2,833 B → 3,777 B |
+| UpperSpanSwitch | AllUpper | 48.799 ns | 48.431 ns | 0.99 | - → - | 1,865 B → 1,743 B |
+| AsciiUpperSpanSwitch | AllUpper | 45.805 ns | 45.211 ns | 0.99 | - → - | 1,648 B → 1,559 B |
+| PlainSpanSwitch | AllUpper | 15.749 ns | 15.849 ns | 1.01 | - → - | 1,141 B → 1,111 B |
+| ChainViaMatcher | AllUpper | 18.521 ns | 19.014 ns | 1.03 | - → - | 1,804 B → 1,786 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.64 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method               | Job                 | Runtime   | Casing     | Mean      | Error     | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
+|--------------------- |-------------------- |---------- |----------- |----------:|----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
+| **GeneratedChain**       | **.NET 10.0**           | **.NET 10.0** | **AsDeclared** |  **8.740 ns** | **0.0936 ns** | **0.1372 ns** |  **8.731 ns** |  **8.446 ns** |  **9.028 ns** |  **8.891 ns** |  **1.00** |    **0.00** |   **1,012 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | .NET 10.0           | .NET 10.0 | AsDeclared | 69.107 ns | 0.4519 ns | 0.6482 ns | 69.028 ns | 68.074 ns | 71.110 ns | 69.843 ns |  7.91 |    0.14 |   2,765 B | 0.0362 |     304 B |          NA |
+| UpperSpanSwitch      | .NET 10.0           | .NET 10.0 | AsDeclared | 48.710 ns | 0.2171 ns | 0.3182 ns | 48.676 ns | 48.228 ns | 49.410 ns | 49.215 ns |  5.57 |    0.09 |   1,865 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | .NET 10.0           | .NET 10.0 | AsDeclared | 45.668 ns | 0.1118 ns | 0.1567 ns | 45.644 ns | 45.470 ns | 46.057 ns | 45.952 ns |  5.23 |    0.08 |   1,648 B |      - |         - |          NA |
+| PlainSpanSwitch      | .NET 10.0           | .NET 10.0 | AsDeclared | 18.023 ns | 0.2109 ns | 0.3025 ns | 17.999 ns | 17.496 ns | 18.571 ns | 18.366 ns |  2.06 |    0.05 |   1,134 B |      - |         - |          NA |
+| ChainViaMatcher      | .NET 10.0           | .NET 10.0 | AsDeclared | 18.469 ns | 0.0813 ns | 0.1191 ns | 18.462 ns | 18.287 ns | 18.815 ns | 18.621 ns |  2.11 |    0.04 |   1,804 B |      - |         - |          NA |
+|                      |                     |           |            |           |           |           |           |           |           |           |       |         |           |        |           |             |
+| GeneratedChain       | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared |  9.195 ns | 0.3834 ns | 0.5619 ns |  8.825 ns |  8.562 ns |  9.840 ns |  9.801 ns |  1.00 |    0.00 |     986 B |      - |         - |          NA |
+| UpperStringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 64.982 ns | 0.4197 ns | 0.6152 ns | 64.761 ns | 64.033 ns | 66.275 ns | 65.839 ns |  7.09 |    0.43 |   4,942 B | 0.0362 |     304 B |          NA |
+| UpperSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 48.504 ns | 0.1722 ns | 0.2357 ns | 48.511 ns | 48.100 ns | 48.956 ns | 48.748 ns |  5.29 |    0.32 |   1,743 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 45.250 ns | 0.1351 ns | 0.2022 ns | 45.226 ns | 44.915 ns | 45.668 ns | 45.532 ns |  4.94 |    0.30 |   1,559 B |      - |         - |          NA |
+| PlainSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 18.566 ns | 0.2879 ns | 0.4309 ns | 18.504 ns | 17.933 ns | 19.316 ns | 19.157 ns |  2.03 |    0.13 |   1,030 B |      - |         - |          NA |
+| ChainViaMatcher      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 19.202 ns | 0.1423 ns | 0.2086 ns | 19.279 ns | 18.824 ns | 19.528 ns | 19.424 ns |  2.10 |    0.13 |   1,786 B |      - |         - |          NA |
+|                      |                     |           |            |           |           |           |           |           |           |           |       |         |           |        |           |             |
+| **GeneratedChain**       | **.NET 10.0**           | **.NET 10.0** | **AllUpper**   |  **8.569 ns** | **0.0975 ns** | **0.1459 ns** |  **8.559 ns** |  **8.332 ns** |  **8.954 ns** |  **8.754 ns** |  **1.00** |    **0.00** |   **1,012 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | .NET 10.0           | .NET 10.0 | AllUpper   | 34.402 ns | 0.8837 ns | 1.3227 ns | 34.473 ns | 32.711 ns | 36.260 ns | 35.877 ns |  4.02 |    0.17 |   2,833 B |      - |         - |          NA |
+| UpperSpanSwitch      | .NET 10.0           | .NET 10.0 | AllUpper   | 48.799 ns | 0.2329 ns | 0.3414 ns | 48.702 ns | 48.299 ns | 49.729 ns | 49.366 ns |  5.70 |    0.10 |   1,865 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | .NET 10.0           | .NET 10.0 | AllUpper   | 45.805 ns | 0.1732 ns | 0.2539 ns | 45.748 ns | 45.479 ns | 46.391 ns | 46.133 ns |  5.35 |    0.09 |   1,648 B |      - |         - |          NA |
+| PlainSpanSwitch      | .NET 10.0           | .NET 10.0 | AllUpper   | 15.749 ns | 0.0983 ns | 0.1440 ns | 15.742 ns | 15.380 ns | 16.094 ns | 15.915 ns |  1.84 |    0.03 |   1,141 B |      - |         - |          NA |
+| ChainViaMatcher      | .NET 10.0           | .NET 10.0 | AllUpper   | 18.521 ns | 0.1154 ns | 0.1727 ns | 18.510 ns | 18.259 ns | 18.920 ns | 18.745 ns |  2.16 |    0.04 |   1,804 B |      - |         - |          NA |
+|                      |                     |           |            |           |           |           |           |           |           |           |       |         |           |        |           |             |
+| GeneratedChain       | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   |  9.230 ns | 0.3450 ns | 0.5164 ns |  9.255 ns |  8.644 ns |  9.880 ns |  9.784 ns |  1.00 |    0.00 |     986 B |      - |         - |          NA |
+| UpperStringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 26.870 ns | 0.1371 ns | 0.1966 ns | 26.830 ns | 26.565 ns | 27.372 ns | 27.177 ns |  2.92 |    0.16 |   3,777 B |      - |         - |          NA |
+| UpperSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 48.431 ns | 0.1480 ns | 0.2215 ns | 48.405 ns | 48.077 ns | 49.021 ns | 48.664 ns |  5.26 |    0.29 |   1,743 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 45.211 ns | 0.1099 ns | 0.1504 ns | 45.206 ns | 44.899 ns | 45.478 ns | 45.395 ns |  4.91 |    0.27 |   1,559 B |      - |         - |          NA |
+| PlainSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 15.849 ns | 0.1056 ns | 0.1514 ns | 15.871 ns | 15.481 ns | 16.143 ns | 16.020 ns |  1.72 |    0.10 |   1,111 B |      - |         - |          NA |
+| ChainViaMatcher      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 19.014 ns | 0.0768 ns | 0.1076 ns | 19.010 ns | 18.873 ns | 19.255 ns | 19.155 ns |  2.07 |    0.11 |   1,786 B |      - |         - |          NA |
+
+### ColumnMatchSnake8Benchmark
+
+net10 → net11 per row:
+
+| Method | Casing | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| GeneratedChain | AsDeclared | 8.460 ns | 8.523 ns | 1.01 | - → - | 1,034 B → 1,035 B |
+| UpperStringSwitch | AsDeclared | 72.315 ns | 68.850 ns | 0.95 | 328 B → 328 B | 2,763 B → 4,940 B |
+| UpperSpanSwitch | AsDeclared | 52.512 ns | 51.892 ns | 0.99 | - → - | 1,855 B → 1,741 B |
+| AsciiUpperSpanSwitch | AsDeclared | 49.232 ns | 49.141 ns | 1.00 | - → - | 1,638 B → 1,557 B |
+| PlainSpanSwitch | AsDeclared | 17.673 ns | 18.212 ns | 1.03 | - → - | 1,133 B → 1,033 B |
+| ChainViaMatcher | AsDeclared | 18.260 ns | 18.345 ns | 1.00 | - → - | 1,847 B → 1,873 B |
+| GeneratedChain | AllUpper | 8.418 ns | 8.486 ns | 1.01 | - → - | 1,034 B → 1,035 B |
+| UpperStringSwitch | AllUpper | 33.989 ns | 27.298 ns | 0.80 | - → - | 2,833 B → 3,783 B |
+| UpperSpanSwitch | AllUpper | 52.517 ns | 52.779 ns | 1.00 | - → - | 1,855 B → 1,741 B |
+| AsciiUpperSpanSwitch | AllUpper | 49.452 ns | 49.719 ns | 1.01 | - → - | 1,638 B → 1,557 B |
+| PlainSpanSwitch | AllUpper | 15.415 ns | 15.588 ns | 1.01 | - → - | 1,140 B → 1,114 B |
+| ChainViaMatcher | AllUpper | 18.364 ns | 18.478 ns | 1.01 | - → - | 1,847 B → 1,873 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.62 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method               | Job                 | Runtime   | Casing     | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
+|--------------------- |-------------------- |---------- |----------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
+| **GeneratedChain**       | **.NET 10.0**           | **.NET 10.0** | **AsDeclared** |  **8.460 ns** | **0.0426 ns** | **0.0625 ns** |  **8.336 ns** |  **8.601 ns** |  **8.546 ns** |  **1.00** |    **0.00** |   **1,034 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | .NET 10.0           | .NET 10.0 | AsDeclared | 72.315 ns | 0.3967 ns | 0.5815 ns | 71.266 ns | 73.687 ns | 73.114 ns |  8.55 |    0.09 |   2,763 B | 0.0391 |     328 B |          NA |
+| UpperSpanSwitch      | .NET 10.0           | .NET 10.0 | AsDeclared | 52.512 ns | 0.1176 ns | 0.1724 ns | 52.108 ns | 52.802 ns | 52.697 ns |  6.21 |    0.05 |   1,855 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | .NET 10.0           | .NET 10.0 | AsDeclared | 49.232 ns | 0.1290 ns | 0.1849 ns | 48.930 ns | 49.657 ns | 49.479 ns |  5.82 |    0.05 |   1,638 B |      - |         - |          NA |
+| PlainSpanSwitch      | .NET 10.0           | .NET 10.0 | AsDeclared | 17.673 ns | 0.2874 ns | 0.4212 ns | 17.028 ns | 18.344 ns | 18.175 ns |  2.09 |    0.05 |   1,133 B |      - |         - |          NA |
+| ChainViaMatcher      | .NET 10.0           | .NET 10.0 | AsDeclared | 18.260 ns | 0.0560 ns | 0.0767 ns | 18.120 ns | 18.383 ns | 18.355 ns |  2.16 |    0.02 |   1,847 B |      - |         - |          NA |
+|                      |                     |           |            |           |           |           |           |           |           |       |         |           |        |           |             |
+| GeneratedChain       | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared |  8.523 ns | 0.0637 ns | 0.0934 ns |  8.379 ns |  8.668 ns |  8.662 ns |  1.00 |    0.00 |   1,035 B |      - |         - |          NA |
+| UpperStringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 68.850 ns | 0.7683 ns | 1.1262 ns | 67.064 ns | 70.793 ns | 70.350 ns |  8.08 |    0.16 |   4,940 B | 0.0391 |     328 B |          NA |
+| UpperSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 51.892 ns | 0.1110 ns | 0.1627 ns | 51.590 ns | 52.184 ns | 52.076 ns |  6.09 |    0.07 |   1,741 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 49.141 ns | 0.1371 ns | 0.2009 ns | 48.761 ns | 49.571 ns | 49.353 ns |  5.77 |    0.07 |   1,557 B |      - |         - |          NA |
+| PlainSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 18.212 ns | 0.3728 ns | 0.5347 ns | 17.359 ns | 19.015 ns | 18.824 ns |  2.14 |    0.07 |   1,033 B |      - |         - |          NA |
+| ChainViaMatcher      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 18.345 ns | 0.0830 ns | 0.1217 ns | 18.115 ns | 18.642 ns | 18.490 ns |  2.15 |    0.03 |   1,873 B |      - |         - |          NA |
+|                      |                     |           |            |           |           |           |           |           |           |       |         |           |        |           |             |
+| **GeneratedChain**       | **.NET 10.0**           | **.NET 10.0** | **AllUpper**   |  **8.418 ns** | **0.0424 ns** | **0.0621 ns** |  **8.297 ns** |  **8.552 ns** |  **8.493 ns** |  **1.00** |    **0.00** |   **1,034 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | .NET 10.0           | .NET 10.0 | AllUpper   | 33.989 ns | 0.3835 ns | 0.5621 ns | 33.109 ns | 35.214 ns | 34.770 ns |  4.04 |    0.07 |   2,833 B |      - |         - |          NA |
+| UpperSpanSwitch      | .NET 10.0           | .NET 10.0 | AllUpper   | 52.517 ns | 0.1775 ns | 0.2602 ns | 52.031 ns | 53.053 ns | 52.808 ns |  6.24 |    0.05 |   1,855 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | .NET 10.0           | .NET 10.0 | AllUpper   | 49.452 ns | 0.1343 ns | 0.1883 ns | 49.129 ns | 49.877 ns | 49.757 ns |  5.87 |    0.05 |   1,638 B |      - |         - |          NA |
+| PlainSpanSwitch      | .NET 10.0           | .NET 10.0 | AllUpper   | 15.415 ns | 0.1501 ns | 0.2246 ns | 15.082 ns | 15.946 ns | 15.770 ns |  1.83 |    0.03 |   1,140 B |      - |         - |          NA |
+| ChainViaMatcher      | .NET 10.0           | .NET 10.0 | AllUpper   | 18.364 ns | 0.0766 ns | 0.1099 ns | 18.204 ns | 18.626 ns | 18.522 ns |  2.18 |    0.02 |   1,847 B |      - |         - |          NA |
+|                      |                     |           |            |           |           |           |           |           |           |       |         |           |        |           |             |
+| GeneratedChain       | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   |  8.486 ns | 0.0476 ns | 0.0713 ns |  8.356 ns |  8.599 ns |  8.564 ns |  1.00 |    0.00 |   1,035 B |      - |         - |          NA |
+| UpperStringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 27.298 ns | 0.1171 ns | 0.1753 ns | 27.031 ns | 27.753 ns | 27.505 ns |  3.22 |    0.03 |   3,783 B |      - |         - |          NA |
+| UpperSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 52.779 ns | 0.8132 ns | 1.2171 ns | 51.575 ns | 55.910 ns | 54.716 ns |  6.22 |    0.15 |   1,741 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 49.719 ns | 0.2816 ns | 0.4128 ns | 49.190 ns | 50.852 ns | 50.252 ns |  5.86 |    0.07 |   1,557 B |      - |         - |          NA |
+| PlainSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 15.588 ns | 0.0906 ns | 0.1300 ns | 15.376 ns | 15.960 ns | 15.753 ns |  1.84 |    0.02 |   1,114 B |      - |         - |          NA |
+| ChainViaMatcher      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 18.478 ns | 0.1094 ns | 0.1497 ns | 18.241 ns | 18.822 ns | 18.646 ns |  2.18 |    0.03 |   1,873 B |      - |         - |          NA |
+
+### ColumnMatchPascal24Benchmark
+
+net10 → net11 per row:
+
+| Method | Casing | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| GeneratedHash | AsDeclared | 79.59 ns | 79.39 ns | 1.00 | - → - | 3,367 B → 3,422 B |
+| UpperStringSwitch | AsDeclared | 227.23 ns | 229.04 ns | 1.01 | 976 B → 976 B | 3,939 B → 9,852 B |
+| UpperSpanSwitch | AsDeclared | 161.30 ns | 160.87 ns | 1.00 | - → - | 3,117 B → 2,747 B |
+| AsciiUpperSpanSwitch | AsDeclared | 152.61 ns | 157.18 ns | 1.03 | - → - | 2,900 B → 2,563 B |
+| PlainSpanSwitch | AsDeclared | 56.05 ns | 56.41 ns | 1.01 | - → - | 2,395 B → 2,034 B |
+| GeneratedHash | AllUpper | 79.00 ns | 79.11 ns | 1.00 | - → - | 3,367 B → 3,422 B |
+| UpperStringSwitch | AllUpper | 107.54 ns | 83.99 ns | 0.78 | - → - | 3,612 B → 4,633 B |
+| UpperSpanSwitch | AllUpper | 161.48 ns | 161.48 ns | 1.00 | - → - | 3,119 B → 2,749 B |
+| AsciiUpperSpanSwitch | AllUpper | 158.93 ns | 151.81 ns | 0.96 | - → - | 2,902 B → 2,565 B |
+| PlainSpanSwitch | AllUpper | 51.10 ns | 50.86 ns | 1.00 | - → - | 2,386 B → 2,198 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.55 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method               | Job                 | Runtime   | Casing     | Mean      | Error    | StdDev   | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
+|--------------------- |-------------------- |---------- |----------- |----------:|---------:|---------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
+| **GeneratedHash**        | **.NET 10.0**           | **.NET 10.0** | **AsDeclared** |  **79.59 ns** | **0.389 ns** | **0.558 ns** |  **78.68 ns** |  **80.91 ns** |  **80.26 ns** |  **1.00** |    **0.00** |   **3,367 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | .NET 10.0           | .NET 10.0 | AsDeclared | 227.23 ns | 1.033 ns | 1.546 ns | 224.97 ns | 230.99 ns | 229.42 ns |  2.86 |    0.03 |   3,939 B | 0.1166 |     976 B |          NA |
+| UpperSpanSwitch      | .NET 10.0           | .NET 10.0 | AsDeclared | 161.30 ns | 0.488 ns | 0.715 ns | 160.14 ns | 162.69 ns | 162.19 ns |  2.03 |    0.02 |   3,117 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | .NET 10.0           | .NET 10.0 | AsDeclared | 152.61 ns | 0.726 ns | 1.064 ns | 151.57 ns | 155.00 ns | 154.10 ns |  1.92 |    0.02 |   2,900 B |      - |         - |          NA |
+| PlainSpanSwitch      | .NET 10.0           | .NET 10.0 | AsDeclared |  56.05 ns | 0.650 ns | 0.973 ns |  54.45 ns |  58.09 ns |  57.28 ns |  0.70 |    0.01 |   2,395 B |      - |         - |          NA |
+|                      |                     |           |            |           |          |          |           |           |           |       |         |           |        |           |             |
+| GeneratedHash        | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared |  79.39 ns | 0.279 ns | 0.400 ns |  78.88 ns |  80.63 ns |  79.90 ns |  1.00 |    0.00 |   3,422 B |      - |         - |          NA |
+| UpperStringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 229.04 ns | 2.956 ns | 4.240 ns | 222.51 ns | 235.04 ns | 234.07 ns |  2.89 |    0.05 |   9,852 B | 0.1166 |     976 B |          NA |
+| UpperSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 160.87 ns | 0.633 ns | 0.928 ns | 159.12 ns | 163.26 ns | 161.79 ns |  2.03 |    0.02 |   2,747 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 157.18 ns | 3.448 ns | 5.161 ns | 150.81 ns | 163.56 ns | 162.81 ns |  1.98 |    0.06 |   2,563 B |      - |         - |          NA |
+| PlainSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared |  56.41 ns | 0.252 ns | 0.377 ns |  55.74 ns |  57.21 ns |  56.81 ns |  0.71 |    0.01 |   2,034 B |      - |         - |          NA |
+|                      |                     |           |            |           |          |          |           |           |           |       |         |           |        |           |             |
+| **GeneratedHash**        | **.NET 10.0**           | **.NET 10.0** | **AllUpper**   |  **79.00 ns** | **0.330 ns** | **0.473 ns** |  **78.05 ns** |  **80.02 ns** |  **79.54 ns** |  **1.00** |    **0.00** |   **3,367 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | .NET 10.0           | .NET 10.0 | AllUpper   | 107.54 ns | 4.089 ns | 5.993 ns | 102.95 ns | 124.79 ns | 118.75 ns |  1.36 |    0.08 |   3,612 B |      - |         - |          NA |
+| UpperSpanSwitch      | .NET 10.0           | .NET 10.0 | AllUpper   | 161.48 ns | 0.736 ns | 1.079 ns | 159.56 ns | 164.55 ns | 162.57 ns |  2.04 |    0.02 |   3,119 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | .NET 10.0           | .NET 10.0 | AllUpper   | 158.93 ns | 4.841 ns | 6.943 ns | 151.18 ns | 170.15 ns | 166.64 ns |  2.01 |    0.09 |   2,902 B |      - |         - |          NA |
+| PlainSpanSwitch      | .NET 10.0           | .NET 10.0 | AllUpper   |  51.10 ns | 0.701 ns | 1.005 ns |  49.75 ns |  52.57 ns |  52.25 ns |  0.65 |    0.01 |   2,386 B |      - |         - |          NA |
+|                      |                     |           |            |           |          |          |           |           |           |       |         |           |        |           |             |
+| GeneratedHash        | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   |  79.11 ns | 0.255 ns | 0.357 ns |  78.49 ns |  79.89 ns |  79.58 ns |  1.00 |    0.00 |   3,422 B |      - |         - |          NA |
+| UpperStringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   |  83.99 ns | 0.216 ns | 0.303 ns |  83.47 ns |  84.43 ns |  84.32 ns |  1.06 |    0.01 |   4,633 B |      - |         - |          NA |
+| UpperSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 161.48 ns | 0.625 ns | 0.936 ns | 160.18 ns | 163.53 ns | 162.85 ns |  2.04 |    0.01 |   2,749 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 151.81 ns | 0.895 ns | 1.284 ns | 150.23 ns | 154.62 ns | 153.75 ns |  1.92 |    0.02 |   2,565 B |      - |         - |          NA |
+| PlainSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   |  50.86 ns | 0.240 ns | 0.351 ns |  50.29 ns |  51.65 ns |  51.27 ns |  0.64 |    0.01 |   2,198 B |      - |         - |          NA |
+
+### ColumnMatchSnake24Benchmark
+
+net10 → net11 per row:
+
+| Method | Casing | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| GeneratedHash | AsDeclared | 79.97 ns | 79.78 ns | 1.00 | - → - | 3,357 B → 3,502 B |
+| UpperStringSwitch | AsDeclared | 229.35 ns | 227.88 ns | 0.99 | 1008 B → 1008 B | 3,962 B → 9,878 B |
+| UpperSpanSwitch | AsDeclared | 162.52 ns | 161.61 ns | 0.99 | - → - | 3,138 B → 2,783 B |
+| AsciiUpperSpanSwitch | AsDeclared | 154.17 ns | 153.11 ns | 0.99 | - → - | 2,921 B → 2,599 B |
+| PlainSpanSwitch | AsDeclared | 55.07 ns | 56.32 ns | 1.02 | - → - | 2,410 B → 2,064 B |
+| GeneratedHash | AllUpper | 79.25 ns | 79.68 ns | 1.01 | - → - | 3,357 B → 3,502 B |
+| UpperStringSwitch | AllUpper | 107.62 ns | 85.88 ns | 0.80 | - → - | 3,639 B → 4,668 B |
+| UpperSpanSwitch | AllUpper | 162.39 ns | 161.26 ns | 0.99 | - → - | 3,140 B → 2,785 B |
+| AsciiUpperSpanSwitch | AllUpper | 154.20 ns | 153.08 ns | 0.99 | - → - | 2,923 B → 2,601 B |
+| PlainSpanSwitch | AllUpper | 43.75 ns | 44.07 ns | 1.01 | - → - | 2,453 B → 2,407 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.32 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method               | Job                 | Runtime   | Casing     | Mean      | Error    | StdDev   | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Gen0   | Allocated | Alloc Ratio |
+|--------------------- |-------------------- |---------- |----------- |----------:|---------:|---------:|----------:|----------:|----------:|------:|--------:|----------:|-------:|----------:|------------:|
+| **GeneratedHash**        | **.NET 10.0**           | **.NET 10.0** | **AsDeclared** |  **79.97 ns** | **0.621 ns** | **0.871 ns** |  **78.70 ns** |  **81.57 ns** |  **80.91 ns** |  **1.00** |    **0.00** |   **3,357 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | .NET 10.0           | .NET 10.0 | AsDeclared | 229.35 ns | 1.417 ns | 2.078 ns | 225.18 ns | 233.38 ns | 231.66 ns |  2.87 |    0.04 |   3,962 B | 0.1204 |    1008 B |          NA |
+| UpperSpanSwitch      | .NET 10.0           | .NET 10.0 | AsDeclared | 162.52 ns | 0.400 ns | 0.586 ns | 161.24 ns | 163.51 ns | 163.19 ns |  2.03 |    0.02 |   3,138 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | .NET 10.0           | .NET 10.0 | AsDeclared | 154.17 ns | 0.598 ns | 0.895 ns | 152.61 ns | 156.08 ns | 155.44 ns |  1.93 |    0.02 |   2,921 B |      - |         - |          NA |
+| PlainSpanSwitch      | .NET 10.0           | .NET 10.0 | AsDeclared |  55.07 ns | 0.337 ns | 0.493 ns |  54.18 ns |  56.40 ns |  55.66 ns |  0.69 |    0.01 |   2,410 B |      - |         - |          NA |
+|                      |                     |           |            |           |          |          |           |           |           |       |         |           |        |           |             |
+| GeneratedHash        | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared |  79.78 ns | 0.452 ns | 0.634 ns |  78.59 ns |  80.96 ns |  80.45 ns |  1.00 |    0.00 |   3,502 B |      - |         - |          NA |
+| UpperStringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 227.88 ns | 0.919 ns | 1.258 ns | 225.72 ns | 230.65 ns | 229.11 ns |  2.86 |    0.03 |   9,878 B | 0.1204 |    1008 B |          NA |
+| UpperSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 161.61 ns | 0.400 ns | 0.574 ns | 160.88 ns | 163.14 ns | 162.21 ns |  2.03 |    0.02 |   2,783 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared | 153.11 ns | 0.362 ns | 0.507 ns | 152.18 ns | 154.09 ns | 153.82 ns |  1.92 |    0.02 |   2,599 B |      - |         - |          NA |
+| PlainSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AsDeclared |  56.32 ns | 0.375 ns | 0.537 ns |  55.46 ns |  57.76 ns |  56.95 ns |  0.71 |    0.01 |   2,064 B |      - |         - |          NA |
+|                      |                     |           |            |           |          |          |           |           |           |       |         |           |        |           |             |
+| **GeneratedHash**        | **.NET 10.0**           | **.NET 10.0** | **AllUpper**   |  **79.25 ns** | **0.502 ns** | **0.751 ns** |  **78.19 ns** |  **80.65 ns** |  **80.34 ns** |  **1.00** |    **0.00** |   **3,357 B** |      **-** |         **-** |          **NA** |
+| UpperStringSwitch    | .NET 10.0           | .NET 10.0 | AllUpper   | 107.62 ns | 1.002 ns | 1.469 ns | 104.86 ns | 109.81 ns | 109.33 ns |  1.36 |    0.02 |   3,639 B |      - |         - |          NA |
+| UpperSpanSwitch      | .NET 10.0           | .NET 10.0 | AllUpper   | 162.39 ns | 0.524 ns | 0.768 ns | 161.13 ns | 164.14 ns | 163.38 ns |  2.05 |    0.02 |   3,140 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | .NET 10.0           | .NET 10.0 | AllUpper   | 154.20 ns | 0.632 ns | 0.906 ns | 153.04 ns | 156.49 ns | 155.57 ns |  1.95 |    0.02 |   2,923 B |      - |         - |          NA |
+| PlainSpanSwitch      | .NET 10.0           | .NET 10.0 | AllUpper   |  43.75 ns | 0.178 ns | 0.260 ns |  43.42 ns |  44.49 ns |  44.09 ns |  0.55 |    0.01 |   2,453 B |      - |         - |          NA |
+|                      |                     |           |            |           |          |          |           |           |           |       |         |           |        |           |             |
+| GeneratedHash        | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   |  79.68 ns | 0.531 ns | 0.744 ns |  78.50 ns |  81.16 ns |  80.58 ns |  1.00 |    0.00 |   3,502 B |      - |         - |          NA |
+| UpperStringSwitch    | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   |  85.88 ns | 0.452 ns | 0.662 ns |  84.90 ns |  87.49 ns |  86.77 ns |  1.08 |    0.01 |   4,668 B |      - |         - |          NA |
+| UpperSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 161.26 ns | 0.330 ns | 0.451 ns | 160.19 ns | 162.12 ns | 161.74 ns |  2.02 |    0.02 |   2,785 B |      - |         - |          NA |
+| AsciiUpperSpanSwitch | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   | 153.08 ns | 0.388 ns | 0.580 ns | 151.73 ns | 154.39 ns | 153.68 ns |  1.92 |    0.02 |   2,601 B |      - |         - |          NA |
+| PlainSpanSwitch      | MediumRun-.NET 11.0 | .NET 11.0 | AllUpper   |  44.07 ns | 0.275 ns | 0.403 ns |  43.41 ns |  44.88 ns |  44.64 ns |  0.55 |    0.01 |   2,407 B |      - |         - |          NA |
+
+## Earlier record
+
 - Verdict: **converting the probe never pays - it loses in all 12 conditions measured.** For the match itself
   the crossover is at column count: the `Equals(OrdinalIgnoreCase)` chain wins at 8 columns (0.84x) and the
   plain ordinal switch wins at 24 (0.91x), both measured like for like

@@ -1,5 +1,48 @@
 # LAB-RefIdentity: ref identity and ref arithmetic (study queue 7-11)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged. Index recovery from a ref stays 1.52x of carrying the index on both generations
+- Alias check: `Unsafe.AreSame` got 0.88x faster on net11 (480 → 424 ns), so it is 0.63x of `Overlaps` (0.72x on net10)
+
+### RefIdentityBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| IndexCarried | 324.2 ns | 323.3 ns | 1.00 | - → - | 64 B → 64 B |
+| IndexRecoveredFromRef | 493.3 ns | 492.7 ns | 1.00 | - → - | 82 B → 82 B |
+| AliasCheckWithAreSame | 480.4 ns | 423.6 ns | 0.88 | - → - | 81 B → 75 B |
+| AliasCheckWithOverlaps | 669.2 ns | 669.8 ns | 1.00 | - → - | 126 B → 123 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.75 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method                 | Job                 | Runtime   | Mean     | Error    | StdDev   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|----------------------- |-------------------- |---------- |---------:|---------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
+| IndexCarried           | .NET 10.0           | .NET 10.0 | 324.2 ns |  0.50 ns |  0.71 ns | 323.2 ns | 326.1 ns | 325.2 ns |  1.00 |    0.00 |      64 B |         - |          NA |
+| IndexRecoveredFromRef  | .NET 10.0           | .NET 10.0 | 493.3 ns |  1.04 ns |  1.50 ns | 490.1 ns | 496.3 ns | 495.0 ns |  1.52 |    0.01 |      82 B |         - |          NA |
+| AliasCheckWithAreSame  | .NET 10.0           | .NET 10.0 | 480.4 ns | 25.85 ns | 38.69 ns | 437.3 ns | 522.5 ns | 519.9 ns |  1.48 |    0.12 |      81 B |         - |          NA |
+| AliasCheckWithOverlaps | .NET 10.0           | .NET 10.0 | 669.2 ns |  6.36 ns |  9.13 ns | 655.7 ns | 688.9 ns | 679.7 ns |  2.06 |    0.03 |     126 B |         - |          NA |
+|                        |                     |           |          |          |          |          |          |          |       |         |           |           |             |
+| IndexCarried           | MediumRun-.NET 11.0 | .NET 11.0 | 323.3 ns |  0.35 ns |  0.49 ns | 322.4 ns | 324.3 ns | 323.9 ns |  1.00 |    0.00 |      64 B |         - |          NA |
+| IndexRecoveredFromRef  | MediumRun-.NET 11.0 | .NET 11.0 | 492.7 ns |  1.06 ns |  1.49 ns | 490.5 ns | 496.6 ns | 494.7 ns |  1.52 |    0.01 |      82 B |         - |          NA |
+| AliasCheckWithAreSame  | MediumRun-.NET 11.0 | .NET 11.0 | 423.6 ns | 17.53 ns | 26.24 ns | 383.3 ns | 457.7 ns | 454.7 ns |  1.31 |    0.08 |      75 B |         - |          NA |
+| AliasCheckWithOverlaps | MediumRun-.NET 11.0 | .NET 11.0 | 669.8 ns |  2.32 ns |  3.40 ns | 663.9 ns | 679.1 ns | 674.2 ns |  2.07 |    0.01 |     123 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: index recovery rejected -> R-21; alias checking recorded as a quick-reference note. Re-measured on
   x86-64-v4 (Zen 5); both conclusions reproduce with slightly larger margins than x86-64-v3 (Zen 3)
 - Recovering the index from a ref with `Unsafe.ByteOffset` costs **1.52x** against simply carrying the index

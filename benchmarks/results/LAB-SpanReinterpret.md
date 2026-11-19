@@ -1,5 +1,45 @@
 # LAB-SpanReinterpret: MemoryMarshal.Cast and its traps (study queue 7-8)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged - `MemoryMarshal.Cast` stays the fastest (219.7 ns on net11)
+- BinaryPrimitives per element got 0.86x faster on net11 (367.8 → 314.6 ns, 103 → 90 B): 1.43x of Cast instead of 1.68x
+
+### SpanReinterpretBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| MemoryMarshalCast | 219.0 ns | 219.7 ns | 1.00 | - → - | 57 B → 57 B |
+| UnsafeReadUnaligned | 239.8 ns | 240.2 ns | 1.00 | - → - | 54 B → 54 B |
+| BinaryPrimitivesRead | 367.8 ns | 314.6 ns | 0.86 | - → - | 103 B → 90 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.78 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method               | Job                 | Runtime   | Mean     | Error   | StdDev  | Min      | Max      | P90      | Ratio | Code Size | Allocated | Alloc Ratio |
+|--------------------- |-------------------- |---------- |---------:|--------:|--------:|---------:|---------:|---------:|------:|----------:|----------:|------------:|
+| MemoryMarshalCast    | .NET 10.0           | .NET 10.0 | 219.0 ns | 1.24 ns | 1.78 ns | 216.4 ns | 221.8 ns | 221.2 ns |  1.00 |      57 B |         - |          NA |
+| UnsafeReadUnaligned  | .NET 10.0           | .NET 10.0 | 239.8 ns | 0.59 ns | 0.83 ns | 238.4 ns | 241.6 ns | 241.0 ns |  1.10 |      54 B |         - |          NA |
+| BinaryPrimitivesRead | .NET 10.0           | .NET 10.0 | 367.8 ns | 0.92 ns | 1.32 ns | 365.3 ns | 370.7 ns | 369.2 ns |  1.68 |     103 B |         - |          NA |
+|                      |                     |           |          |         |         |          |          |          |       |           |           |             |
+| MemoryMarshalCast    | MediumRun-.NET 11.0 | .NET 11.0 | 219.7 ns | 0.32 ns | 0.43 ns | 218.9 ns | 220.8 ns | 220.1 ns |  1.00 |      57 B |         - |          NA |
+| UnsafeReadUnaligned  | MediumRun-.NET 11.0 | .NET 11.0 | 240.2 ns | 0.53 ns | 0.79 ns | 239.0 ns | 242.1 ns | 241.2 ns |  1.09 |      54 B |         - |          NA |
+| BinaryPrimitivesRead | MediumRun-.NET 11.0 | .NET 11.0 | 314.6 ns | 0.59 ns | 0.87 ns | 313.0 ns | 316.2 ns | 315.6 ns |  1.43 |      90 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: confirms the existing recommendation; the traps are the deliverable. Re-measured on x86-64-v4 (Zen 5)
 - `MemoryMarshal.Cast` is the fastest of the three on both machines: **217.5 ns**, ahead of a manual
   `Unsafe.ReadUnaligned` walk (242.2 ns, **1.11x**) and a `BinaryPrimitives` loop (375.3 ns, **1.73x**).

@@ -1,5 +1,54 @@
 # LAB-ScopedRef: scoped and [UnscopedRef] (study queue 7-1)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged - plain and scoped span parameters are identical on both generations (57.5-57.8 ns, same code size)
+- Scoped vs plain ref parameter on net11: 1.34 vs 1.46 ns with identical code size (94 B); attributed to placement, not to `scoped`
+
+### ScopedRefBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| GetSetPair | 0.3875 ns | 0.3904 ns | 1.01 | - → - | 85 B → 85 B |
+| UnscopedRefAccessor | 0.3639 ns | 0.3601 ns | 0.99 | - → - | 81 B → 81 B |
+| PlainSpanParameter | 57.6162 ns | 57.8399 ns | 1.00 | - → - | 124 B → 130 B |
+| ScopedSpanParameter | 57.4449 ns | 57.4758 ns | 1.00 | - → - | 124 B → 130 B |
+| PlainRefParameter | 1.4636 ns | 1.4568 ns | 1.00 | - → - | 88 B → 94 B |
+| ScopedRefParameter | 1.4735 ns | 1.3438 ns | 0.91 | - → - | 88 B → 94 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.76 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method              | Job                 | Runtime   | Mean       | Error     | StdDev    | Median     | Min        | Max        | P90        | Ratio  | RatioSD | Code Size | Allocated | Alloc Ratio |
+|-------------------- |-------------------- |---------- |-----------:|----------:|----------:|-----------:|-----------:|-----------:|-----------:|-------:|--------:|----------:|----------:|------------:|
+| GetSetPair          | .NET 10.0           | .NET 10.0 |  0.3875 ns | 0.0031 ns | 0.0045 ns |  0.3904 ns |  0.3819 ns |  0.3938 ns |  0.3928 ns |   1.00 |    0.00 |      85 B |         - |          NA |
+| UnscopedRefAccessor | .NET 10.0           | .NET 10.0 |  0.3639 ns | 0.0011 ns | 0.0015 ns |  0.3638 ns |  0.3610 ns |  0.3670 ns |  0.3657 ns |   0.94 |    0.01 |      81 B |         - |          NA |
+| PlainSpanParameter  | .NET 10.0           | .NET 10.0 | 57.6162 ns | 0.1938 ns | 0.2900 ns | 57.5742 ns | 57.2207 ns | 58.4721 ns | 57.9413 ns | 148.71 |    1.85 |     124 B |         - |          NA |
+| ScopedSpanParameter | .NET 10.0           | .NET 10.0 | 57.4449 ns | 0.1834 ns | 0.2689 ns | 57.3600 ns | 57.0420 ns | 58.3201 ns | 57.6779 ns | 148.27 |    1.82 |     124 B |         - |          NA |
+| PlainRefParameter   | .NET 10.0           | .NET 10.0 |  1.4636 ns | 0.0158 ns | 0.0237 ns |  1.4685 ns |  1.3763 ns |  1.4836 ns |  1.4821 ns |   3.78 |    0.07 |      88 B |         - |          NA |
+| ScopedRefParameter  | .NET 10.0           | .NET 10.0 |  1.4735 ns | 0.0132 ns | 0.0194 ns |  1.4789 ns |  1.3906 ns |  1.4911 ns |  1.4850 ns |   3.80 |    0.07 |      88 B |         - |          NA |
+|                     |                     |           |            |           |           |            |            |            |            |        |         |           |           |             |
+| GetSetPair          | MediumRun-.NET 11.0 | .NET 11.0 |  0.3904 ns | 0.0007 ns | 0.0010 ns |  0.3905 ns |  0.3882 ns |  0.3924 ns |  0.3913 ns |   1.00 |    0.00 |      85 B |         - |          NA |
+| UnscopedRefAccessor | MediumRun-.NET 11.0 | .NET 11.0 |  0.3601 ns | 0.0010 ns | 0.0015 ns |  0.3599 ns |  0.3572 ns |  0.3643 ns |  0.3619 ns |   0.92 |    0.00 |      81 B |         - |          NA |
+| PlainSpanParameter  | MediumRun-.NET 11.0 | .NET 11.0 | 57.8399 ns | 0.2375 ns | 0.3554 ns | 57.8389 ns | 57.2873 ns | 58.7162 ns | 58.1936 ns | 148.16 |    0.97 |     130 B |         - |          NA |
+| ScopedSpanParameter | MediumRun-.NET 11.0 | .NET 11.0 | 57.4758 ns | 0.2673 ns | 0.3834 ns | 57.4945 ns | 56.7213 ns | 58.0928 ns | 57.9635 ns | 147.23 |    1.03 |     130 B |         - |          NA |
+| PlainRefParameter   | MediumRun-.NET 11.0 | .NET 11.0 |  1.4568 ns | 0.0161 ns | 0.0241 ns |  1.4667 ns |  1.4086 ns |  1.4906 ns |  1.4827 ns |   3.73 |    0.06 |      94 B |         - |          NA |
+| ScopedRefParameter  | MediumRun-.NET 11.0 | .NET 11.0 |  1.3438 ns | 0.0877 ns | 0.1313 ns |  1.3229 ns |  1.1759 ns |  1.4908 ns |  1.4830 ns |   3.44 |    0.33 |      94 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: no difference (scoped) / rejected as a performance pattern (UnscopedRef accessor) -> R-20
 - Re-measured on x86-64-v4 (Zen 5, .NET 10.0.11). The earlier x86-64-v3 (Zen 3) run reached the same verdict
 - scoped: caller and callee disassembly are identical instruction for instruction. The only difference is the

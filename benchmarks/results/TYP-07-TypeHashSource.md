@@ -1,5 +1,55 @@
 # TYP-07: Hash source for Type-keyed lookup (virtual / identity hash / TypeHandle)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict (JIT): unchanged - `TypeHandle.Value` stays the cheapest at 0.70x hit / 0.65x miss of the virtual call on net11 (0.63x / 0.58x on net10)
+- The virtual call got 0.92-0.93x faster on net11 and the identity hash 1.02-1.06x slower, so identity is now level with the virtual call (0.97x hit)
+- AOT was not re-run
+
+### TypeHashSourceBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| VirtualHashHit | 1.2940 ns | 1.1905 ns | 0.92 | - → - | 384 B → 395 B |
+| IdentityHashHit | 1.0956 ns | 1.1571 ns | 1.06 | - → - | 343 B → 365 B |
+| HandleHashHit | 0.8089 ns | 0.8287 ns | 1.02 | - → - | 192 B → 186 B |
+| VirtualHashMiss | 1.4539 ns | 1.3541 ns | 0.93 | - → - | 384 B → 402 B |
+| IdentityHashMiss | 1.3665 ns | 1.3999 ns | 1.02 | - → - | 349 B → 371 B |
+| HandleHashMiss | 0.8363 ns | 0.8831 ns | 1.06 | - → - | 202 B → 205 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.69 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method           | Job                 | Runtime   | Mean      | Error     | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|----------------- |-------------------- |---------- |----------:|----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| VirtualHashHit   | .NET 10.0           | .NET 10.0 | 1.2940 ns | 0.0072 ns | 0.0108 ns | 1.2947 ns | 1.2724 ns | 1.3217 ns | 1.3077 ns |  1.00 |    0.00 |     384 B |         - |          NA |
+| IdentityHashHit  | .NET 10.0           | .NET 10.0 | 1.0956 ns | 0.0053 ns | 0.0072 ns | 1.0949 ns | 1.0832 ns | 1.1113 ns | 1.1050 ns |  0.85 |    0.01 |     343 B |         - |          NA |
+| HandleHashHit    | .NET 10.0           | .NET 10.0 | 0.8089 ns | 0.0040 ns | 0.0058 ns | 0.8094 ns | 0.7995 ns | 0.8250 ns | 0.8149 ns |  0.63 |    0.01 |     192 B |         - |          NA |
+| VirtualHashMiss  | .NET 10.0           | .NET 10.0 | 1.4539 ns | 0.0255 ns | 0.0382 ns | 1.4609 ns | 1.4005 ns | 1.4980 ns | 1.4942 ns |  1.12 |    0.03 |     384 B |         - |          NA |
+| IdentityHashMiss | .NET 10.0           | .NET 10.0 | 1.3665 ns | 0.0185 ns | 0.0260 ns | 1.3675 ns | 1.3333 ns | 1.4034 ns | 1.4004 ns |  1.06 |    0.02 |     349 B |         - |          NA |
+| HandleHashMiss   | .NET 10.0           | .NET 10.0 | 0.8363 ns | 0.0145 ns | 0.0207 ns | 0.8214 ns | 0.8137 ns | 0.8726 ns | 0.8617 ns |  0.65 |    0.02 |     202 B |         - |          NA |
+|                  |                     |           |           |           |           |           |           |           |           |       |         |           |           |             |
+| VirtualHashHit   | MediumRun-.NET 11.0 | .NET 11.0 | 1.1905 ns | 0.0087 ns | 0.0121 ns | 1.1880 ns | 1.1731 ns | 1.2205 ns | 1.2064 ns |  1.00 |    0.00 |     395 B |         - |          NA |
+| IdentityHashHit  | MediumRun-.NET 11.0 | .NET 11.0 | 1.1571 ns | 0.0519 ns | 0.0744 ns | 1.0953 ns | 1.0801 ns | 1.2438 ns | 1.2393 ns |  0.97 |    0.06 |     365 B |         - |          NA |
+| HandleHashHit    | MediumRun-.NET 11.0 | .NET 11.0 | 0.8287 ns | 0.0051 ns | 0.0074 ns | 0.8311 ns | 0.8175 ns | 0.8386 ns | 0.8374 ns |  0.70 |    0.01 |     186 B |         - |          NA |
+| VirtualHashMiss  | MediumRun-.NET 11.0 | .NET 11.0 | 1.3541 ns | 0.0068 ns | 0.0093 ns | 1.3526 ns | 1.3400 ns | 1.3728 ns | 1.3653 ns |  1.14 |    0.01 |     402 B |         - |          NA |
+| IdentityHashMiss | MediumRun-.NET 11.0 | .NET 11.0 | 1.3999 ns | 0.0150 ns | 0.0215 ns | 1.4030 ns | 1.3613 ns | 1.4452 ns | 1.4236 ns |  1.18 |    0.02 |     371 B |         - |          NA |
+| HandleHashMiss   | MediumRun-.NET 11.0 | .NET 11.0 | 0.8831 ns | 0.0152 ns | 0.0228 ns | 0.8756 ns | 0.8595 ns | 0.9280 ns | 0.9136 ns |  0.74 |    0.02 |     205 B |         - |          NA |
+
+## Earlier record
+
 - Use case: runtime type dispatch tables - serializer formatter lookup, DI resolution caches, message handler registries: anywhere a `Type` arrives as data rather than as a generic argument
 - Verdict: **conditional on the compilation mode - the ranking reverses between JIT and NativeAOT**
   - **JIT: `type.TypeHandle.Value` wins** - 0.60x on hit, 0.64x on miss, and less than half the code (403 B → 192 B)

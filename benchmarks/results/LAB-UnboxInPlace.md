@@ -1,5 +1,41 @@
 # LAB-UnboxInPlace: Unsafe.Unbox for in-place update of an existing box (study queue 7-12)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged - adopted. `Unsafe.Unbox` in place is 0.19x of unbox / mutate / rebox on both generations (168.3 vs 863.6 ns on net11); both got 0.87-0.89x faster on net11
+
+### UnboxInPlaceBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| UnboxCopyRebox | 993.5 ns | 863.6 ns | 0.87 | 8192 B → 8192 B | 540 B → 545 B |
+| UnsafeUnboxInPlace | 189.3 ns | 168.3 ns | 0.89 | - → - | 251 B → 255 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.63 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method             | Job                 | Runtime   | Mean     | Error    | StdDev   | Median   | Min      | Max        | P90        | Ratio | RatioSD | Code Size | Gen0   | Gen1   | Allocated | Alloc Ratio |
+|------------------- |-------------------- |---------- |---------:|---------:|---------:|---------:|---------:|-----------:|-----------:|------:|--------:|----------:|-------:|-------:|----------:|------------:|
+| UnboxCopyRebox     | .NET 10.0           | .NET 10.0 | 993.5 ns | 12.67 ns | 17.35 ns | 989.5 ns | 968.6 ns | 1,045.8 ns | 1,013.3 ns |  1.00 |    0.00 |     540 B | 0.9785 | 0.0305 |    8192 B |        1.00 |
+| UnsafeUnboxInPlace | .NET 10.0           | .NET 10.0 | 189.3 ns | 12.70 ns | 18.21 ns | 200.1 ns | 169.0 ns |   214.8 ns |   207.8 ns |  0.19 |    0.02 |     251 B |      - |      - |         - |        0.00 |
+|                    |                     |           |          |          |          |          |          |            |            |       |         |           |        |        |           |             |
+| UnboxCopyRebox     | MediumRun-.NET 11.0 | .NET 11.0 | 863.6 ns |  9.89 ns | 14.50 ns | 870.0 ns | 837.3 ns |   885.4 ns |   878.4 ns |  1.00 |    0.00 |     545 B | 0.9794 | 0.0305 |    8192 B |        1.00 |
+| UnsafeUnboxInPlace | MediumRun-.NET 11.0 | .NET 11.0 | 168.3 ns |  0.95 ns |  1.30 ns | 168.2 ns | 166.3 ns |   170.7 ns |   170.0 ns |  0.19 |    0.00 |     255 B |      - |      - |         - |        0.00 |
+
+## Earlier record
+
 - Verdict: adopted (recorded as an STK-05 extension). Re-measured on x86-64-v4 (Zen 5)
 - **0.17x** against unbox / mutate the copy / rebox (171.2 vs 1,024.9 ns), code 251 vs 582 B, and allocation
   goes from **8,192 B to zero**. All three axes improve (x86-64-v3: 0.18x, byte-identical code sizes)

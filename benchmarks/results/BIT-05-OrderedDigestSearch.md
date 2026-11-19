@@ -1,5 +1,119 @@
 # BIT-05: Order-preserving 8-byte digest probes in a binary search
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged - conditional. Random keys on net11: hit 0.76x / 0.71x / 0.63x, miss 0.63x / 0.56x / 0.51x at 64 / 256 / 1024; shared 8-byte prefix: 1.22-1.30x (net10 1.23-1.29x)
+- At 1024 random keys the full-compare hit got 0.87x faster on net11 (19.52 → 17.02 ns), so the digest gain there narrows from 0.54x to 0.63x
+- The digest miss probe shrank from 1,756 to about 1,000 B on net11 with no time change
+
+### OrderedDigestSearchBenchmark
+
+net10 → net11 per row:
+
+| Method | KeyCount | Shape | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|---|
+| HitFullCompare | 64 | Random | 10.463 ns | 10.091 ns | 0.96 | - → - | 672 B → 715 B |
+| HitDigest | 64 | Random | 7.764 ns | 7.713 ns | 0.99 | - → - | 1,442 B → 1,443 B |
+| MissFullCompare | 64 | Random | 9.932 ns | 10.249 ns | 1.03 | - → - | 696 B → 721 B |
+| MissDigest | 64 | Random | 6.540 ns | 6.435 ns | 0.98 | - → - | 1,758 B → 1,001 B |
+| HitFullCompare | 64 | SharedPrefix | 10.252 ns | 10.505 ns | 1.02 | - → - | 685 B → 710 B |
+| HitDigest | 64 | SharedPrefix | 13.028 ns | 13.521 ns | 1.04 | - → - | 1,428 B → 1,464 B |
+| MissFullCompare | 64 | SharedPrefix | 11.118 ns | 11.296 ns | 1.02 | - → - | 693 B → 718 B |
+| MissDigest | 64 | SharedPrefix | 14.311 ns | 14.719 ns | 1.03 | - → - | 1,428 B → 1,460 B |
+| HitFullCompare | 256 | Random | 13.438 ns | 13.118 ns | 0.98 | - → - | 691 B → 715 B |
+| HitDigest | 256 | Random | 9.048 ns | 9.294 ns | 1.03 | - → - | 1,388 B → 1,431 B |
+| MissFullCompare | 256 | Random | 14.108 ns | 13.780 ns | 0.98 | - → - | 686 B → 713 B |
+| MissDigest | 256 | Random | 7.776 ns | 7.776 ns | 1.00 | - → - | 1,756 B → 1,006 B |
+| HitFullCompare | 256 | SharedPrefix | 13.374 ns | 14.038 ns | 1.05 | - → - | 685 B → 710 B |
+| HitDigest | 256 | SharedPrefix | 16.719 ns | 17.063 ns | 1.02 | - → - | 1,428 B → 1,449 B |
+| MissFullCompare | 256 | SharedPrefix | 14.731 ns | 15.486 ns | 1.05 | - → - | 689 B → 709 B |
+| MissDigest | 256 | SharedPrefix | 18.523 ns | 19.761 ns | 1.07 | - → - | 1,414 B → 1,449 B |
+| HitFullCompare | 1024 | Random | 19.517 ns | 17.018 ns | 0.87 | - → - | 690 B → 715 B |
+| HitDigest | 1024 | Random | 10.604 ns | 10.646 ns | 1.00 | - → - | 1,389 B → 1,443 B |
+| MissFullCompare | 1024 | Random | 17.223 ns | 17.618 ns | 1.02 | - → - | 696 B → 713 B |
+| MissDigest | 1024 | Random | 9.042 ns | 9.052 ns | 1.00 | - → - | 1,756 B → 1,002 B |
+| HitFullCompare | 1024 | SharedPrefix | 17.491 ns | 17.885 ns | 1.02 | - → - | 678 B → 708 B |
+| HitDigest | 1024 | SharedPrefix | 21.569 ns | 22.221 ns | 1.03 | - → - | 1,421 B → 1,464 B |
+| MissFullCompare | 1024 | SharedPrefix | 18.889 ns | 19.798 ns | 1.05 | - → - | 682 B → 720 B |
+| MissDigest | 1024 | SharedPrefix | 23.382 ns | 24.167 ns | 1.03 | - → - | 1,428 B → 1,458 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.19 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method          | Job                 | Runtime   | KeyCount | Shape        | Mean      | Error     | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|---------------- |-------------------- |---------- |--------- |------------- |----------:|----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| **HitFullCompare**  | **.NET 10.0**           | **.NET 10.0** | **64**       | **Random**       | **10.463 ns** | **0.6114 ns** | **0.8962 ns** |  **9.745 ns** |  **9.523 ns** | **11.707 ns** | **11.422 ns** |  **1.00** |    **0.00** |     **672 B** |         **-** |          **NA** |
+| HitDigest       | .NET 10.0           | .NET 10.0 | 64       | Random       |  7.764 ns | 0.0644 ns | 0.0924 ns |  7.762 ns |  7.620 ns |  7.999 ns |  7.865 ns |  0.75 |    0.06 |   1,442 B |         - |          NA |
+| MissFullCompare | .NET 10.0           | .NET 10.0 | 64       | Random       |  9.932 ns | 0.1986 ns | 0.2911 ns | 10.048 ns |  9.605 ns | 10.338 ns | 10.275 ns |  0.96 |    0.08 |     696 B |         - |          NA |
+| MissDigest      | .NET 10.0           | .NET 10.0 | 64       | Random       |  6.540 ns | 0.0417 ns | 0.0611 ns |  6.542 ns |  6.445 ns |  6.631 ns |  6.609 ns |  0.63 |    0.05 |   1,758 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| HitFullCompare  | MediumRun-.NET 11.0 | .NET 11.0 | 64       | Random       | 10.091 ns | 0.0565 ns | 0.0810 ns | 10.087 ns |  9.928 ns | 10.245 ns | 10.214 ns |  1.00 |    0.00 |     715 B |         - |          NA |
+| HitDigest       | MediumRun-.NET 11.0 | .NET 11.0 | 64       | Random       |  7.713 ns | 0.0241 ns | 0.0346 ns |  7.710 ns |  7.658 ns |  7.800 ns |  7.756 ns |  0.76 |    0.01 |   1,443 B |         - |          NA |
+| MissFullCompare | MediumRun-.NET 11.0 | .NET 11.0 | 64       | Random       | 10.249 ns | 0.0372 ns | 0.0521 ns | 10.250 ns | 10.161 ns | 10.375 ns | 10.314 ns |  1.02 |    0.01 |     721 B |         - |          NA |
+| MissDigest      | MediumRun-.NET 11.0 | .NET 11.0 | 64       | Random       |  6.435 ns | 0.0410 ns | 0.0574 ns |  6.459 ns |  6.351 ns |  6.522 ns |  6.501 ns |  0.64 |    0.01 |   1,001 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| **HitFullCompare**  | **.NET 10.0**           | **.NET 10.0** | **64**       | **SharedPrefix** | **10.252 ns** | **0.1510 ns** | **0.2213 ns** | **10.136 ns** |  **9.953 ns** | **10.528 ns** | **10.497 ns** |  **1.00** |    **0.00** |     **685 B** |         **-** |          **NA** |
+| HitDigest       | .NET 10.0           | .NET 10.0 | 64       | SharedPrefix | 13.028 ns | 0.1115 ns | 0.1563 ns | 12.965 ns | 12.866 ns | 13.427 ns | 13.242 ns |  1.27 |    0.03 |   1,428 B |         - |          NA |
+| MissFullCompare | .NET 10.0           | .NET 10.0 | 64       | SharedPrefix | 11.118 ns | 0.3035 ns | 0.4449 ns | 11.475 ns | 10.622 ns | 11.588 ns | 11.566 ns |  1.08 |    0.05 |     693 B |         - |          NA |
+| MissDigest      | .NET 10.0           | .NET 10.0 | 64       | SharedPrefix | 14.311 ns | 0.0478 ns | 0.0700 ns | 14.304 ns | 14.202 ns | 14.502 ns | 14.389 ns |  1.40 |    0.03 |   1,428 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| HitFullCompare  | MediumRun-.NET 11.0 | .NET 11.0 | 64       | SharedPrefix | 10.505 ns | 0.0408 ns | 0.0598 ns | 10.524 ns | 10.399 ns | 10.589 ns | 10.578 ns |  1.00 |    0.00 |     710 B |         - |          NA |
+| HitDigest       | MediumRun-.NET 11.0 | .NET 11.0 | 64       | SharedPrefix | 13.521 ns | 0.0864 ns | 0.1266 ns | 13.543 ns | 13.332 ns | 13.764 ns | 13.671 ns |  1.29 |    0.01 |   1,464 B |         - |          NA |
+| MissFullCompare | MediumRun-.NET 11.0 | .NET 11.0 | 64       | SharedPrefix | 11.296 ns | 0.0674 ns | 0.0988 ns | 11.327 ns | 11.150 ns | 11.479 ns | 11.401 ns |  1.08 |    0.01 |     718 B |         - |          NA |
+| MissDigest      | MediumRun-.NET 11.0 | .NET 11.0 | 64       | SharedPrefix | 14.719 ns | 0.1494 ns | 0.2095 ns | 14.657 ns | 14.462 ns | 15.005 ns | 14.953 ns |  1.40 |    0.02 |   1,460 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| **HitFullCompare**  | **.NET 10.0**           | **.NET 10.0** | **256**      | **Random**       | **13.438 ns** | **0.5748 ns** | **0.8243 ns** | **12.786 ns** | **12.531 ns** | **14.391 ns** | **14.332 ns** |  **1.00** |    **0.00** |     **691 B** |         **-** |          **NA** |
+| HitDigest       | .NET 10.0           | .NET 10.0 | 256      | Random       |  9.048 ns | 0.0537 ns | 0.0736 ns |  9.025 ns |  8.966 ns |  9.267 ns |  9.144 ns |  0.68 |    0.04 |   1,388 B |         - |          NA |
+| MissFullCompare | .NET 10.0           | .NET 10.0 | 256      | Random       | 14.108 ns | 0.1123 ns | 0.1646 ns | 14.043 ns | 13.886 ns | 14.385 ns | 14.363 ns |  1.05 |    0.06 |     686 B |         - |          NA |
+| MissDigest      | .NET 10.0           | .NET 10.0 | 256      | Random       |  7.776 ns | 0.0426 ns | 0.0598 ns |  7.766 ns |  7.683 ns |  7.907 ns |  7.846 ns |  0.58 |    0.04 |   1,756 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| HitFullCompare  | MediumRun-.NET 11.0 | .NET 11.0 | 256      | Random       | 13.118 ns | 0.0921 ns | 0.1291 ns | 13.131 ns | 12.886 ns | 13.403 ns | 13.266 ns |  1.00 |    0.00 |     715 B |         - |          NA |
+| HitDigest       | MediumRun-.NET 11.0 | .NET 11.0 | 256      | Random       |  9.294 ns | 0.0888 ns | 0.1329 ns |  9.318 ns |  9.113 ns |  9.537 ns |  9.456 ns |  0.71 |    0.01 |   1,431 B |         - |          NA |
+| MissFullCompare | MediumRun-.NET 11.0 | .NET 11.0 | 256      | Random       | 13.780 ns | 0.0522 ns | 0.0781 ns | 13.779 ns | 13.651 ns | 13.947 ns | 13.900 ns |  1.05 |    0.01 |     713 B |         - |          NA |
+| MissDigest      | MediumRun-.NET 11.0 | .NET 11.0 | 256      | Random       |  7.776 ns | 0.0292 ns | 0.0409 ns |  7.774 ns |  7.705 ns |  7.846 ns |  7.833 ns |  0.59 |    0.01 |   1,006 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| **HitFullCompare**  | **.NET 10.0**           | **.NET 10.0** | **256**      | **SharedPrefix** | **13.374 ns** | **0.1220 ns** | **0.1749 ns** | **13.333 ns** | **13.135 ns** | **13.747 ns** | **13.593 ns** |  **1.00** |    **0.00** |     **685 B** |         **-** |          **NA** |
+| HitDigest       | .NET 10.0           | .NET 10.0 | 256      | SharedPrefix | 16.719 ns | 0.0487 ns | 0.0683 ns | 16.713 ns | 16.604 ns | 16.881 ns | 16.789 ns |  1.25 |    0.02 |   1,428 B |         - |          NA |
+| MissFullCompare | .NET 10.0           | .NET 10.0 | 256      | SharedPrefix | 14.731 ns | 0.0596 ns | 0.0796 ns | 14.703 ns | 14.629 ns | 14.916 ns | 14.851 ns |  1.10 |    0.02 |     689 B |         - |          NA |
+| MissDigest      | .NET 10.0           | .NET 10.0 | 256      | SharedPrefix | 18.523 ns | 0.0622 ns | 0.0830 ns | 18.517 ns | 18.404 ns | 18.769 ns | 18.620 ns |  1.39 |    0.02 |   1,414 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| HitFullCompare  | MediumRun-.NET 11.0 | .NET 11.0 | 256      | SharedPrefix | 14.038 ns | 0.0816 ns | 0.1222 ns | 14.040 ns | 13.822 ns | 14.273 ns | 14.211 ns |  1.00 |    0.00 |     710 B |         - |          NA |
+| HitDigest       | MediumRun-.NET 11.0 | .NET 11.0 | 256      | SharedPrefix | 17.063 ns | 0.0387 ns | 0.0543 ns | 17.061 ns | 16.982 ns | 17.200 ns | 17.133 ns |  1.22 |    0.01 |   1,449 B |         - |          NA |
+| MissFullCompare | MediumRun-.NET 11.0 | .NET 11.0 | 256      | SharedPrefix | 15.486 ns | 0.0892 ns | 0.1280 ns | 15.482 ns | 15.311 ns | 15.799 ns | 15.665 ns |  1.10 |    0.01 |     709 B |         - |          NA |
+| MissDigest      | MediumRun-.NET 11.0 | .NET 11.0 | 256      | SharedPrefix | 19.761 ns | 0.0557 ns | 0.0762 ns | 19.762 ns | 19.645 ns | 19.909 ns | 19.862 ns |  1.41 |    0.01 |   1,449 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| **HitFullCompare**  | **.NET 10.0**           | **.NET 10.0** | **1024**     | **Random**       | **19.517 ns** | **0.6348 ns** | **0.9104 ns** | **20.171 ns** | **18.335 ns** | **20.662 ns** | **20.434 ns** |  **1.00** |    **0.00** |     **690 B** |         **-** |          **NA** |
+| HitDigest       | .NET 10.0           | .NET 10.0 | 1024     | Random       | 10.604 ns | 0.0316 ns | 0.0454 ns | 10.589 ns | 10.538 ns | 10.746 ns | 10.656 ns |  0.54 |    0.03 |   1,389 B |         - |          NA |
+| MissFullCompare | .NET 10.0           | .NET 10.0 | 1024     | Random       | 17.223 ns | 0.0617 ns | 0.0865 ns | 17.223 ns | 17.069 ns | 17.398 ns | 17.336 ns |  0.88 |    0.04 |     696 B |         - |          NA |
+| MissDigest      | .NET 10.0           | .NET 10.0 | 1024     | Random       |  9.042 ns | 0.0360 ns | 0.0505 ns |  9.036 ns |  8.977 ns |  9.169 ns |  9.113 ns |  0.46 |    0.02 |   1,756 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| HitFullCompare  | MediumRun-.NET 11.0 | .NET 11.0 | 1024     | Random       | 17.018 ns | 0.0611 ns | 0.0876 ns | 17.034 ns | 16.864 ns | 17.149 ns | 17.124 ns |  1.00 |    0.00 |     715 B |         - |          NA |
+| HitDigest       | MediumRun-.NET 11.0 | .NET 11.0 | 1024     | Random       | 10.646 ns | 0.0291 ns | 0.0398 ns | 10.639 ns | 10.582 ns | 10.759 ns | 10.695 ns |  0.63 |    0.00 |   1,443 B |         - |          NA |
+| MissFullCompare | MediumRun-.NET 11.0 | .NET 11.0 | 1024     | Random       | 17.618 ns | 0.0629 ns | 0.0882 ns | 17.617 ns | 17.481 ns | 17.819 ns | 17.701 ns |  1.04 |    0.01 |     713 B |         - |          NA |
+| MissDigest      | MediumRun-.NET 11.0 | .NET 11.0 | 1024     | Random       |  9.052 ns | 0.0267 ns | 0.0391 ns |  9.050 ns |  8.998 ns |  9.137 ns |  9.099 ns |  0.53 |    0.00 |   1,002 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| **HitFullCompare**  | **.NET 10.0**           | **.NET 10.0** | **1024**     | **SharedPrefix** | **17.491 ns** | **0.0653 ns** | **0.0916 ns** | **17.475 ns** | **17.346 ns** | **17.637 ns** | **17.608 ns** |  **1.00** |    **0.00** |     **678 B** |         **-** |          **NA** |
+| HitDigest       | .NET 10.0           | .NET 10.0 | 1024     | SharedPrefix | 21.569 ns | 0.2183 ns | 0.3268 ns | 21.622 ns | 21.115 ns | 21.974 ns | 21.936 ns |  1.23 |    0.02 |   1,421 B |         - |          NA |
+| MissFullCompare | .NET 10.0           | .NET 10.0 | 1024     | SharedPrefix | 18.889 ns | 0.0508 ns | 0.0728 ns | 18.885 ns | 18.788 ns | 19.028 ns | 18.997 ns |  1.08 |    0.01 |     682 B |         - |          NA |
+| MissDigest      | .NET 10.0           | .NET 10.0 | 1024     | SharedPrefix | 23.382 ns | 0.1064 ns | 0.1491 ns | 23.416 ns | 23.112 ns | 23.639 ns | 23.576 ns |  1.34 |    0.01 |   1,428 B |         - |          NA |
+|                 |                     |           |          |              |           |           |           |           |           |           |           |       |         |           |           |             |
+| HitFullCompare  | MediumRun-.NET 11.0 | .NET 11.0 | 1024     | SharedPrefix | 17.885 ns | 0.1775 ns | 0.2429 ns | 17.795 ns | 17.703 ns | 18.788 ns | 18.153 ns |  1.00 |    0.00 |     708 B |         - |          NA |
+| HitDigest       | MediumRun-.NET 11.0 | .NET 11.0 | 1024     | SharedPrefix | 22.221 ns | 0.1451 ns | 0.2081 ns | 22.215 ns | 21.908 ns | 22.645 ns | 22.473 ns |  1.24 |    0.02 |   1,464 B |         - |          NA |
+| MissFullCompare | MediumRun-.NET 11.0 | .NET 11.0 | 1024     | SharedPrefix | 19.798 ns | 0.0882 ns | 0.1293 ns | 19.780 ns | 19.583 ns | 20.117 ns | 19.952 ns |  1.11 |    0.02 |     720 B |         - |          NA |
+| MissDigest      | MediumRun-.NET 11.0 | .NET 11.0 | 1024     | SharedPrefix | 24.167 ns | 0.0683 ns | 0.0957 ns | 24.161 ns | 24.002 ns | 24.400 ns | 24.287 ns |  1.35 |    0.02 |   1,458 B |         - |          NA |
+
+## Earlier record
+
 - Use case: **storage-engine index blocks** - binary search over a sorted run of variable-length keys, where the structure has to stay ordered because range scans, prefix scans and successor lookups go through it too. If ordering is not required, a hash table beats binary search outright and this pattern has no place
 - Verdict: conditional (adopt only when keys are known to diverge inside the first 8 bytes - the worst case is a real 1.2-1.4x regression, not a wash)
 - Random keys: hit 0.74x (64) / 0.68x (256) / **0.65x** (1024), miss 0.64x / 0.57x / **0.54x**. The gain grows with table size because a deeper search means more probes that never touch key bytes

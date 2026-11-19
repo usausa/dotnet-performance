@@ -104,6 +104,7 @@ public static class Program
         ArrayCovarianceBenchmark.Verify();
         BitCastStructVectorBenchmark.Verify();
         SpanSortComparerBenchmark.Verify();
+        FrozenBuildSourceBenchmark.Verify();
 #if NET11_0_OR_GREATER
         WhiteSpaceSearchBenchmark.Verify();
         GZipEncoderBenchmark.Verify();
@@ -147,6 +148,7 @@ public static class Program
                 typeof(ArrayDataReferenceBenchmark),
                 typeof(StructStreamIoBenchmark),
                 typeof(FrozenBuildBenchmark),
+                typeof(FrozenBuildSourceBenchmark),
                 typeof(FrozenLookupBenchmark),
                 typeof(UnsafeAsCastBenchmark),
                 typeof(CallAbstractionBenchmark),

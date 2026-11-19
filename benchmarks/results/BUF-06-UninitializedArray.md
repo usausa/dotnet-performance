@@ -1,5 +1,74 @@
 # BUF-06: GC.AllocateUninitializedArray
 
+## net11 / net10 re-verification (2026-11-18, HX 370)
+
+- Verdict: unchanged - adopted (conditional). On both generations: 0.27x at 64 KB, 0.73x at 4 KB, 1.16x at 2 KB, about 1.0x at 256 B and 1 MB (the earlier record's 0.18x at 64 KB came from another run)
+- Both forms are 1.10-1.14x slower on net11 at 64 KB and 1 MB; allocation identical
+
+### UninitializedArrayBenchmark
+
+net10 → net11 per row:
+
+| Method | Size | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| NewArray | 256 | 5.419 ns | 5.648 ns | 1.04 | 280 B → 280 B | 69 B → 69 B |
+| AllocateUninitialized | 256 | 5.564 ns | 5.653 ns | 1.02 | 280 B → 280 B | 139 B → 139 B |
+| NewArray | 2048 | 28.780 ns | 28.980 ns | 1.01 | 2072 B → 2072 B | 69 B → 69 B |
+| AllocateUninitialized | 2048 | 33.382 ns | 33.651 ns | 1.01 | 2072 B → 2072 B | 288 B → 288 B |
+| NewArray | 4096 | 53.943 ns | 55.300 ns | 1.03 | 4120 B → 4120 B | 69 B → 69 B |
+| AllocateUninitialized | 4096 | 39.167 ns | 40.420 ns | 1.03 | 4120 B → 4120 B | 288 B → 288 B |
+| NewArray | 65536 | 742.448 ns | 845.209 ns | 1.14 | 65560 B → 65560 B | 69 B → 69 B |
+| AllocateUninitialized | 65536 | 198.409 ns | 226.132 ns | 1.14 | 65560 B → 65560 B | 288 B → 288 B |
+| NewArray | 1048576 | 49,406.204 ns | 51,861.127 ns | 1.05 | 1049026 B → 1049025 B | 69 B → 69 B |
+| AllocateUninitialized | 1048576 | 48,535.903 ns | 53,242.095 ns | 1.10 | 1049022 B → 1049022 B | 86 B → 288 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.74 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method                | Job                 | Runtime   | Size    | Mean          | Error         | StdDev        | Min           | Max           | P90           | Ratio | RatioSD | Code Size | Gen0     | Gen1     | Gen2     | Allocated | Alloc Ratio |
+|---------------------- |-------------------- |---------- |-------- |--------------:|--------------:|--------------:|--------------:|--------------:|--------------:|------:|--------:|----------:|---------:|---------:|---------:|----------:|------------:|
+| **NewArray**              | **.NET 10.0**           | **.NET 10.0** | **256**     |      **5.419 ns** |     **0.0668 ns** |     **0.0936 ns** |      **5.281 ns** |      **5.584 ns** |      **5.524 ns** |  **1.00** |    **0.00** |      **69 B** |   **0.0335** |        **-** |        **-** |     **280 B** |        **1.00** |
+| AllocateUninitialized | .NET 10.0           | .NET 10.0 | 256     |      5.564 ns |     0.0253 ns |     0.0370 ns |      5.482 ns |      5.651 ns |      5.599 ns |  1.03 |    0.02 |     139 B |   0.0335 |        - |        - |     280 B |        1.00 |
+|                       |                     |           |         |               |               |               |               |               |               |       |         |           |          |          |          |           |             |
+| NewArray              | MediumRun-.NET 11.0 | .NET 11.0 | 256     |      5.648 ns |     0.0312 ns |     0.0448 ns |      5.567 ns |      5.743 ns |      5.691 ns |  1.00 |    0.00 |      69 B |   0.0335 |        - |        - |     280 B |        1.00 |
+| AllocateUninitialized | MediumRun-.NET 11.0 | .NET 11.0 | 256     |      5.653 ns |     0.0492 ns |     0.0721 ns |      5.534 ns |      5.791 ns |      5.733 ns |  1.00 |    0.01 |     139 B |   0.0335 |        - |        - |     280 B |        1.00 |
+|                       |                     |           |         |               |               |               |               |               |               |       |         |           |          |          |          |           |             |
+| **NewArray**              | **.NET 10.0**           | **.NET 10.0** | **2048**    |     **28.780 ns** |     **0.4652 ns** |     **0.6963 ns** |     **27.590 ns** |     **30.019 ns** |     **29.940 ns** |  **1.00** |    **0.00** |      **69 B** |   **0.2477** |        **-** |        **-** |    **2072 B** |        **1.00** |
+| AllocateUninitialized | .NET 10.0           | .NET 10.0 | 2048    |     33.382 ns |     0.1634 ns |     0.2343 ns |     32.935 ns |     33.873 ns |     33.724 ns |  1.16 |    0.03 |     288 B |   0.2472 |        - |        - |    2072 B |        1.00 |
+|                       |                     |           |         |               |               |               |               |               |               |       |         |           |          |          |          |           |             |
+| NewArray              | MediumRun-.NET 11.0 | .NET 11.0 | 2048    |     28.980 ns |     0.4753 ns |     0.7115 ns |     27.711 ns |     30.180 ns |     29.892 ns |  1.00 |    0.00 |      69 B |   0.2478 |        - |        - |    2072 B |        1.00 |
+| AllocateUninitialized | MediumRun-.NET 11.0 | .NET 11.0 | 2048    |     33.651 ns |     0.2046 ns |     0.2934 ns |     33.173 ns |     34.231 ns |     34.033 ns |  1.16 |    0.03 |     288 B |   0.2471 |        - |        - |    2072 B |        1.00 |
+|                       |                     |           |         |               |               |               |               |               |               |       |         |           |          |          |          |           |             |
+| **NewArray**              | **.NET 10.0**           | **.NET 10.0** | **4096**    |     **53.943 ns** |     **0.9962 ns** |     **1.4911 ns** |     **51.115 ns** |     **55.837 ns** |     **55.479 ns** |  **1.00** |    **0.00** |      **69 B** |   **0.4928** |        **-** |        **-** |    **4120 B** |        **1.00** |
+| AllocateUninitialized | .NET 10.0           | .NET 10.0 | 4096    |     39.167 ns |     0.1837 ns |     0.2692 ns |     38.683 ns |     39.686 ns |     39.546 ns |  0.73 |    0.02 |     288 B |   0.4911 |        - |        - |    4120 B |        1.00 |
+|                       |                     |           |         |               |               |               |               |               |               |       |         |           |          |          |          |           |             |
+| NewArray              | MediumRun-.NET 11.0 | .NET 11.0 | 4096    |     55.300 ns |     0.8474 ns |     1.2421 ns |     52.297 ns |     56.955 ns |     56.788 ns |  1.00 |    0.00 |      69 B |   0.4928 |        - |        - |    4120 B |        1.00 |
+| AllocateUninitialized | MediumRun-.NET 11.0 | .NET 11.0 | 4096    |     40.420 ns |     0.1865 ns |     0.2674 ns |     40.062 ns |     41.186 ns |     40.711 ns |  0.73 |    0.02 |     288 B |   0.4911 |        - |        - |    4120 B |        1.00 |
+|                       |                     |           |         |               |               |               |               |               |               |       |         |           |          |          |          |           |             |
+| **NewArray**              | **.NET 10.0**           | **.NET 10.0** | **65536**   |    **742.448 ns** |    **26.2757 ns** |    **39.3283 ns** |    **687.347 ns** |    **787.732 ns** |    **782.378 ns** |  **1.00** |    **0.00** |      **69 B** |   **7.8115** |        **-** |        **-** |   **65560 B** |        **1.00** |
+| AllocateUninitialized | .NET 10.0           | .NET 10.0 | 65536   |    198.409 ns |     1.2357 ns |     1.7722 ns |    195.687 ns |    202.373 ns |    200.061 ns |  0.27 |    0.01 |     288 B |   7.8123 |        - |        - |   65560 B |        1.00 |
+|                       |                     |           |         |               |               |               |               |               |               |       |         |           |          |          |          |           |             |
+| NewArray              | MediumRun-.NET 11.0 | .NET 11.0 | 65536   |    845.209 ns |    49.3328 ns |    73.8389 ns |    751.393 ns |    945.893 ns |    927.272 ns |  1.00 |    0.00 |      69 B |   7.8115 |        - |        - |   65560 B |        1.00 |
+| AllocateUninitialized | MediumRun-.NET 11.0 | .NET 11.0 | 65536   |    226.132 ns |     0.8834 ns |     1.2670 ns |    223.976 ns |    228.890 ns |    227.577 ns |  0.27 |    0.02 |     288 B |   7.8123 |        - |        - |   65560 B |        1.00 |
+|                       |                     |           |         |               |               |               |               |               |               |       |         |           |          |          |          |           |             |
+| **NewArray**              | **.NET 10.0**           | **.NET 10.0** | **1048576** | **49,406.204 ns** |   **624.3998 ns** |   **854.6856 ns** | **48,251.807 ns** | **51,994.342 ns** | **50,213.022 ns** |  **1.00** |    **0.00** |      **69 B** | **333.3130** | **333.3130** | **333.3130** | **1049026 B** |        **1.00** |
+| AllocateUninitialized | .NET 10.0           | .NET 10.0 | 1048576 | 48,535.903 ns |   304.8172 ns |   406.9223 ns | 48,002.539 ns | 49,715.167 ns | 49,024.596 ns |  0.98 |    0.02 |      86 B | 333.3130 | 333.3130 | 333.3130 | 1049022 B |        1.00 |
+|                       |                     |           |         |               |               |               |               |               |               |       |         |           |          |          |          |           |             |
+| NewArray              | MediumRun-.NET 11.0 | .NET 11.0 | 1048576 | 51,861.127 ns | 1,242.4889 ns | 1,781.9405 ns | 49,702.258 ns | 54,718.201 ns | 53,895.006 ns |  1.00 |    0.00 |      69 B | 333.3130 | 333.3130 | 333.3130 | 1049025 B |        1.00 |
+| AllocateUninitialized | MediumRun-.NET 11.0 | .NET 11.0 | 1048576 | 53,242.095 ns |   380.5495 ns |   557.8045 ns | 52,600.220 ns | 54,711.505 ns | 53,964.454 ns |  1.03 |    0.04 |     288 B | 333.3130 | 333.3130 | 333.3130 | 1049022 B |        1.00 |
+
+## Earlier record
+
 - Verdict: adopted (conditional)
 - 0.18x at 64 KB, 0.60x at 4 KB, 0.94x at 2 KB
 - ~1.0x at 256 B and 1 MB (small allocations and LOH / GC dominate the cost either way)

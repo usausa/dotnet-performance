@@ -1,5 +1,56 @@
 # TXT-11: Type fast path for `object` -> `string` conversion
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged in sign, smaller in size. The interface path got 0.78x faster on net11 on monomorphic input (5.40 → 4.19 ns, code 5.2 → 2.2 KB), so the narrow fast path is 0.95x of it (0.80x on net10) and the wide one 1.11x
+- Mixed input: 0.97x (narrow) and 1.04x (wide), still within the noise recorded earlier
+
+### ObjectToStringBenchmark
+
+net10 → net11 per row:
+
+| Method | Shape | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| InterfacePath | Monomorphic | 5.399 ns | 4.186 ns | 0.78 | 40 B → 40 B | 5,156 B → 2,186 B |
+| TypeSwitch | Monomorphic | 5.123 ns | 4.664 ns | 0.91 | 40 B → 40 B | 4,912 B → 4,999 B |
+| TypeSwitchNarrow | Monomorphic | 4.315 ns | 3.981 ns | 0.92 | 40 B → 40 B | 1,673 B → 2,150 B |
+| InterfacePath | Mixed | 12.861 ns | 12.334 ns | 0.96 | 32 B → 32 B | 16,831 B → 3,588 B |
+| TypeSwitch | Mixed | 12.920 ns | 12.819 ns | 0.99 | 32 B → 32 B | 19,884 B → 26,600 B |
+| TypeSwitchNarrow | Mixed | 13.207 ns | 11.988 ns | 0.91 | 32 B → 32 B | 14,861 B → 18,900 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 68.92 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method           | Job                 | Runtime   | Shape       | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Gen0   | Code Size | Allocated | Alloc Ratio |
+|----------------- |-------------------- |---------- |------------ |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|-------:|----------:|----------:|------------:|
+| **InterfacePath**    | **.NET 10.0**           | **.NET 10.0** | **Monomorphic** |  **5.399 ns** | **0.0327 ns** | **0.0469 ns** |  **5.319 ns** |  **5.504 ns** |  **5.459 ns** |  **1.00** |    **0.00** | **0.0048** |   **5,156 B** |      **40 B** |        **1.00** |
+| TypeSwitch       | .NET 10.0           | .NET 10.0 | Monomorphic |  5.123 ns | 0.0417 ns | 0.0584 ns |  5.055 ns |  5.291 ns |  5.189 ns |  0.95 |    0.01 | 0.0048 |   4,912 B |      40 B |        1.00 |
+| TypeSwitchNarrow | .NET 10.0           | .NET 10.0 | Monomorphic |  4.315 ns | 0.0229 ns | 0.0321 ns |  4.268 ns |  4.388 ns |  4.354 ns |  0.80 |    0.01 | 0.0048 |   1,673 B |      40 B |        1.00 |
+|                  |                     |           |             |           |           |           |           |           |           |       |         |        |           |           |             |
+| InterfacePath    | MediumRun-.NET 11.0 | .NET 11.0 | Monomorphic |  4.186 ns | 0.0191 ns | 0.0267 ns |  4.151 ns |  4.251 ns |  4.221 ns |  1.00 |    0.00 | 0.0048 |   2,186 B |      40 B |        1.00 |
+| TypeSwitch       | MediumRun-.NET 11.0 | .NET 11.0 | Monomorphic |  4.664 ns | 0.0314 ns | 0.0429 ns |  4.611 ns |  4.787 ns |  4.717 ns |  1.11 |    0.01 | 0.0048 |   4,999 B |      40 B |        1.00 |
+| TypeSwitchNarrow | MediumRun-.NET 11.0 | .NET 11.0 | Monomorphic |  3.981 ns | 0.0365 ns | 0.0534 ns |  3.924 ns |  4.154 ns |  4.050 ns |  0.95 |    0.01 | 0.0048 |   2,150 B |      40 B |        1.00 |
+|                  |                     |           |             |           |           |           |           |           |           |       |         |        |           |           |             |
+| **InterfacePath**    | **.NET 10.0**           | **.NET 10.0** | **Mixed**       | **12.861 ns** | **0.1382 ns** | **0.2026 ns** | **12.513 ns** | **13.226 ns** | **13.103 ns** |  **1.00** |    **0.00** | **0.0038** |  **16,831 B** |      **32 B** |        **1.00** |
+| TypeSwitch       | .NET 10.0           | .NET 10.0 | Mixed       | 12.920 ns | 0.1136 ns | 0.1700 ns | 12.599 ns | 13.224 ns | 13.126 ns |  1.00 |    0.02 | 0.0038 |  19,884 B |      32 B |        1.00 |
+| TypeSwitchNarrow | .NET 10.0           | .NET 10.0 | Mixed       | 13.207 ns | 0.1762 ns | 0.2583 ns | 12.822 ns | 13.605 ns | 13.510 ns |  1.03 |    0.03 | 0.0038 |  14,861 B |      32 B |        1.00 |
+|                  |                     |           |             |           |           |           |           |           |           |       |         |        |           |           |             |
+| InterfacePath    | MediumRun-.NET 11.0 | .NET 11.0 | Mixed       | 12.334 ns | 0.2136 ns | 0.3131 ns | 11.819 ns | 12.723 ns | 12.677 ns |  1.00 |    0.00 | 0.0038 |   3,588 B |      32 B |        1.00 |
+| TypeSwitch       | MediumRun-.NET 11.0 | .NET 11.0 | Mixed       | 12.819 ns | 0.1441 ns | 0.2112 ns | 12.425 ns | 13.189 ns | 13.107 ns |  1.04 |    0.03 | 0.0038 |  26,600 B |      32 B |        1.00 |
+| TypeSwitchNarrow | MediumRun-.NET 11.0 | .NET 11.0 | Mixed       | 11.988 ns | 0.0493 ns | 0.0738 ns | 11.863 ns | 12.164 ns | 12.085 ns |  0.97 |    0.03 | 0.0038 |  18,900 B |      32 B |        1.00 |
+
+## Earlier record
+
 - Verdict: **adopted for monomorphic call sites, conditional on the fast path being small enough to inline. No claim on polymorphic call sites.**
 - Narrow fast path (`int` / `string`, then the same fallback), monomorphic input: **0.91-0.96x across three runs, non-overlapping CIs every time**
 - Wide fast path (9 arms, every supported type), monomorphic input: **1.10-1.13x - slower than having no fast path at all**, also reproduced three times

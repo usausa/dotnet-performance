@@ -1,5 +1,44 @@
 # JIT-01: AggressiveInlining on a loop-containing helper
 
+## net11 / net10 re-verification (2026-11-18, HX 370)
+
+- Verdict: unchanged - the default policy and AggressiveInlining compile to the same 100 B on both generations; NoInlining stays 1.19x
+
+### InliningBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| DefaultPolicy | 990.7 ns | 989.4 ns | 1.00 | - → - | 100 B → 100 B |
+| Aggressive | 1,018.6 ns | 995.5 ns | 0.98 | - → - | 100 B → 100 B |
+| NoInline | 1,179.7 ns | 1,176.6 ns | 1.00 | - → - | 107 B → 107 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.59 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method        | Job                 | Runtime   | Mean       | Error    | StdDev   | Median     | Min        | Max        | P90        | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|-------------- |-------------------- |---------- |-----------:|---------:|---------:|-----------:|-----------:|-----------:|-----------:|------:|--------:|----------:|----------:|------------:|
+| DefaultPolicy | .NET 10.0           | .NET 10.0 |   990.7 ns | 29.48 ns | 43.21 ns |   965.0 ns |   940.0 ns | 1,039.4 ns | 1,037.2 ns |  1.00 |    0.00 |     100 B |         - |          NA |
+| Aggressive    | .NET 10.0           | .NET 10.0 | 1,018.6 ns |  8.76 ns | 12.57 ns | 1,026.2 ns |   997.3 ns | 1,035.5 ns | 1,032.2 ns |  1.03 |    0.05 |     100 B |         - |          NA |
+| NoInline      | .NET 10.0           | .NET 10.0 | 1,179.7 ns | 12.29 ns | 18.39 ns | 1,180.4 ns | 1,149.6 ns | 1,207.7 ns | 1,205.6 ns |  1.19 |    0.05 |     107 B |         - |          NA |
+|               |                     |           |            |          |          |            |            |            |            |       |         |           |           |             |
+| DefaultPolicy | MediumRun-.NET 11.0 | .NET 11.0 |   989.4 ns | 30.68 ns | 44.97 ns |   979.8 ns |   935.5 ns | 1,040.6 ns | 1,036.6 ns |  1.00 |    0.00 |     100 B |         - |          NA |
+| Aggressive    | MediumRun-.NET 11.0 | .NET 11.0 |   995.5 ns | 28.13 ns | 42.11 ns | 1,016.2 ns |   936.2 ns | 1,045.9 ns | 1,036.3 ns |  1.01 |    0.06 |     100 B |         - |          NA |
+| NoInline      | MediumRun-.NET 11.0 | .NET 11.0 | 1,176.6 ns | 15.40 ns | 23.05 ns | 1,180.6 ns | 1,119.7 ns | 1,221.5 ns | 1,196.0 ns |  1.19 |    0.06 |     107 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: attribute had no effect in this shape (default policy already inlined); NoInlining shows the stake
 - Default 0.943 us vs Aggressive 0.959 us (CIs overlap) - call-site codegen IDENTICAL (100 B both): net10 default policy inlines the loop-containing helper
 - NoInline 1.180 us: non-overlapping CIs vs default (+25%) - inlining itself matters; the attribute is insurance for shapes the heuristic declines

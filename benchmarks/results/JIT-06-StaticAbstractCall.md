@@ -1,5 +1,58 @@
 # JIT-06: static abstract interface members through a generic type parameter
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged. A class T that is inlined with its exact type stays at the direct-call cost (0.387 ns) on both generations
+- The shared class body is 1.11x slower on net11 (1.82 → 2.02 ns, 5.20x of direct); struct T got 0.92x faster (1.18 → 1.08 ns, 2.80x)
+- The instance interface calls do not move (mono 2.71x, poly 4.28x)
+
+### StaticAbstractCallBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| Direct | 0.3871 ns | 0.3873 ns | 1.00 | - → - | 19 B → 19 B |
+| StructSaim | 1.1754 ns | 1.0834 ns | 0.92 | - → - | 43 B → 49 B |
+| ClassSaimInlined | 0.3873 ns | 0.3870 ns | 1.00 | - → - | 19 B → 19 B |
+| ClassSaimShared | 1.8148 ns | 2.0152 ns | 1.11 | - → - | 103 B → 115 B |
+| ClassSaimSharedPoly | 2.2598 ns | 2.2516 ns | 1.00 | - → - | 131 B → 149 B |
+| InstanceMono | 0.9863 ns | 1.0494 ns | 1.06 | - → - | 90 B → 96 B |
+| InstancePoly | 1.6602 ns | 1.6596 ns | 1.00 | - → - | 109 B → 115 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.64 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method              | Job                 | Runtime   | Mean      | Error     | StdDev    | Median    | Min       | Max       | P90       | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|-------------------- |-------------------- |---------- |----------:|----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|----------:|----------:|------------:|
+| Direct              | .NET 10.0           | .NET 10.0 | 0.3871 ns | 0.0008 ns | 0.0011 ns | 0.3867 ns | 0.3861 ns | 0.3914 ns | 0.3884 ns |  1.00 |    0.00 |      19 B |         - |          NA |
+| StructSaim          | .NET 10.0           | .NET 10.0 | 1.1754 ns | 0.0102 ns | 0.0153 ns | 1.1787 ns | 1.1255 ns | 1.1958 ns | 1.1895 ns |  3.04 |    0.04 |      43 B |         - |          NA |
+| ClassSaimInlined    | .NET 10.0           | .NET 10.0 | 0.3873 ns | 0.0006 ns | 0.0009 ns | 0.3873 ns | 0.3860 ns | 0.3893 ns | 0.3881 ns |  1.00 |    0.00 |      19 B |         - |          NA |
+| ClassSaimShared     | .NET 10.0           | .NET 10.0 | 1.8148 ns | 0.0067 ns | 0.0093 ns | 1.8145 ns | 1.8005 ns | 1.8364 ns | 1.8261 ns |  4.69 |    0.03 |     103 B |         - |          NA |
+| ClassSaimSharedPoly | .NET 10.0           | .NET 10.0 | 2.2598 ns | 0.0285 ns | 0.0417 ns | 2.2617 ns | 2.1740 ns | 2.3286 ns | 2.3094 ns |  5.84 |    0.11 |     131 B |         - |          NA |
+| InstanceMono        | .NET 10.0           | .NET 10.0 | 0.9863 ns | 0.0313 ns | 0.0459 ns | 0.9751 ns | 0.9172 ns | 1.0875 ns | 1.0530 ns |  2.55 |    0.12 |      90 B |         - |          NA |
+| InstancePoly        | .NET 10.0           | .NET 10.0 | 1.6602 ns | 0.0349 ns | 0.0501 ns | 1.6274 ns | 1.6064 ns | 1.7176 ns | 1.7159 ns |  4.29 |    0.13 |     109 B |         - |          NA |
+|                     |                     |           |           |           |           |           |           |           |           |       |         |           |           |             |
+| Direct              | MediumRun-.NET 11.0 | .NET 11.0 | 0.3873 ns | 0.0007 ns | 0.0010 ns | 0.3872 ns | 0.3859 ns | 0.3901 ns | 0.3885 ns |  1.00 |    0.00 |      19 B |         - |          NA |
+| StructSaim          | MediumRun-.NET 11.0 | .NET 11.0 | 1.0834 ns | 0.0292 ns | 0.0438 ns | 1.0872 ns | 0.9845 ns | 1.1661 ns | 1.1287 ns |  2.80 |    0.11 |      49 B |         - |          NA |
+| ClassSaimInlined    | MediumRun-.NET 11.0 | .NET 11.0 | 0.3870 ns | 0.0004 ns | 0.0005 ns | 0.3870 ns | 0.3861 ns | 0.3880 ns | 0.3879 ns |  1.00 |    0.00 |      19 B |         - |          NA |
+| ClassSaimShared     | MediumRun-.NET 11.0 | .NET 11.0 | 2.0152 ns | 0.0081 ns | 0.0114 ns | 2.0150 ns | 1.9988 ns | 2.0516 ns | 2.0301 ns |  5.20 |    0.03 |     115 B |         - |          NA |
+| ClassSaimSharedPoly | MediumRun-.NET 11.0 | .NET 11.0 | 2.2516 ns | 0.0222 ns | 0.0332 ns | 2.2506 ns | 2.1932 ns | 2.3329 ns | 2.2859 ns |  5.81 |    0.09 |     149 B |         - |          NA |
+| InstanceMono        | MediumRun-.NET 11.0 | .NET 11.0 | 1.0494 ns | 0.0407 ns | 0.0609 ns | 1.0612 ns | 0.9243 ns | 1.1424 ns | 1.1100 ns |  2.71 |    0.15 |      96 B |         - |          NA |
+| InstancePoly        | MediumRun-.NET 11.0 | .NET 11.0 | 1.6596 ns | 0.0390 ns | 0.0521 ns | 1.7007 ns | 1.5986 ns | 1.7217 ns | 1.7121 ns |  4.28 |    0.13 |     115 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: the cost of `T.Method()` on a `static abstract` member is decided by **what T is at the call site**, not by the member being static. Struct T or a class T that reaches the JIT with its exact type (the generic method inlined into a caller that names the type): same code as a direct call (19 B, 1.00x). Class T executing the **shared canonical body**: 4.75x (1.83 vs 0.39 ns, 354 B) — a generic-dictionary slot load and an indirect `call rax`, with a `GenericsHelpers.Method` slow path on the first call. The B550H (x86-64-v3) provisional run had the same order with a larger gap (8.44x)
 - The shared body cannot be rescued by PGO: there is no receiver object to guard on. The instance interface call in the same benchmark **is** rescued — `Apply(IOp)` compiles to `cmp [rcx], MT_OpA` + inlined `lea eax,[rdx+1]`, with the other type falling back to the interface call — so on .NET 10 the monomorphic instance call (1.17 ns) beats the shared static call by 1.6x (3.3x on x86-64-v3), and the polymorphic one (1.73 ns) beats it too (1.06x, CIs disjoint). Coanet measured the opposite order on .NET 7 before dynamic PGO
 - Alternating two class instantiations of the shared body costs 1.23x on this core (2.25 vs 1.83 ns; no difference on x86-64-v3): the indirect-call target changes every call. Each instantiation has its own dictionary, the code is the same (382 vs 354 B)

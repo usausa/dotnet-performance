@@ -1,5 +1,99 @@
 # COL-07: GetValueRefOrNullRef + Unsafe.IsNullRef (optional ref lookup)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged - adopted. Every Dictionary path is 3-6% faster on net11 and the ratios do not move
+- Update: GetValueRefOrNullRef is 0.44x (all hit), 0.59x (half miss) and 0.49x (32 B value) of TryGetValue + indexer write-back on net11 (0.44x / 0.57x / 0.49x on net10)
+- Read: 0.99-1.01x of TryGetValue on both generations
+
+### ValueRefLookupBenchmark
+
+net10 → net11 per row:
+
+| Method | Probe | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|---|
+| TryGetValueRead | AllHit | 1.584 μs | 1.490 μs | 0.94 | - → - | 1,205 B → 1,209 B |
+| ValueRefOrNullRefRead | AllHit | 1.555 μs | 1.473 μs | 0.95 | - → - | 1,202 B → 1,202 B |
+| TryGetValueThenIndexerUpdate | AllHit | 3.570 μs | 3.402 μs | 0.95 | - → - | 6,763 B → 7,334 B |
+| ValueRefOrNullRefUpdate | AllHit | 1.577 μs | 1.503 μs | 0.95 | - → - | 1,206 B → 1,210 B |
+| TryGetValueRead | HalfMiss | 1.248 μs | 1.209 μs | 0.97 | - → - | 1,003 B → 989 B |
+| ValueRefOrNullRefRead | HalfMiss | 1.224 μs | 1.224 μs | 1.00 | - → - | 1,000 B → 986 B |
+| TryGetValueThenIndexerUpdate | HalfMiss | 2.162 μs | 2.090 μs | 0.97 | - → - | 6,042 B → 6,638 B |
+| ValueRefOrNullRefUpdate | HalfMiss | 1.239 μs | 1.231 μs | 0.99 | - → - | 1,003 B → 989 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.55 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method                       | Job                 | Runtime   | Probe    | Mean     | Error     | StdDev    | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|----------------------------- |-------------------- |---------- |--------- |---------:|----------:|----------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
+| **TryGetValueRead**              | **.NET 10.0**           | **.NET 10.0** | **AllHit**   | **1.584 μs** | **0.0152 μs** | **0.0218 μs** | **1.554 μs** | **1.615 μs** | **1.610 μs** |  **1.00** |    **0.00** |   **1,205 B** |         **-** |          **NA** |
+| ValueRefOrNullRefRead        | .NET 10.0           | .NET 10.0 | AllHit   | 1.555 μs | 0.0057 μs | 0.0082 μs | 1.542 μs | 1.574 μs | 1.566 μs |  0.98 |    0.01 |   1,202 B |         - |          NA |
+| TryGetValueThenIndexerUpdate | .NET 10.0           | .NET 10.0 | AllHit   | 3.570 μs | 0.0116 μs | 0.0174 μs | 3.540 μs | 3.608 μs | 3.591 μs |  2.25 |    0.03 |   6,763 B |         - |          NA |
+| ValueRefOrNullRefUpdate      | .NET 10.0           | .NET 10.0 | AllHit   | 1.577 μs | 0.0058 μs | 0.0082 μs | 1.561 μs | 1.596 μs | 1.588 μs |  1.00 |    0.01 |   1,206 B |         - |          NA |
+|                              |                     |           |          |          |           |           |          |          |          |       |         |           |           |             |
+| TryGetValueRead              | MediumRun-.NET 11.0 | .NET 11.0 | AllHit   | 1.490 μs | 0.0046 μs | 0.0063 μs | 1.480 μs | 1.503 μs | 1.499 μs |  1.00 |    0.00 |   1,209 B |         - |          NA |
+| ValueRefOrNullRefRead        | MediumRun-.NET 11.0 | .NET 11.0 | AllHit   | 1.473 μs | 0.0057 μs | 0.0082 μs | 1.462 μs | 1.494 μs | 1.483 μs |  0.99 |    0.01 |   1,202 B |         - |          NA |
+| TryGetValueThenIndexerUpdate | MediumRun-.NET 11.0 | .NET 11.0 | AllHit   | 3.402 μs | 0.0117 μs | 0.0168 μs | 3.372 μs | 3.446 μs | 3.420 μs |  2.28 |    0.01 |   7,334 B |         - |          NA |
+| ValueRefOrNullRefUpdate      | MediumRun-.NET 11.0 | .NET 11.0 | AllHit   | 1.503 μs | 0.0041 μs | 0.0057 μs | 1.492 μs | 1.513 μs | 1.510 μs |  1.01 |    0.01 |   1,210 B |         - |          NA |
+|                              |                     |           |          |          |           |           |          |          |          |       |         |           |           |             |
+| **TryGetValueRead**              | **.NET 10.0**           | **.NET 10.0** | **HalfMiss** | **1.248 μs** | **0.0053 μs** | **0.0078 μs** | **1.237 μs** | **1.266 μs** | **1.258 μs** |  **1.00** |    **0.00** |   **1,003 B** |         **-** |          **NA** |
+| ValueRefOrNullRefRead        | .NET 10.0           | .NET 10.0 | HalfMiss | 1.224 μs | 0.0030 μs | 0.0044 μs | 1.214 μs | 1.234 μs | 1.229 μs |  0.98 |    0.01 |   1,000 B |         - |          NA |
+| TryGetValueThenIndexerUpdate | .NET 10.0           | .NET 10.0 | HalfMiss | 2.162 μs | 0.0083 μs | 0.0122 μs | 2.137 μs | 2.178 μs | 2.175 μs |  1.73 |    0.01 |   6,042 B |         - |          NA |
+| ValueRefOrNullRefUpdate      | .NET 10.0           | .NET 10.0 | HalfMiss | 1.239 μs | 0.0064 μs | 0.0094 μs | 1.220 μs | 1.265 μs | 1.248 μs |  0.99 |    0.01 |   1,003 B |         - |          NA |
+|                              |                     |           |          |          |           |           |          |          |          |       |         |           |           |             |
+| TryGetValueRead              | MediumRun-.NET 11.0 | .NET 11.0 | HalfMiss | 1.209 μs | 0.0051 μs | 0.0072 μs | 1.197 μs | 1.221 μs | 1.216 μs |  1.00 |    0.00 |     989 B |         - |          NA |
+| ValueRefOrNullRefRead        | MediumRun-.NET 11.0 | .NET 11.0 | HalfMiss | 1.224 μs | 0.0087 μs | 0.0121 μs | 1.209 μs | 1.257 μs | 1.244 μs |  1.01 |    0.01 |     986 B |         - |          NA |
+| TryGetValueThenIndexerUpdate | MediumRun-.NET 11.0 | .NET 11.0 | HalfMiss | 2.090 μs | 0.0082 μs | 0.0115 μs | 2.067 μs | 2.109 μs | 2.104 μs |  1.73 |    0.01 |   6,638 B |         - |          NA |
+| ValueRefOrNullRefUpdate      | MediumRun-.NET 11.0 | .NET 11.0 | HalfMiss | 1.231 μs | 0.0071 μs | 0.0105 μs | 1.211 μs | 1.248 μs | 1.243 μs |  1.02 |    0.01 |     989 B |         - |          NA |
+
+### ValueRefLargeLookupBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| TryGetValueRead | 1.622 μs | 1.584 μs | 0.98 | - → - | 1,219 B → 1,216 B |
+| ValueRefOrNullRefRead | 1.631 μs | 1.571 μs | 0.96 | - → - | 1,206 B → 1,210 B |
+| TryGetValueThenIndexerUpdate | 3.434 μs | 3.306 μs | 0.96 | - → - | 3,217 B → 3,268 B |
+| ValueRefOrNullRefUpdate | 1.699 μs | 1.610 μs | 0.95 | - → - | 1,214 B → 1,215 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.57 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method                       | Job                 | Runtime   | Mean     | Error     | StdDev    | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|----------------------------- |-------------------- |---------- |---------:|----------:|----------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
+| TryGetValueRead              | .NET 10.0           | .NET 10.0 | 1.622 μs | 0.0126 μs | 0.0188 μs | 1.593 μs | 1.654 μs | 1.647 μs |  1.00 |    0.00 |   1,219 B |         - |          NA |
+| ValueRefOrNullRefRead        | .NET 10.0           | .NET 10.0 | 1.631 μs | 0.0069 μs | 0.0104 μs | 1.609 μs | 1.649 μs | 1.642 μs |  1.01 |    0.01 |   1,206 B |         - |          NA |
+| TryGetValueThenIndexerUpdate | .NET 10.0           | .NET 10.0 | 3.434 μs | 0.0251 μs | 0.0352 μs | 3.384 μs | 3.491 μs | 3.473 μs |  2.12 |    0.03 |   3,217 B |         - |          NA |
+| ValueRefOrNullRefUpdate      | .NET 10.0           | .NET 10.0 | 1.699 μs | 0.0085 μs | 0.0122 μs | 1.679 μs | 1.719 μs | 1.715 μs |  1.05 |    0.01 |   1,214 B |         - |          NA |
+|                              |                     |           |          |           |           |          |          |          |       |         |           |           |             |
+| TryGetValueRead              | MediumRun-.NET 11.0 | .NET 11.0 | 1.584 μs | 0.0080 μs | 0.0118 μs | 1.562 μs | 1.606 μs | 1.597 μs |  1.00 |    0.00 |   1,216 B |         - |          NA |
+| ValueRefOrNullRefRead        | MediumRun-.NET 11.0 | .NET 11.0 | 1.571 μs | 0.0046 μs | 0.0069 μs | 1.559 μs | 1.583 μs | 1.580 μs |  0.99 |    0.01 |   1,210 B |         - |          NA |
+| TryGetValueThenIndexerUpdate | MediumRun-.NET 11.0 | .NET 11.0 | 3.306 μs | 0.0203 μs | 0.0297 μs | 3.265 μs | 3.355 μs | 3.344 μs |  2.09 |    0.02 |   3,268 B |         - |          NA |
+| ValueRefOrNullRefUpdate      | MediumRun-.NET 11.0 | .NET 11.0 | 1.610 μs | 0.0089 μs | 0.0125 μs | 1.596 μs | 1.643 μs | 1.625 μs |  1.02 |    0.01 |   1,215 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: adopted for the update path unconditionally; adopted for the read path **in proportion to how many
   fields the loop reads out of the slot**
 - Re-measured on x86-64-v4 (Zen 5). The update-path verdict is identical to the earlier x86-64-v3 (Zen 3) run;

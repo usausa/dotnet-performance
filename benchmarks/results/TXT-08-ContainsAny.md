@@ -1,5 +1,54 @@
 # TXT-08: ContainsAny vs IndexOfAny(...) >= 0
 
+## net11 / net10 re-verification (2026-11-18, HX 370)
+
+- Verdict: unchanged - ContainsAny is 0.67x / 0.85x / 0.98x of IndexOfAny (early / late / absent) on net11
+- IndexOfAny is 1.05-1.11x slower on net11; ContainsAny is unchanged
+
+### ContainsAnyBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| IndexOfAny_Early | 1.633 ns | 1.815 ns | 1.11 | - → - | 560 B → 587 B |
+| ContainsAny_Early | 1.231 ns | 1.224 ns | 0.99 | - → - | 401 B → 404 B |
+| IndexOfAny_Late | 4.100 ns | 4.304 ns | 1.05 | - → - | 557 B → 588 B |
+| ContainsAny_Late | 3.668 ns | 3.661 ns | 1.00 | - → - | 376 B → 396 B |
+| IndexOfAny_Absent | 3.685 ns | 3.862 ns | 1.05 | - → - | 560 B → 587 B |
+| ContainsAny_Absent | 3.673 ns | 3.766 ns | 1.03 | - → - | 396 B → 391 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.61 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method             | Job                 | Runtime   | Mean     | Error     | StdDev    | Median   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|------------------- |-------------------- |---------- |---------:|----------:|----------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
+| IndexOfAny_Early   | .NET 10.0           | .NET 10.0 | 1.633 ns | 0.0159 ns | 0.0223 ns | 1.624 ns | 1.615 ns | 1.706 ns | 1.660 ns |  1.00 |    0.00 |     560 B |         - |          NA |
+| ContainsAny_Early  | .NET 10.0           | .NET 10.0 | 1.231 ns | 0.0050 ns | 0.0075 ns | 1.229 ns | 1.219 ns | 1.247 ns | 1.242 ns |  0.75 |    0.01 |     401 B |         - |          NA |
+| IndexOfAny_Late    | .NET 10.0           | .NET 10.0 | 4.100 ns | 0.0109 ns | 0.0153 ns | 4.102 ns | 4.065 ns | 4.129 ns | 4.116 ns |  2.51 |    0.03 |     557 B |         - |          NA |
+| ContainsAny_Late   | .NET 10.0           | .NET 10.0 | 3.668 ns | 0.0137 ns | 0.0201 ns | 3.665 ns | 3.644 ns | 3.715 ns | 3.696 ns |  2.25 |    0.03 |     376 B |         - |          NA |
+| IndexOfAny_Absent  | .NET 10.0           | .NET 10.0 | 3.685 ns | 0.0102 ns | 0.0146 ns | 3.686 ns | 3.659 ns | 3.714 ns | 3.706 ns |  2.26 |    0.03 |     560 B |         - |          NA |
+| ContainsAny_Absent | .NET 10.0           | .NET 10.0 | 3.673 ns | 0.0168 ns | 0.0230 ns | 3.669 ns | 3.645 ns | 3.738 ns | 3.698 ns |  2.25 |    0.03 |     396 B |         - |          NA |
+|                    |                     |           |          |           |           |          |          |          |          |       |         |           |           |             |
+| IndexOfAny_Early   | MediumRun-.NET 11.0 | .NET 11.0 | 1.815 ns | 0.0071 ns | 0.0097 ns | 1.812 ns | 1.800 ns | 1.841 ns | 1.826 ns |  1.00 |    0.00 |     587 B |         - |          NA |
+| ContainsAny_Early  | MediumRun-.NET 11.0 | .NET 11.0 | 1.224 ns | 0.0034 ns | 0.0048 ns | 1.224 ns | 1.216 ns | 1.233 ns | 1.231 ns |  0.67 |    0.00 |     404 B |         - |          NA |
+| IndexOfAny_Late    | MediumRun-.NET 11.0 | .NET 11.0 | 4.304 ns | 0.0401 ns | 0.0575 ns | 4.288 ns | 4.253 ns | 4.490 ns | 4.366 ns |  2.37 |    0.03 |     588 B |         - |          NA |
+| ContainsAny_Late   | MediumRun-.NET 11.0 | .NET 11.0 | 3.661 ns | 0.0101 ns | 0.0141 ns | 3.665 ns | 3.638 ns | 3.697 ns | 3.677 ns |  2.02 |    0.01 |     396 B |         - |          NA |
+| IndexOfAny_Absent  | MediumRun-.NET 11.0 | .NET 11.0 | 3.862 ns | 0.0099 ns | 0.0142 ns | 3.865 ns | 3.837 ns | 3.904 ns | 3.875 ns |  2.13 |    0.01 |     587 B |         - |          NA |
+| ContainsAny_Absent | MediumRun-.NET 11.0 | .NET 11.0 | 3.766 ns | 0.0853 ns | 0.1224 ns | 3.691 ns | 3.642 ns | 3.956 ns | 3.938 ns |  2.08 |    0.07 |     391 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: adopted (use ContainsAny whenever the position is not needed)
 - Re-measured on x86-64-v4 (Zen 5). The verdict is unchanged and **two rows that were noise on x86-64-v3
   (Zen 3) now resolve**, both in ContainsAny's favour or as a tie

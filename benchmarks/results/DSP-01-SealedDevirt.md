@@ -1,5 +1,45 @@
 # DSP-01: sealed devirtualization (single-impl interface call)
 
+## net11 / net10 re-verification (2026-11-18, HX 370)
+
+- Verdict: unchanged - conditional. Sealed against open through an interface is 1.00x on net11 (228.4 vs 229.6 ns, the same 84 B); the concrete sealed type is 0.96x (221.1 ns, 27 B)
+- The open form's 240.7 ns on net10 in this run (same code) is a placement difference, not a generation change
+
+### SealedDevirtBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| OpenInterface | 240.7 ns | 229.6 ns | 0.95 | - → - | 84 B → 84 B |
+| SealedInterface | 228.2 ns | 228.4 ns | 1.00 | - → - | 84 B → 84 B |
+| SealedConcrete | 221.4 ns | 221.1 ns | 1.00 | - → - | 27 B → 27 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 70.84 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method          | Job                 | Runtime   | Mean     | Error   | StdDev  | Median   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|---------------- |-------------------- |---------- |---------:|--------:|--------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
+| OpenInterface   | .NET 10.0           | .NET 10.0 | 240.7 ns | 3.19 ns | 4.47 ns | 239.6 ns | 235.6 ns | 252.5 ns | 247.3 ns |  1.00 |    0.00 |      84 B |         - |          NA |
+| SealedInterface | .NET 10.0           | .NET 10.0 | 228.2 ns | 5.42 ns | 7.95 ns | 224.0 ns | 219.1 ns | 239.8 ns | 237.2 ns |  0.95 |    0.04 |      84 B |         - |          NA |
+| SealedConcrete  | .NET 10.0           | .NET 10.0 | 221.4 ns | 0.37 ns | 0.50 ns | 221.3 ns | 220.3 ns | 222.6 ns | 222.0 ns |  0.92 |    0.02 |      27 B |         - |          NA |
+|                 |                     |           |          |         |         |          |          |          |          |       |         |           |           |             |
+| OpenInterface   | MediumRun-.NET 11.0 | .NET 11.0 | 229.6 ns | 6.22 ns | 9.12 ns | 226.3 ns | 217.6 ns | 240.7 ns | 239.5 ns |  1.00 |    0.00 |      84 B |         - |          NA |
+| SealedInterface | MediumRun-.NET 11.0 | .NET 11.0 | 228.4 ns | 6.87 ns | 9.63 ns | 234.2 ns | 217.2 ns | 241.7 ns | 238.6 ns |  1.00 |    0.06 |      84 B |         - |          NA |
+| SealedConcrete  | MediumRun-.NET 11.0 | .NET 11.0 | 221.1 ns | 0.46 ns | 0.67 ns | 221.0 ns | 219.9 ns | 222.7 ns | 222.0 ns |  0.96 |    0.04 |      27 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: conditional
 - Via interface reference, sealed vs open measures equal (220.7 vs 221.9 ns, CIs overlap, code size 84 B both)
 - Disassembly shows why: **PGO's guarded devirtualization already inlines the body behind a type guard on the interface path** - each iteration reloads the field and compares the method table (`cmp [rcx], MT`), and on match runs the inlined add; the guard predicts perfectly, so sealed adds nothing on top

@@ -1,5 +1,59 @@
 # MEM-05: Struct layout (field order, padding, LayoutKind)
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged - every layout runs at the same time on both generations (sequential 12.86-12.88 μs, scattered 1.02-1.03x)
+
+### StructLayoutBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| SequentialPadded | 12,888.621 ns | 12,855.925 ns | 1.00 | - → - | 65 B → 65 B |
+| SequentialPacked | 12,877.047 ns | 12,869.622 ns | 1.00 | - → - | 65 B → 65 B |
+| SequentialAuto | 12,882.365 ns | 12,868.339 ns | 1.00 | - → - | 65 B → 65 B |
+| ScatteredPadded | 13,190.589 ns | 13,189.642 ns | 1.00 | - → - | 93 B → 93 B |
+| ScatteredPacked | 13,143.739 ns | 13,157.844 ns | 1.00 | - → - | 93 B → 93 B |
+| ScatteredAuto | 13,139.899 ns | 13,159.525 ns | 1.00 | - → - | 93 B → 93 B |
+| ByValuePadded | 1.263 ns | 1.225 ns | 0.97 | - → - | 102 B → 108 B |
+| ByValuePacked | 1.388 ns | 1.376 ns | 0.99 | - → - | 118 B → 124 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.79 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method           | Job                 | Runtime   | Mean          | Error      | StdDev     | Min           | Max           | P90           | Ratio | Code Size | Allocated | Alloc Ratio |
+|----------------- |-------------------- |---------- |--------------:|-----------:|-----------:|--------------:|--------------:|--------------:|------:|----------:|----------:|------------:|
+| SequentialPadded | .NET 10.0           | .NET 10.0 | 12,888.621 ns | 15.9028 ns | 23.8026 ns | 12,851.143 ns | 12,947.244 ns | 12,925.705 ns | 1.000 |      65 B |         - |          NA |
+| SequentialPacked | .NET 10.0           | .NET 10.0 | 12,877.047 ns | 23.7944 ns | 34.8775 ns | 12,832.123 ns | 12,959.814 ns | 12,920.293 ns | 0.999 |      65 B |         - |          NA |
+| SequentialAuto   | .NET 10.0           | .NET 10.0 | 12,882.365 ns | 12.5803 ns | 17.6358 ns | 12,844.682 ns | 12,926.546 ns | 12,902.952 ns | 1.000 |      65 B |         - |          NA |
+| ScatteredPadded  | .NET 10.0           | .NET 10.0 | 13,190.589 ns | 35.2757 ns | 48.2857 ns | 13,119.278 ns | 13,346.983 ns | 13,247.562 ns | 1.023 |      93 B |         - |          NA |
+| ScatteredPacked  | .NET 10.0           | .NET 10.0 | 13,143.739 ns | 31.0639 ns | 44.5509 ns | 13,051.773 ns | 13,225.563 ns | 13,201.572 ns | 1.020 |      93 B |         - |          NA |
+| ScatteredAuto    | .NET 10.0           | .NET 10.0 | 13,139.899 ns | 32.3572 ns | 46.4058 ns | 13,055.170 ns | 13,259.422 ns | 13,186.956 ns | 1.019 |      93 B |         - |          NA |
+| ByValuePadded    | .NET 10.0           | .NET 10.0 |      1.263 ns |  0.0167 ns |  0.0250 ns |      1.200 ns |      1.302 ns |      1.289 ns | 0.000 |     102 B |         - |          NA |
+| ByValuePacked    | .NET 10.0           | .NET 10.0 |      1.388 ns |  0.0726 ns |  0.1087 ns |      1.254 ns |      1.518 ns |      1.513 ns | 0.000 |     118 B |         - |          NA |
+|                  |                     |           |               |            |            |               |               |               |       |           |           |             |
+| SequentialPadded | MediumRun-.NET 11.0 | .NET 11.0 | 12,855.925 ns | 21.1530 ns | 30.3370 ns | 12,810.941 ns | 12,928.970 ns | 12,899.824 ns | 1.000 |      65 B |         - |          NA |
+| SequentialPacked | MediumRun-.NET 11.0 | .NET 11.0 | 12,869.622 ns | 16.2714 ns | 23.8504 ns | 12,832.510 ns | 12,920.163 ns | 12,897.599 ns | 1.001 |      65 B |         - |          NA |
+| SequentialAuto   | MediumRun-.NET 11.0 | .NET 11.0 | 12,868.339 ns | 15.1216 ns | 22.1651 ns | 12,833.177 ns | 12,916.443 ns | 12,896.181 ns | 1.001 |      65 B |         - |          NA |
+| ScatteredPadded  | MediumRun-.NET 11.0 | .NET 11.0 | 13,189.642 ns | 47.7780 ns | 71.5119 ns | 13,120.126 ns | 13,388.902 ns | 13,319.208 ns | 1.026 |      93 B |         - |          NA |
+| ScatteredPacked  | MediumRun-.NET 11.0 | .NET 11.0 | 13,157.844 ns | 39.4146 ns | 57.7735 ns | 13,076.657 ns | 13,323.738 ns | 13,216.408 ns | 1.023 |      93 B |         - |          NA |
+| ScatteredAuto    | MediumRun-.NET 11.0 | .NET 11.0 | 13,159.525 ns | 36.2245 ns | 51.9521 ns | 13,058.694 ns | 13,281.920 ns | 13,218.378 ns | 1.024 |      93 B |         - |          NA |
+| ByValuePadded    | MediumRun-.NET 11.0 | .NET 11.0 |      1.225 ns |  0.0320 ns |  0.0479 ns |      1.105 ns |      1.324 ns |      1.278 ns | 0.000 |     108 B |         - |          NA |
+| ByValuePacked    | MediumRun-.NET 11.0 | .NET 11.0 |      1.376 ns |  0.0758 ns |  0.1135 ns |      1.234 ns |      1.510 ns |      1.500 ns | 0.000 |     124 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: **conditional. Both axes of this pattern are microarchitecture dependent, and they can point in
   opposite directions for the same type** - the sections below give the mechanism for each and what to weigh
   when choosing a size

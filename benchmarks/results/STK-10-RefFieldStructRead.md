@@ -1,5 +1,48 @@
 # STK-10: ref field cursor for field-granular structured reads
 
+## net11 / net10 re-verification (2026-11-19, HX 370)
+
+- Verdict: unchanged - adopted, stronger on net11. The ref-field reader is 0.68x of inline index arithmetic on net11 (514.4 vs 757.0 ns) against 0.80x on net10; it got 0.84x faster on net11 (613.2 → 514.4 ns)
+- The slice reader stays 0.86x on both generations
+
+### RefFieldStructReadBenchmark
+
+net10 → net11 per row:
+
+| Method | net10 | net11 | net11/net10 | Alloc net10 → net11 | Code net10 → net11 |
+|---|---|---|---|---|---|
+| ParseInlineIndex | 768.1 ns | 757.0 ns | 0.99 | - → - | 163 B → 162 B |
+| ParseSpanReader | 759.5 ns | 743.3 ns | 0.98 | - → - | 153 B → 156 B |
+| ParseSliceReader | 658.2 ns | 652.0 ns | 0.99 | - → - | 128 B → 137 B |
+| ParseRefFieldReader | 613.2 ns | 514.4 ns | 0.84 | - → - | 111 B → 108 B |
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen AI 9 HX 370 w/ Radeon 890M 2.00GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 95.62 GB Total, 69.79 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+  .NET 10.0           : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v4
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v4
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method              | Job                 | Runtime   | Mean     | Error    | StdDev   | Min      | Max      | P90      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|-------------------- |-------------------- |---------- |---------:|---------:|---------:|---------:|---------:|---------:|------:|--------:|----------:|----------:|------------:|
+| ParseInlineIndex    | .NET 10.0           | .NET 10.0 | 768.1 ns |  1.51 ns |  2.26 ns | 764.6 ns | 772.6 ns | 771.5 ns |  1.00 |    0.00 |     163 B |         - |          NA |
+| ParseSpanReader     | .NET 10.0           | .NET 10.0 | 759.5 ns |  1.24 ns |  1.82 ns | 756.1 ns | 762.5 ns | 761.6 ns |  0.99 |    0.00 |     153 B |         - |          NA |
+| ParseSliceReader    | .NET 10.0           | .NET 10.0 | 658.2 ns |  1.24 ns |  1.82 ns | 655.2 ns | 660.9 ns | 660.4 ns |  0.86 |    0.00 |     128 B |         - |          NA |
+| ParseRefFieldReader | .NET 10.0           | .NET 10.0 | 613.2 ns |  1.18 ns |  1.66 ns | 610.6 ns | 617.1 ns | 615.7 ns |  0.80 |    0.00 |     111 B |         - |          NA |
+|                     |                     |           |          |          |          |          |          |          |       |         |           |           |             |
+| ParseInlineIndex    | MediumRun-.NET 11.0 | .NET 11.0 | 757.0 ns |  0.87 ns |  1.25 ns | 754.9 ns | 759.7 ns | 758.6 ns |  1.00 |    0.00 |     162 B |         - |          NA |
+| ParseSpanReader     | MediumRun-.NET 11.0 | .NET 11.0 | 743.3 ns | 10.60 ns | 15.86 ns | 724.9 ns | 764.2 ns | 760.5 ns |  0.98 |    0.02 |     156 B |         - |          NA |
+| ParseSliceReader    | MediumRun-.NET 11.0 | .NET 11.0 | 652.0 ns |  1.07 ns |  1.60 ns | 649.1 ns | 655.7 ns | 653.8 ns |  0.86 |    0.00 |     137 B |         - |          NA |
+| ParseRefFieldReader | MediumRun-.NET 11.0 | .NET 11.0 | 514.4 ns |  1.03 ns |  1.55 ns | 511.4 ns | 517.4 ns | 516.0 ns |  0.68 |    0.00 |     108 B |         - |          NA |
+
+## Earlier record
+
 - Verdict: adopted
 - Re-measured on x86-64-v4 (Zen 5). Same ranking as the earlier x86-64-v3 (Zen 3) run, and the code sizes are
   byte for byte identical on both machines (163 / 153 / 128 / 111 B)

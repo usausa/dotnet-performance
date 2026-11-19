@@ -112,7 +112,7 @@
 | [TXT-03](#-txt-03-try-パターンによる例外回避) | Try パターン | 例外を制御フローに使わない | ✅ | [検証済](benchmarks/results/TXT-03-TryPattern.md) |
 | [TXT-04](#-txt-04-バイト列トークンの直接判定) | バイト列トークン直接判定 | string 化せず u8/uint で判定 | ✅ | [検証済](benchmarks/results/TXT-04-TokenMatch.md) |
 | [TXT-05](#-txt-05-utf8trywrite-による-utf-8-直接整形) | Utf8.TryWrite | UTF-8 補間の Span 直接書き込み | ✅ | [検証済](benchmarks/results/TXT-05-Utf8TryWrite.md) |
-| [TXT-06](#-txt-06-ascii-特化比較) | ASCII 特化比較 | Ascii クラスによる大小無視処理 | ✅ | [検証済](benchmarks/results/TXT-06-Ascii.md) |
+| [TXT-06](#-txt-06-ascii-特化比較) | ASCII 特化比較 | 大小無視比較(string は string.Equals、byte 列は Ascii) | ✅ | [検証済](benchmarks/results/TXT-06-Ascii.md) |
 | [TXT-07](#-txt-07-stringcreate--tryformat--ispanformattable) | string.Create / TryFormat | 文字列生成のゼロアロケーション化 | ✅ | [検証済](benchmarks/results/TXT-07-StringCreate.md) |
 | [TXT-08](#-txt-08-searchvaluest) | SearchValues\<T\> | 多数候補探索の SIMD 最適化 | ✅ | [検証済](benchmarks/results/TXT-08-SearchValues.md) |
 | [TXT-09](#-txt-09-固定長整形の応用イディオム) | 固定長整形の応用 | TryFormat + Fill・ベクトル化トリム | ✅ | [検証済](benchmarks/results/TXT-09-FixedFieldFormat.md) |
@@ -2844,7 +2844,7 @@ for (var i = 0; i < span.Length; i++)
 - 検索は `Dictionary` 比 2〜4 倍高速(1024 件)。ただし**構築は 15〜20 倍遅く**割り当ても大きい — 起動時に一度だけ構築して読み続ける用途限定
 - キー集合によっては検索も逆転する(実測例: enum 名 64 件で Dictionary より 1.15〜1.31 倍遅い)。採用前に実データで計測する
 
-**net11 での再検証(net11 / net10、x86-64-v4):** 構築は net11 でも安くならない。`Dictionary` に対する構築比は net10 の 9.4 / 7.6 / 5.4 倍に対して net11 は 10.7 / 8.3 / 5.5 倍(16 / 256 / 1024 件)で、確保は同じバイト数。件数の分かる配列から作る形では net11 の事前サイズ確保(#128300)は効かず、採用条件は変わらない。→ [測定結果](benchmarks/results/COL-02-FrozenCondition.md)
+**net11 での再検証(net11 / net10、x86-64-v4):** 構築は net11 でも安くならない。`Dictionary` に対する構築比は net10 の 9.4 / 7.6 / 5.4 倍に対して net11 は 10.7 / 8.3 / 5.5 倍(16 / 256 / 1024 件)で、確保は同じバイト数。net11 の事前サイズ確保(#128300)が効くのは、件数の分かる `KeyValuePair` の列をセレクタなしで渡す形だけ(4,096 件で 803 → 495 KB、0.88 倍)で、セレクタ付きの形は net10 から既に同じ確保量、件数の分からない列挙には効かない。採用条件は変わらない。→ [測定結果](benchmarks/results/COL-02-FrozenCondition.md)
 
 **実測結果(net10 / x86-64-v4、string キー、非インターンのプローブ):**
 
@@ -3290,22 +3290,22 @@ if (Utf8.TryWrite(destination, $"id={id}&name={name}&ts={timestamp}", out var wr
 
 ### 🔤 TXT-06: ASCII 特化比較
 
-**目的:** ASCII 前提が保証できるトークン(HTTP ヘッダ名等)の大文字小文字無視処理を、Unicode 対応の汎用実装から ASCII 特化(.NET 8 の `Ascii` クラス)へ置き換える。
+**目的:** ASCII 前提が保証できるトークン(HTTP ヘッダ名等)の大文字小文字無視比較で、入力の形(string / byte 列)に合った序数比較 API を選ぶ。
 
-**効果(実測、net10 / x86-64-v4、ヘッダ名 8 ペアの大小無視比較):**
+**効果(実測、net11 / net10、x86-64-v4、ヘッダ名 8 ペアの大小無視比較):**
 
-- `Ascii.EqualsIgnoreCase`(byte 列同士)は `string.Equals(OrdinalIgnoreCase)` 比 **0.76 倍**。byte のままで比較でき、事前の string 化自体も不要になる(実質の差はさらに大きい)
-- 手書き `| 0x20` 正規化比較は 0.59 倍と最速だが、`@` と `` ` `` など記号ペアを誤同一視する罠がある
+- **net11 で逆転:** `string.Equals(OrdinalIgnoreCase)` が 57.0 → 22.1 ns に高速化し、`Ascii.EqualsIgnoreCase`(byte 列同士)は同比 **2.16 倍**、手書き `| 0x20` 正規化比較も 1.47 倍で、どちらも速くならない。net10 では従来どおり Ascii 0.77 倍・手書き 0.57 倍
+- 入力が string なら素の `string.Equals(OrdinalIgnoreCase)` を使う。`Ascii` は入力が既に byte 列(受信した UTF-8 ヘッダ等)で、string 化を省ける場合に使う。手書き `| 0x20` は `@` と `` ` `` など記号ペアを誤同一視する罠がある
 
 **AOT:** ✅ 問題なし
 
 **実装例:**
 
 ```csharp
-// 既定: Ascii クラス(.NET 8+。byte/char 混在オーバーロードもある)
-if (Ascii.EqualsIgnoreCase(headerName, "content-type"u8)) { ... }
-
-// 英字のみ大小が異なる閉じたトークン集合に限り、| 0x20 正規化も可
+// string 入力: 素の string.Equals(net11 で最速)
+if (string.Equals(headerName, "content-type", StringComparison.OrdinalIgnoreCase)) { ... }
+// byte 列入力: string 化せず Ascii で比較(.NET 8+。byte/char 混在オーバーロードもある)
+if (Ascii.EqualsIgnoreCase(headerBytes, "content-type"u8)) { ... }
 ```
 
 **ユースケース:** HTTP ヘッダ・プロトコルフィールドの判定、`Ascii.ToLowerInPlace` 等による正規化、`char.IsAsciiDigit` 系での分類。
