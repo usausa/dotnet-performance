@@ -4,6 +4,7 @@
 
 - Verdict: unchanged - Environment.TickCount64 is still the cheapest timestamp (0.09x of DateTime.UtcNow on net11)
 - **TickCount64 is 1.39x slower on net11** (1.33 → 1.85 ns, disjoint intervals, code 63 → 102 B); DateTime.UtcNow and Stopwatch are unchanged
+- Re-run (2026-11-19): reproduced at 1.41x (1.20 → 1.69 ns). net10 calls GetTickCount64 directly; net11 calls a function that writes the counter through a pointer and then scales it (mulx + shr), which is the 39 B of extra code
 
 ### TimestampBenchmark
 

@@ -60,7 +60,7 @@ public static int GetIndex(ReadOnlySpan<char> name)
 
 **Why these three tiers:**
 
-- **≤ 4 entries:** a plain switch compiles to **exactly the same code as the Equals chain**, so there is nothing to gain. On span input the chain is marginally faster
+- **≤ 4 entries:** a plain switch compiles to **exactly the same code as the Equals chain**, so there is nothing to gain. On span input the chain was marginally faster on net10; on net11 the two compile to the same size and the gap is gone
 - **5-64 entries:** Roslyn emits length bucketing plus character tests (two levels of jump table at 64), and **never reads every character**. It matches the hand-written sampling hash while the generated code stays far simpler
 - **> 64 entries:** this is where Roslyn switches to an FNV-1a hash **over every character** plus a binary search over the hash values. The hand-written sampling form (length + 3 characters, no loop) earns its place from here on
 

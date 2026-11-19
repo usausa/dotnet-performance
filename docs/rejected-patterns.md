@@ -282,9 +282,9 @@ A u8 literal does have the advantage that the table address becomes a link-time 
 
 | Shape | string / array | `ReadOnlySpan<char>` |
 |---|---|---|
-| `prefix.Length < path.Length ? path[prefix.Length] : -1` (**index taken from another sequence's Length**) | **Eliminated** (22 B, no RNGCHKFAIL) | **Kept** (48 B, `cmp/jae` + `CORINFO_HELP_RNGCHKFAIL` + a stack frame) |
+| `prefix.Length < path.Length ? path[prefix.Length] : -1` (**index taken from another sequence's Length**) | **Eliminated** (22 B, no RNGCHKFAIL) | **Kept** on net10 (48 B, `cmp/jae` + `CORINFO_HELP_RNGCHKFAIL` + a stack frame). **Eliminated** on net11 (26 B) |
 
-**With the very same guard, only the Span keeps its bounds check.** The guard and the check are the same two-register compare, yet the JIT does not merge them for Span. The time cost is core-dependent — 1.09x on x86-64-v4 (2.05x on x86-64-v3) — but **the instruction sequences are identical on both machines**. On a hot path that indexes by another sequence's length, take a string / array instead of a Span, or derive the index from the sequence's own `Length`.
+**With the very same guard, only the Span keeps its bounds check.** The guard and the check are the same two-register compare, yet the JIT does not merge them for Span. The time cost is core-dependent — 1.09x on x86-64-v4 (2.05x on x86-64-v3) — but **the instruction sequences are identical on both machines**. On a hot path that indexes by another sequence's length, take a string / array instead of a Span, or derive the index from the sequence's own `Length`. **On net11 the Span loses the check too** (26 B, the same shape as string / array; 1.05x of string), so this workaround only matters while net10 or earlier is a target.
 
 `switch (span.Length) { 4 => span[0] + span[1] + span[2] + span[3], _ => -1 }` is **check-free** from .NET 10 on, the same as the `if (span.Length == 4)` guard (32 B vs 31 B, equivalent instruction sequences). Formatting and parsing code that branches on length may use switch.
 

@@ -3,7 +3,7 @@
 ## net11 / net10 re-verification (2026-11-18, HX 370)
 
 - Verdict: unchanged - adopted (conditional)
-- The pipe pump is 1.91x of MemoryStream on net10 and 2.12x on net11 (the pipe itself is 1.12x slower on net11)
+- The pipe pump is 1.9-2.1x of MemoryStream on both generations
 - Allocation unchanged: 128.2 KB against 1.8-1.9 KB
 
 ### PipelinesBenchmark

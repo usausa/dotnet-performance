@@ -4,6 +4,7 @@
 
 - Verdict: unchanged. Pooled segments 0.32x / 0.31x and PipeReader 0.32x / 0.33x of MemoryStream + ToArray on net10 / net11; allocation identical
 - PipeReader is 1.06x slower on net11 (55.1 → 58.4 μs)
+- Re-run (2026-11-19): reproduced at 1.06x (55.0 → 58.6 μs)
 
 ### StreamSequenceBenchmark
 

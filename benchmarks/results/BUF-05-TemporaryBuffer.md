@@ -4,6 +4,7 @@
 
 - Verdict: unchanged - adopted. The pool path is still 0.12x of `new byte[4096]` on net11 (6.83 vs 58.1 ns)
 - **`ArrayPool<byte>.Shared` Rent/Return is 1.26-1.31x slower on net11** (5.25 → 6.87 ns at 64 B, 5.53 → 6.95 ns at 4 KB, disjoint intervals; code 4.0 → 5.1 KB). TemporaryBuffer's pool path follows it (5.22 → 6.83 ns); its 64 B stack path does not (2.64 ns)
+- Re-run (2026-11-19, second process): reproduced. Rent/Return 1.30x at 64 B (5.40 → 7.01 ns) and 1.29x at 4 KB (5.40 → 6.95 ns), TemporaryBuffer pool path 1.39x. The net11 code is larger in both runs (5.1-5.6 KB against 4.0-4.2 KB), so this is a library-side change
 
 ### TemporaryBufferBenchmark
 

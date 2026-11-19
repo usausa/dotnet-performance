@@ -4,7 +4,7 @@
 
 - Verdict: unchanged - adopted
 - The single reader/writer options still help: 0.83x of the default on net10 and 0.92x on net11
-- Every channel path is slower on net11: unbounded default 1.02x, single reader/writer 1.14x, bounded 1.24x (allocation unchanged at 3-6 B per item)
+- Bounded is slower on net11 in both runs (1.24x / 1.27x in the re-run); single reader/writer 1.14x / 1.08x and unbounded default 1.02x / 1.03x (allocation unchanged at 3-6 B per item)
 
 ### ChannelsBenchmark
 

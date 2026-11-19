@@ -4,6 +4,7 @@
 
 - Verdict: unchanged - adopted (cost awareness)
 - await foreach over synchronously completing items is 13.3x of foreach on net10 and 15.6x on net11 (7.21 → 8.43 ns per item)
+- Re-run (2026-11-19): reproduced at 1.18x (7.19 → 8.52 ns per item)
 
 ### AsyncEnumerableBenchmark
 

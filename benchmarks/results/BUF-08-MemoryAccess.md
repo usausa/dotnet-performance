@@ -3,7 +3,6 @@
 ## net11 / net10 re-verification (2026-11-19, HX 370)
 
 - Verdict: unchanged - adopted
-- **Resolving `.Span` per element got worse on net11:** 3.26x → **3.87x** of the hoisted span (2.51 → 2.88 μs, 1.15x slower, disjoint intervals)
 - Slicing `Memory<T>` per chunk is 1.09x (array backed) and 1.16x (manager backed) of the hoisted span on net11 (1.07x / 1.08x on net10)
 - TryGetArraySegment stays 0.89-0.90x of ToArray on both generations
 

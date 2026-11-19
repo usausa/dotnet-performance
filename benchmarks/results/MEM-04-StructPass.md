@@ -2,8 +2,7 @@
 
 ## net11 / net10 re-verification (2026-11-18, HX 370)
 
-- Verdict: unchanged - adopted, and the gain grows on net11 for large structs: `in` against by-value is 0.99x / 0.85x / 0.90x / 0.52x / 0.50x / 0.32x at 8 / 16 / 32 / 64 / 128 / 256 B
-- By-value passing of 128 B and 256 B structs is 1.62x and 1.27x slower on net11 with the same code; 64 B by value got 0.86x
+- Verdict: unchanged - adopted. `in` stays at 1.0-1.4 ns at every size on both generations, while by-value at 256 B costs 3.0-4.1 ns
 
 ### StructPassBenchmark
 

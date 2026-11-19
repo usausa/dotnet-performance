@@ -3,7 +3,6 @@
 ## net11 / net10 re-verification (2026-11-19, HX 370)
 
 - Verdict: unchanged - adopted. The Vector128 byte shuffle stays the fastest at 0.31x of the scalar loop on net11 (0.28x on net10)
-- The shuffle forms are 1.07-1.10x slower on net11 (58.95 → 64.56 ns) and the arithmetic `Vector<T>` form 0.82x faster (103.6 → 85.0 ns, 0.40x of scalar), so the gap between them narrows from 1.76x to 1.32x
 
 ### VectorShuffleBenchmark
 

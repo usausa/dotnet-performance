@@ -282,9 +282,9 @@ u8 リテラルはテーブルのアドレスがリンク時定数になりル�
 
 | 形 | string / 配列 | `ReadOnlySpan<char>` |
 |---|---|---|
-| `prefix.Length < path.Length ? path[prefix.Length] : -1`(**別のシーケンスの Length を添字に使う**) | **消える**(22 B、RNGCHKFAIL なし) | **残る**(48 B、`cmp/jae` + `CORINFO_HELP_RNGCHKFAIL` + スタックフレーム) |
+| `prefix.Length < path.Length ? path[prefix.Length] : -1`(**別のシーケンスの Length を添字に使う**) | **消える**(22 B、RNGCHKFAIL なし) | net10 は**残る**(48 B、`cmp/jae` + `CORINFO_HELP_RNGCHKFAIL` + スタックフレーム)。net11 は**消える**(26 B) |
 
-**同じガードを書いても Span だけ境界チェックが残る。** ガードと境界チェックは同じ 2 レジスタの比較なのに JIT は Span では融合しない。時間への影響は x86-64-v4 で 1.09 倍(x86-64-v3 では 2.05 倍)とコア依存だが、**命令列の差は両機で同一**。ホットパスで「他のシーケンスの長さを添字に使う」なら、Span より string / 配列で受けるか、添字を自身の `Length` から導く形に直す。
+**同じガードを書いても Span だけ境界チェックが残る。** ガードと境界チェックは同じ 2 レジスタの比較なのに JIT は Span では融合しない。時間への影響は x86-64-v4 で 1.09 倍(x86-64-v3 では 2.05 倍)とコア依存だが、**命令列の差は両機で同一**。ホットパスで「他のシーケンスの長さを添字に使う」なら、Span より string / 配列で受けるか、添字を自身の `Length` から導く形に直す。**net11 では Span でもチェックが消える**(26 B、string / 配列と同じ形。string 比 1.05 倍)ため、この回避が要るのは net10 以前を対象にする間だけ。
 
 `switch (span.Length) { 4 => span[0] + span[1] + span[2] + span[3], _ => -1 }` は .NET 10 から `if (span.Length == 4)` ガードと同じく**チェックなし**(32 B vs 31 B で命令列も同等)。長さで分岐する整形・解析コードは switch で書いてよい。
 
