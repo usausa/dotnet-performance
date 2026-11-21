@@ -88,6 +88,7 @@ public static class Program
         StreamOverrideBenchmark.Verify();
         ReflectionConstructBenchmark.Verify();
         ReflectionAccessorBenchmark.Verify();
+        ReflectionGetterBenchmark.Verify();
         ScopeBoxingBenchmark.Verify();
         NegativeCacheBenchmark.Verify();
         SampledHashIndexBenchmark.Verify();
@@ -249,6 +250,7 @@ public static class Program
                 typeof(StreamOverrideBenchmark),
                 typeof(ReflectionConstructBenchmark),
                 typeof(ReflectionAccessorBenchmark),
+                typeof(ReflectionGetterBenchmark),
                 typeof(ScopeBoxingBenchmark),
                 typeof(NegativeCacheBenchmark),
                 typeof(SampledHashIndexBenchmark),

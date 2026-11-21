@@ -4214,11 +4214,12 @@ private static readonly ConstructorInvoker Invoker = ConstructorInvoker.Create(c
 var instance = Invoker.Invoke(boxedValue);
 ```
 
-**実測結果(net11 / x86-64-v4、JIT と NativeAOT):** 引数 1 個のコンストラクタは JIT で **9.43 ns・56 B → Invoker 5.25 ns・24 B(0.56 倍)→ 型つきデリゲート 3.21 ns・24 B(0.34 倍)**、NativeAOT で **18.0 ns・56 B → 15.4 ns・24 B(0.86 倍)→ 3.58 ns・24 B(0.20 倍)**。setter は JIT の `SetValue` が **6.40 ns・0 B**(CoreCLR は配列を作らない)、NativeAOT が **20.4 ns・32 B → 13.2 ns・0 B(0.65 倍)→ 3.71 ns・0 B(0.18 倍)**。どの形にも残る 24 B は生成したインスタンスそのもの(ベンチは引数を事前に箱へ入れてある)。別環境(Zen 3 機・実運用ライブラリの Native AOT)では、引数 16 個が **225.0 ns・264 B → 145.9 ns・112 B**、getter は変わらない(30.9 → 31.3 ns)。→ [測定結果](benchmarks/results/GEN-03-ReflectionInvoke.md)
+**実測結果(net11 / x86-64-v4、JIT と NativeAOT):** 引数 1 個のコンストラクタは JIT で **9.43 ns・56 B → Invoker 5.25 ns・24 B(0.56 倍)→ 型つきデリゲート 3.21 ns・24 B(0.34 倍)**、NativeAOT で **18.0 ns・56 B → 15.4 ns・24 B(0.86 倍)→ 3.58 ns・24 B(0.20 倍)**。setter は JIT の `SetValue` が **6.40 ns・0 B**(CoreCLR は配列を作らない)、NativeAOT が **20.4 ns・32 B → 13.2 ns・0 B(0.65 倍)→ 3.71 ns・0 B(0.18 倍)**。どの形にも残る 24 B は生成したインスタンスそのもの(ベンチは引数を事前に箱へ入れてある)。別環境(Zen 3 機)では、引数 16 個が **225.0 ns・264 B → 145.9 ns・112 B**、**getter は逆に悪くなる: `MethodInvoker` は `GetValue` より遅く(JIT で 10.97 → 12.78 ns、NativeAOT で 21.0 → 25.4 ns、どちらも 24 B)、効くのは型つきデリゲートだけ(3.04 ns / 6.64 ns、箱なし)**。→ [測定結果](benchmarks/results/GEN-03-ReflectionInvoke.md)
 
 **注意:**
 
 - 値型引数の箱は残る。完全に消すには `CreateDelegate<T>` の型つき経路か GEN-02(Source Generator)
+- **置き換える価値があるのは setter とコンストラクターだけ。** getter には消せる引数配列がないので `MethodInvoker` は層が増えるだけで、名前で実行時に引くプロパティは `CreateDelegate<T>` を使えない(プロパティの型がコンパイル時に決まらず、`MakeGenericMethod` は AOT で使えない)。setter は Invoker・getter は素の `GetValue` という反射アクセサーの形は、見落ちではなく正しい
 - `Invoker` 系は .NET 8 以降。`net8.0` を含む多ターゲットでは、コレクション式の `Span` 渡しでコンパイラが internal な `InlineArray` 型を生成し、DLL が 3〜4 KB 増える
 - 💥 包まなくなると `Type.Missing`・インデクサー・自作 `ConstructorInfo` などで例外の型が変わる。AOT の経路を JIT の経路(Emit 版は包まない)に揃える向きの変更として扱う
 

@@ -106,6 +106,31 @@ IterationCount=15  LaunchCount=2  WarmupCount=10
 | SetWithMethodInvoker | NativeAOT 11.0      | NativeAOT 11.0 | 13.152 ns | 0.1273 ns | 0.1784 ns | 12.944 ns | 13.581 ns | 13.482 ns |  0.65 |      - |         - |        0.00 |
 | SetWithTypedDelegate | NativeAOT 11.0      | NativeAOT 11.0 |  3.714 ns | 0.0427 ns | 0.0612 ns |  3.640 ns |  3.867 ns |  3.814 ns |  0.18 |      - |         - |        0.00 |
 
+## ReflectionGetterBenchmark, JIT and NativeAOT (AotHarness)
+
+```
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+AMD Ryzen 9 5900X 3.69GHz, 1 CPU, 24 logical and 12 physical cores
+Memory: 63.93 GB Total, 18.5 GB Available
+.NET SDK 11.0.100
+  [Host]              : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v3
+  MediumRun-.NET 11.0 : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v3
+  NativeAOT 11.0      : .NET 11.0.0, X64 NativeAOT x86-64-v3
+
+IterationCount=15  LaunchCount=2  WarmupCount=10  
+
+```
+| Method               | Job                 | Runtime        | Mean      | Error     | StdDev    | Min       | Max       | P90       | Ratio | RatioSD | Gen0   | Allocated | Alloc Ratio |
+|--------------------- |-------------------- |--------------- |----------:|----------:|----------:|----------:|----------:|----------:|------:|--------:|-------:|----------:|------------:|
+| GetWithGetValue      | MediumRun-.NET 11.0 | .NET 11.0      | 10.966 ns | 0.7661 ns | 1.1467 ns |  9.709 ns | 14.204 ns | 12.212 ns |  1.00 |    0.00 | 0.0014 |      24 B |        1.00 |
+| GetWithMethodInvoker | MediumRun-.NET 11.0 | .NET 11.0      | 12.778 ns | 0.6853 ns | 0.9828 ns | 10.709 ns | 14.119 ns | 13.779 ns |  1.18 |    0.14 | 0.0014 |      24 B |        1.00 |
+| GetWithTypedDelegate | MediumRun-.NET 11.0 | .NET 11.0      |  3.039 ns | 0.2208 ns | 0.3304 ns |  2.480 ns |  3.937 ns |  3.397 ns |  0.28 |    0.04 |      - |         - |        0.00 |
+|                      |                     |                |           |           |           |           |           |           |       |         |        |           |             |
+| GetWithGetValue      | NativeAOT 11.0      | NativeAOT 11.0 | 20.999 ns | 0.8626 ns | 1.2092 ns | 18.904 ns | 23.623 ns | 22.673 ns |  1.00 |    0.00 | 0.0014 |      24 B |        1.00 |
+| GetWithMethodInvoker | NativeAOT 11.0      | NativeAOT 11.0 | 25.413 ns | 1.0461 ns | 1.5658 ns | 21.914 ns | 28.221 ns | 26.915 ns |  1.21 |    0.10 | 0.0014 |      24 B |        1.00 |
+| GetWithTypedDelegate | NativeAOT 11.0      | NativeAOT 11.0 |  6.643 ns | 0.7344 ns | 1.0532 ns |  5.409 ns |  8.100 ns |  7.863 ns |  0.32 |    0.05 |      - |         - |        0.00 |
+
 ## Basis for the verdict
 
 1. **Time:** every step has disjoint intervals on both runtimes. The typed delegate is the clear winner under
@@ -117,5 +142,10 @@ IterationCount=15  LaunchCount=2  WarmupCount=10
 4. **Invoker versus delegate:** under NativeAOT the invoker recovers less than under JIT (0.86x against
    0.56x on the constructor), so the invoker is the fallback for dynamic signatures, not the default
 5. **Against the Zen 3 reference (NativeAOT):** same direction, smaller invoker gain - 0.86x against 0.64x on
-   the constructor and 0.65x against 0.51x on the setter. The sixteen-argument constructor and the getter are
-   not part of this benchmark
+   the constructor and 0.65x against 0.51x on the setter. The sixteen-argument constructor is not part of this
+   benchmark
+6. **The getter goes the other way:** `MethodInvoker` is *slower* than `PropertyInfo.GetValue` on both runtimes
+   (1.18x under JIT, 1.21x under NativeAOT) and the 24 B box for the returned value stays in every variant but
+   one. Only the typed delegate helps (0.28x / 0.32x, no box), and it needs the property type at compile time,
+   so a getter resolved by name at run time keeps `GetValue`. This is what makes the setter/getter asymmetry in
+   a reflection accessor correct rather than an oversight (getter table measured on the Zen 3 machine)

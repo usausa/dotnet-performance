@@ -18,6 +18,7 @@ public static class Program
         SpanSortComparerBenchmark.Verify();
         ReflectionConstructBenchmark.Verify();
         ReflectionAccessorBenchmark.Verify();
+        ReflectionGetterBenchmark.Verify();
         StaticAbstractCallBenchmark.Verify();
         TypeHashSourceBenchmark.Verify();
         TypeKeyBenchmark.Verify();

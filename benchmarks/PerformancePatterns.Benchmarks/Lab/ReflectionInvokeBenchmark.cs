@@ -129,6 +129,42 @@ public class ReflectionAccessorBenchmark
     }
 }
 
+[Config(typeof(BenchmarkConfig))]
+[MediumRunJob(RuntimeMoniker.Net11_0)]
+public class ReflectionGetterBenchmark
+{
+    private static readonly PropertyInfo Property = typeof(AccessorTarget).GetProperty(nameof(AccessorTarget.Value))!;
+
+    private static readonly MethodInvoker GetterInvoker = MethodInvoker.Create(Property.GetMethod!);
+
+    private static readonly Func<AccessorTarget, int> TypedGetter = Property.GetMethod!.CreateDelegate<Func<AccessorTarget, int>>();
+
+    private readonly AccessorTarget target = new(42);
+
+    // ❌ GetValue boxes the value it returns, and builds an argument array inside the runtime on AOT and Mono
+    [Benchmark(Baseline = true)]
+    public int GetWithGetValue() => (int)Property.GetValue(target)!;
+
+    // ✅ MethodInvoker takes no argument array, but still boxes the value
+    [Benchmark]
+    public int GetWithMethodInvoker() => (int)GetterInvoker.Invoke(target)!;
+
+    // ✅ A typed delegate built once - no boxing at all
+    [Benchmark]
+    public int GetWithTypedDelegate() => TypedGetter(target);
+
+    public static void Verify()
+    {
+        var benchmark = new ReflectionGetterBenchmark();
+        if ((benchmark.GetWithGetValue() != 42) ||
+            (benchmark.GetWithMethodInvoker() != 42) ||
+            (benchmark.GetWithTypedDelegate() != 42))
+        {
+            throw new InvalidOperationException("Verify failed. ReflectionGetter");
+        }
+    }
+}
+
 public sealed class AccessorTarget
 {
     public AccessorTarget()
